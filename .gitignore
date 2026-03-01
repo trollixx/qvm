@@ -1,0 +1,8 @@
+# Build artifacts
+*.exe
+
+# Claude Code
+.claude/settings.local.json
+
+# Visual Studio Code
+.vscode/

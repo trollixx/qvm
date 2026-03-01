@@ -1,0 +1,212 @@
+package repository
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestBuildURL_Qt68Plus_TwoLevel(t *testing.T) {
+	base := "https://download.qt.io/"
+	host := "windows_x86"
+
+	tests := []struct {
+		version string
+		major   int
+		want    string
+	}{
+		{
+			"6.8.0", 6,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_680/qt6_680/Updates.xml",
+		},
+		{
+			"6.8.3", 6,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/Updates.xml",
+		},
+		{
+			"6.10.0", 6,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6100/qt6_6100/Updates.xml",
+		},
+		{
+			"6.11.0", 6,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6110/qt6_6110/Updates.xml",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.version, func(t *testing.T) {
+			assert.Equal(t, tc.want, buildURL(base, host, tc.version, tc.major))
+		})
+	}
+}
+
+func TestBuildURL_Qt6Pre68_SingleLevel(t *testing.T) {
+	base := "https://download.qt.io/"
+	host := "windows_x86"
+
+	tests := []struct {
+		version string
+		major   int
+		want    string
+	}{
+		{
+			"6.7.3", 6,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_673/Updates.xml",
+		},
+		{
+			"6.5.3", 6,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_653/Updates.xml",
+		},
+		{
+			"6.2.0", 6,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_620/Updates.xml",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.version, func(t *testing.T) {
+			assert.Equal(t, tc.want, buildURL(base, host, tc.version, tc.major))
+		})
+	}
+}
+
+func TestBuildURL_Qt5_SingleLevel(t *testing.T) {
+	base := "https://download.qt.io/"
+	host := "windows_x86"
+
+	tests := []struct {
+		version string
+		major   int
+		want    string
+	}{
+		{
+			"5.15.18", 5,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_51518/Updates.xml",
+		},
+		{
+			"5.15.0", 5,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5150/Updates.xml",
+		},
+		{
+			"5.9.0", 5,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_59/Updates.xml",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.version, func(t *testing.T) {
+			assert.Equal(t, tc.want, buildURL(base, host, tc.version, tc.major))
+		})
+	}
+}
+
+func TestIsQt68Plus(t *testing.T) {
+	trueFor := []struct{ version string; major int }{
+		{"6.8.0", 6}, {"6.8.3", 6}, {"6.9.0", 6}, {"6.10.0", 6}, {"6.11.0", 6},
+	}
+	falseFor := []struct{ version string; major int }{
+		{"6.7.3", 6}, {"6.5.3", 6}, {"6.2.0", 6},
+		{"5.15.18", 5}, // Qt 5 always false
+	}
+
+	for _, tc := range trueFor {
+		assert.True(t, isQt68Plus(tc.version, tc.major), "%s should be Qt 6.8+", tc.version)
+	}
+	for _, tc := range falseFor {
+		assert.False(t, isQt68Plus(tc.version, tc.major), "%s should not be Qt 6.8+", tc.version)
+	}
+}
+
+func TestVersionToRepoStr(t *testing.T) {
+	tests := []struct {
+		version string
+		major   int
+		want    string
+	}{
+		{"6.10.0", 6, "6100"},
+		{"6.8.3", 6, "683"},
+		{"6.8.0", 6, "680"},
+		{"5.15.18", 5, "51518"},
+		{"5.15.0", 5, "5150"},
+		{"5.9.0", 5, "59"}, // Qt 5.9.0 special case: patch omitted
+	}
+	for _, tc := range tests {
+		t.Run(tc.version, func(t *testing.T) {
+			assert.Equal(t, tc.want, versionToRepoStr(tc.version, tc.major))
+		})
+	}
+}
+
+func TestMirrorList_URLsFor_TwoMirrors(t *testing.T) {
+	m := NewMirrorList(
+		"https://primary.example.com/",
+		[]string{"https://mirror1.example.com/"},
+	)
+	urls := m.URLsFor("6.8.3", 6)
+
+	require.Len(t, urls, 2, "expected primary + 1 fallback")
+	for _, u := range urls {
+		assert.True(t, strings.Contains(u, "qt6_683/qt6_683/Updates.xml"),
+			"URL %q should use two-level structure for Qt 6.8.3", u)
+	}
+	assert.Contains(t, urls[0], "primary.example.com")
+	assert.Contains(t, urls[1], "mirror1.example.com")
+}
+
+func TestExtractFolderNames(t *testing.T) {
+	html := `<html><body>
+		<a href="../">../</a>
+		<a href="qt6_683/">qt6_683/</a>
+		<a href="qt6_6100/">qt6_6100/</a>
+		<a href="qt5_51518/">qt5_51518/</a>
+		<a href="tools_qtcreator/">tools_qtcreator/</a>
+		<a href="http://external.com/path/ignored">external</a>
+	</body></html>`
+
+	got := extractFolderNames(html)
+
+	assert.Contains(t, got, "qt6_683")
+	assert.Contains(t, got, "qt6_6100")
+	assert.Contains(t, got, "qt5_51518")
+	assert.Contains(t, got, "tools_qtcreator")
+	// External URL with a path separator in the href should not appear.
+	for _, name := range got {
+		assert.False(t, strings.HasPrefix(name, "http"), "unexpected external URL %q", name)
+	}
+}
+
+func TestFolderToVersionInfo(t *testing.T) {
+	t.Run("valid folders", func(t *testing.T) {
+		tests := []struct {
+			folder  string
+			wantVer string
+			wantLTS bool
+		}{
+			{"qt6_683", "6.8.3", true},
+			{"qt6_6100", "6.10.0", false},
+			{"qt5_51518", "5.15.18", true},
+			{"qt5_59", "5.9.0", true},
+		}
+		for _, tc := range tests {
+			t.Run(tc.folder, func(t *testing.T) {
+				vi, ok := folderToVersionInfo(tc.folder)
+				require.True(t, ok, "expected ok=true for %q", tc.folder)
+				assert.Equal(t, tc.wantVer, vi.Version)
+				assert.Equal(t, tc.wantLTS, vi.IsLTS)
+			})
+		}
+	})
+
+	t.Run("rejected folders", func(t *testing.T) {
+		rejected := []string{
+			"qt6_680_wasm_singlethread", // extended variant
+			"tools_qtcreator",           // tools folder
+			"random_folder",             // unknown prefix
+		}
+		for _, folder := range rejected {
+			t.Run(folder, func(t *testing.T) {
+				_, ok := folderToVersionInfo(folder)
+				assert.False(t, ok, "expected ok=false for %q", folder)
+			})
+		}
+	})
+}
