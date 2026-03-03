@@ -70,3 +70,19 @@ func (c *Client) FetchBytes(ctx context.Context, url string) ([]byte, error) {
 	body, _, err := c.FetchWithETag(ctx, url, "")
 	return body, err
 }
+
+// Head performs an HTTP HEAD request and returns the status code.
+func (c *Client) Head(ctx context.Context, url string) (int, error) {
+	req, err := retryablehttp.NewRequest(http.MethodHead, url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("building HEAD request for %s: %w", url, err)
+	}
+	req = req.WithContext(ctx)
+
+	resp, err := c.inner.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("HEAD %s: %w", url, err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode, nil
+}

@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"sort"
 	"testing"
 	"time"
@@ -384,6 +387,72 @@ func TestParseRepoIndex_PackageArchivesURLs(t *testing.T) {
 
 	// The 5-part meta-package has no archives.
 	assert.Empty(t, vi.PackageArchives["qt.qt6.683.addons.qtcharts"])
+}
+
+// --- parseDirectoryListing ---
+
+func TestParseDirectoryListing_IsPreviewNotSet(t *testing.T) {
+	// parseDirectoryListing only parses folder names; IsPreview requires network
+	// probing and is not set at parse time.
+	html := `<html><body>
+		<a href="qt6_6110/">qt6_6110/</a>
+		<a href="qt6_683/">qt6_683/</a>
+		<a href="qt6_6100/">qt6_6100/</a>
+		<a href="qt5_51518/">qt5_51518/</a>
+	</body></html>`
+
+	versions, err := parseDirectoryListing([]byte(html))
+	require.NoError(t, err)
+
+	byVersion := map[string]bool{}
+	for _, vi := range versions {
+		byVersion[vi.Version] = vi.IsPreview
+	}
+
+	// No version should have IsPreview set from parsing alone.
+	assert.False(t, byVersion["6.11.0"], "IsPreview should not be set by parseDirectoryListing")
+	assert.False(t, byVersion["6.8.3"])
+	assert.False(t, byVersion["6.10.0"])
+	assert.False(t, byVersion["5.15.18"])
+}
+
+// --- probePreviewVersions with mock server ---
+
+func TestProbePreviewVersions(t *testing.T) {
+	// Set up a test HTTP server that returns 200 for released versions
+	// and 404 for preview versions.
+	released := map[string]bool{
+		"/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/Updates.xml":  true,
+		"/online/qtsdkrepository/windows_x86/desktop/qt6_6100/qt6_6100/Updates.xml": true,
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if released[r.URL.Path] {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	client := NewClient(10)
+	mirrors := NewMirrorList(srv.URL+"/", nil)
+	cache := &Cache{dir: t.TempDir()}
+	fetcher := NewMetadataFetcher(client, cache, mirrors)
+
+	versions := []QtVersionInfo{
+		{Version: "6.11.0", Major: 6},  // preview (404)
+		{Version: "6.10.0", Major: 6},  // released (200)
+		{Version: "6.8.3", Major: 6},   // released (200)
+		{Version: "5.15.18", Major: 5}, // pre-6.8, always not preview
+	}
+
+	fetcher.probePreviewVersions(context.Background(), versions)
+
+	assert.True(t, versions[0].IsPreview, "6.11.0 should be detected as preview")
+	assert.False(t, versions[1].IsPreview, "6.10.0 should not be preview")
+	assert.False(t, versions[2].IsPreview, "6.8.3 should not be preview")
+	assert.False(t, versions[3].IsPreview, "5.15.18 should not be preview (pre-6.8)")
 }
 
 // --- helpers ---

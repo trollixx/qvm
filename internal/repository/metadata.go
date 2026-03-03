@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/trollixx/qvm/pkg/qtmeta"
@@ -70,7 +72,73 @@ func (f *MetadataFetcher) FetchAllQtVersions(ctx context.Context) ([]QtVersionIn
 	if err != nil {
 		return nil, fmt.Errorf("fetching Qt version directory: %w", err)
 	}
-	return parseDirectoryListing(body)
+	versions, err := parseDirectoryListing(body)
+	if err != nil {
+		return nil, err
+	}
+
+	f.probePreviewVersions(ctx, versions)
+	return versions, nil
+}
+
+// probePreviewVersions checks each Qt 6.8+ version with a HEAD request to the
+// combined Updates.xml URL. Released versions have this file; unreleased/preview
+// versions return 404. Pre-6.8 versions are always considered released.
+func (f *MetadataFetcher) probePreviewVersions(ctx context.Context, versions []QtVersionInfo) {
+	// Collect indices of versions that need probing (Qt 6.8+ only).
+	var indices []int
+	for i, v := range versions {
+		if isQt68Plus(v.Version, v.Major) {
+			indices = append(indices, i)
+		}
+	}
+	if len(indices) == 0 {
+		return
+	}
+
+	// Bounded concurrency for HEAD requests.
+	const maxConcurrency = 8
+	sem := make(chan struct{}, maxConcurrency)
+	var wg sync.WaitGroup
+
+	for _, idx := range indices {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			if ctx.Err() != nil {
+				return
+			}
+
+			if f.isPreviewVersion(ctx, versions[i].Version, versions[i].Major) {
+				versions[i].IsPreview = true
+			}
+		}(idx)
+	}
+	wg.Wait()
+}
+
+// isPreviewVersion performs a HEAD request to the combined Updates.xml URL for
+// a Qt version. Returns true if the URL returns 404 (preview/unreleased).
+// For pre-6.8 versions, always returns false.
+func (f *MetadataFetcher) isPreviewVersion(ctx context.Context, version string, major int) bool {
+	if !isQt68Plus(version, major) {
+		return false
+	}
+
+	probeURL := f.mirrors.ProbeURL(version, major)
+	if probeURL == "" {
+		return false
+	}
+
+	status, err := f.client.Head(ctx, probeURL)
+	if err != nil {
+		// Network error — assume not preview (conservative).
+		return false
+	}
+	return status == http.StatusNotFound
 }
 
 // parseDirectoryListing parses an HTML directory page from the Qt repository

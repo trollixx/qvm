@@ -101,6 +101,20 @@ func isQt68Plus(version string, major int) bool {
 	return minor >= 8
 }
 
+// ProbeURL returns the combined Updates.xml URL used to detect whether a
+// version is released or preview. Released Qt 6.8+ versions have a combined
+// Updates.xml at qt6_XXXX/qt6_XXXX/Updates.xml; preview versions do not.
+// Returns "" for pre-6.8 versions.
+func (m *MirrorList) ProbeURL(version string, major int) string {
+	if !isQt68Plus(version, major) {
+		return ""
+	}
+	host := platformHost()
+	verStr := versionToRepoStr(version, major)
+	folder := fmt.Sprintf("qt%d_%s", major, verStr)
+	return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/%s/Updates.xml", m.primary, host, folder, folder)
+}
+
 // DirectoryURL returns the HTML directory listing URL for discovering available versions.
 // Deprecated: prefer DirectoryURLs which includes fallback mirrors.
 func (m *MirrorList) DirectoryURL() string {

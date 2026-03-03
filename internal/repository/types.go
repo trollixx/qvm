@@ -31,6 +31,7 @@ type QtVersionInfo struct {
 	Version      string    `json:"version"`
 	Major        int       `json:"major"`
 	IsLTS        bool      `json:"is_lts,omitempty"`
+	IsPreview    bool      `json:"is_preview,omitempty"`
 	ReleaseDate  time.Time `json:"release_date,omitempty"`
 	Archs        []Arch    `json:"archs,omitempty"`
 	Modules      []Module  `json:"modules,omitempty"` // Add-on modules only (not essentials; those are per-arch)

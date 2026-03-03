@@ -262,7 +262,9 @@ func runListAllQt(ctx context.Context, fetcher *repository.MetadataFetcher, reg 
 
 		for _, v := range vers {
 			label := ""
-			if v.IsLTS {
+			if v.IsPreview {
+				label = "Preview"
+			} else if v.IsLTS {
 				label = "LTS"
 			} else if v.Version == vers[0].Version {
 				label = "Latest"
