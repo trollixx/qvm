@@ -21,10 +21,11 @@ func validateFormat(format string) error {
 // Shared flag definitions used across commands.
 
 var formatFlag = &cli.StringFlag{
-	Name:    "format",
-	Aliases: []string{"f"},
-	Value:   "text",
-	Usage:   "output format: text or json",
+	Name:      "format",
+	Aliases:   []string{"f"},
+	Value:     "text",
+	Usage:     "output format: text or json",
+	Validator: validateFormat,
 }
 
 var archFlag = &cli.StringFlag{

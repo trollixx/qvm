@@ -40,9 +40,6 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 	format := cmd.String("format")
 	host := cmd.String("host")
 
-	if err := validateFormat(format); err != nil {
-		return err
-	}
 	// qt@<version> detail or filtered view — always fetches remote metadata.
 	if strings.HasPrefix(arg, "qt@") {
 		version := strings.TrimPrefix(arg, "qt@")

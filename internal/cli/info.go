@@ -34,9 +34,6 @@ func runInfo(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	format := cmd.String("format")
-	if err := validateFormat(format); err != nil {
-		return err
-	}
 
 	registry, err := storage.NewRegistryManager()
 	if err != nil {

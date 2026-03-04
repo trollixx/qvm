@@ -45,9 +45,6 @@ func runSearch(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	format := cmd.String("format")
-	if err := validateFormat(format); err != nil {
-		return err
-	}
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
