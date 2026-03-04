@@ -56,25 +56,33 @@ func runDefault(_ context.Context, _ *cli.Command) error {
 	return nil
 }
 
+// resolveHost returns host if non-empty, otherwise auto-detects.
+func resolveHost(host string) string {
+	if host != "" {
+		return host
+	}
+	return repository.PlatformHost()
+}
+
 // buildFetcher constructs a MetadataFetcher from config.
-func buildFetcher(cfg *config.Config) (*repository.MetadataFetcher, error) {
+func buildFetcher(cfg *config.Config, host string) (*repository.MetadataFetcher, error) {
 	cache, err := repository.NewCache()
 	if err != nil {
 		return nil, err
 	}
-	mirrors := repository.NewMirrorList(cfg.Repository.URL, cfg.Repository.Mirrors)
+	mirrors := repository.NewMirrorList(cfg.Repository.URL, cfg.Repository.Mirrors, resolveHost(host))
 	client := repository.NewClient(cfg.Download.TimeoutSeconds)
 	return repository.NewMetadataFetcher(client, cache, mirrors), nil
 }
 
 // buildDeps constructs the full dependency chain from config.
-func buildDeps(cfg *config.Config) (*repository.Resolver, *install.Installer, *storage.RegistryManager, error) {
+func buildDeps(cfg *config.Config, host string) (*repository.Resolver, *install.Installer, *storage.RegistryManager, error) {
 	cache, err := repository.NewCache()
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	mirrors := repository.NewMirrorList(cfg.Repository.URL, cfg.Repository.Mirrors)
+	mirrors := repository.NewMirrorList(cfg.Repository.URL, cfg.Repository.Mirrors, resolveHost(host))
 	client := repository.NewClient(cfg.Download.TimeoutSeconds)
 	fetcher := repository.NewMetadataFetcher(client, cache, mirrors)
 	resolver := repository.NewResolver(fetcher)

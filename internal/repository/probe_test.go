@@ -18,7 +18,7 @@ func TestProbeURLs_Reachable(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(okHandler))
 	defer ts.Close()
 
-	results := repository.ProbeURLs(context.Background(), []string{ts.URL + "/"}, 5)
+	results := repository.ProbeURLs(context.Background(), []string{ts.URL + "/"}, 5, "windows_x86")
 
 	require.Len(t, results, 1)
 	assert.Equal(t, ts.URL+"/", results[0].URL)
@@ -32,7 +32,7 @@ func TestProbeURLs_Unreachable(t *testing.T) {
 	badURL := ts.URL + "/"
 	ts.Close()
 
-	results := repository.ProbeURLs(context.Background(), []string{badURL}, 5)
+	results := repository.ProbeURLs(context.Background(), []string{badURL}, 5, "windows_x86")
 
 	require.Len(t, results, 1)
 	assert.Equal(t, badURL, results[0].URL)
@@ -45,7 +45,7 @@ func TestProbeURLs_HTTP404(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	results := repository.ProbeURLs(context.Background(), []string{ts.URL + "/"}, 5)
+	results := repository.ProbeURLs(context.Background(), []string{ts.URL + "/"}, 5, "windows_x86")
 
 	require.Len(t, results, 1)
 	assert.False(t, results[0].Reachable)
@@ -61,7 +61,7 @@ func TestProbeURLs_ReachableBeforeUnreachable(t *testing.T) {
 	bad.Close()
 
 	// Pass bad URL first to verify sorting places reachable results first.
-	results := repository.ProbeURLs(context.Background(), []string{badURL, good.URL + "/"}, 5)
+	results := repository.ProbeURLs(context.Background(), []string{badURL, good.URL + "/"}, 5, "windows_x86")
 
 	require.Len(t, results, 2)
 	assert.True(t, results[0].Reachable, "first result should be reachable")
@@ -69,7 +69,7 @@ func TestProbeURLs_ReachableBeforeUnreachable(t *testing.T) {
 }
 
 func TestProbeURLs_Empty(t *testing.T) {
-	results := repository.ProbeURLs(context.Background(), nil, 5)
+	results := repository.ProbeURLs(context.Background(), nil, 5, "windows_x86")
 	assert.Empty(t, results)
 }
 
@@ -79,7 +79,7 @@ func TestProbeURLs_PreservesURL(t *testing.T) {
 	defer ts.Close()
 
 	base := ts.URL + "/"
-	results := repository.ProbeURLs(context.Background(), []string{base}, 5)
+	results := repository.ProbeURLs(context.Background(), []string{base}, 5, "windows_x86")
 
 	require.Len(t, results, 1)
 	assert.Equal(t, base, results[0].URL)

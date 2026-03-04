@@ -50,6 +50,7 @@ func newInstallCommand() *cli.Command {
 			dirFlag,
 			quietFlag,
 			dryRunFlag,
+			hostFlag,
 		},
 		Action: runInstall,
 	}
@@ -77,6 +78,7 @@ func runInstallQtPickVersion(_ context.Context, _ *cli.Command) error {
 
 func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 	force := cmd.Bool("force")
+	host := cmd.String("host")
 
 	modules := cmd.StringSlice("modules")
 	docs := cmd.StringSlice("docs")
@@ -89,7 +91,7 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	_, installer, _, err := buildDeps(cfg)
+	_, installer, _, err := buildDeps(cfg, host)
 	if err != nil {
 		return fmt.Errorf("initializing dependencies: %w", err)
 	}
@@ -190,7 +192,7 @@ func runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	_, installer, _, err := buildDeps(cfg)
+	_, installer, _, err := buildDeps(cfg, cmd.String("host"))
 	if err != nil {
 		return fmt.Errorf("initializing dependencies: %w", err)
 	}

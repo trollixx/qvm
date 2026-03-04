@@ -26,6 +26,7 @@ func newSearchCommand() *cli.Command {
 		ArgsUsage: "<query>",
 		Flags: []cli.Flag{
 			formatFlag,
+			hostFlag,
 		},
 		Action: runSearch,
 	}
@@ -47,13 +48,12 @@ func runSearch(ctx context.Context, cmd *cli.Command) error {
 	if err := validateFormat(format); err != nil {
 		return err
 	}
-
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	fetcher, err := buildFetcher(cfg)
+	fetcher, err := buildFetcher(cfg, cmd.String("host"))
 	if err != nil {
 		return fmt.Errorf("initializing fetcher: %w", err)
 	}

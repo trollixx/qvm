@@ -19,13 +19,12 @@ type ProbeResult struct {
 // ProbeURLs measures response latency to each base URL concurrently.
 // Each URL is probed by fetching the platform-specific desktop directory listing.
 // Returns results sorted fastest-first; unreachable mirrors are appended last.
-func ProbeURLs(ctx context.Context, urls []string, timeoutSeconds int) []ProbeResult {
+func ProbeURLs(ctx context.Context, urls []string, timeoutSeconds int, host string) []ProbeResult {
 	timeout := time.Duration(timeoutSeconds) * time.Second
 	if timeout <= 0 {
 		timeout = 8 * time.Second
 	}
 	client := &http.Client{Timeout: timeout}
-	host := platformHost()
 
 	results := make([]ProbeResult, len(urls))
 	var wg sync.WaitGroup

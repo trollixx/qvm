@@ -436,7 +436,7 @@ func TestProbePreviewVersions(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(10)
-	mirrors := NewMirrorList(srv.URL+"/", nil)
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
 	cache := &Cache{dir: t.TempDir()}
 	fetcher := NewMetadataFetcher(client, cache, mirrors)
 

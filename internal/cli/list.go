@@ -28,6 +28,7 @@ func newListCommand() *cli.Command {
 				Usage: "show all available versions, not just installed",
 			},
 			formatFlag,
+			hostFlag,
 		},
 		Action: runList,
 	}
@@ -37,11 +38,11 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
 	showAll := cmd.Bool("all")
 	format := cmd.String("format")
+	host := cmd.String("host")
 
 	if err := validateFormat(format); err != nil {
 		return err
 	}
-
 	// qt@<version> detail or filtered view — always fetches remote metadata.
 	if strings.HasPrefix(arg, "qt@") {
 		version := strings.TrimPrefix(arg, "qt@")
@@ -49,7 +50,7 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return fmt.Errorf("loading config: %w", err)
 		}
-		fetcher, err := buildFetcher(cfg)
+		fetcher, err := buildFetcher(cfg, host)
 		if err != nil {
 			return fmt.Errorf("initializing fetcher: %w", err)
 		}
@@ -81,7 +82,7 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if showAll {
-		return runListAll(ctx, arg, format)
+		return runListAll(ctx, arg, format, host)
 	}
 	return runListInstalled(arg, format)
 }
@@ -200,12 +201,12 @@ func buildExtrasLine(extras storage.InstalledExtras) string {
 
 // --- All-available views (with installed markers) ---
 
-func runListAll(ctx context.Context, arg, format string) error {
+func runListAll(ctx context.Context, arg, format, host string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	fetcher, err := buildFetcher(cfg)
+	fetcher, err := buildFetcher(cfg, host)
 	if err != nil {
 		return fmt.Errorf("initializing fetcher: %w", err)
 	}

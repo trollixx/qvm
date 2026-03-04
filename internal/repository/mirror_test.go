@@ -140,6 +140,7 @@ func TestMirrorList_URLsFor_TwoMirrors(t *testing.T) {
 	m := NewMirrorList(
 		"https://primary.example.com/",
 		[]string{"https://mirror1.example.com/"},
+		"windows_x86",
 	)
 	urls := m.URLsFor("6.8.3", 6)
 

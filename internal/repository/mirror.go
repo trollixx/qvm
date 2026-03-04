@@ -11,21 +11,31 @@ type Mirror struct {
 	URL string
 }
 
-// MirrorList manages the ordered list of mirrors to try.
-type MirrorList struct {
-	primary  string
-	fallbacks []string
+// ValidHosts lists the recognized host platform identifiers for Qt repositories.
+var ValidHosts = []string{
+	"windows_x86",
+	"windows_arm64",
+	"linux_x64",
+	"linux_arm64",
+	"mac_x64",
 }
 
-// NewMirrorList creates a MirrorList from a primary URL and fallbacks.
-func NewMirrorList(primary string, fallbacks []string) *MirrorList {
-	return &MirrorList{primary: primary, fallbacks: fallbacks}
+// MirrorList manages the ordered list of mirrors to try.
+type MirrorList struct {
+	primary   string
+	fallbacks []string
+	host      string
+}
+
+// NewMirrorList creates a MirrorList from a primary URL, fallbacks, and host platform.
+func NewMirrorList(primary string, fallbacks []string, host string) *MirrorList {
+	return &MirrorList{primary: primary, fallbacks: fallbacks, host: host}
 }
 
 // URLsFor returns an ordered list of URLs to try for the given Qt SDK parameters.
 // base is the mirror base URL, host is "windows_x86"/"linux_x64"/"mac_x64", etc.
 func (m *MirrorList) URLsFor(version string, major int) []string {
-	host := platformHost()
+	host := m.host
 	var urls []string
 
 	// Primary mirror first.
@@ -41,7 +51,7 @@ func (m *MirrorList) URLsFor(version string, major int) []string {
 // URLsForMasterList returns URLs for the master list of available Qt versions.
 // This fetches a listing that enumerates available versions.
 func (m *MirrorList) URLsForMasterList() []string {
-	host := platformHost()
+	host := m.host
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))
 	for _, base := range all {
@@ -52,7 +62,7 @@ func (m *MirrorList) URLsForMasterList() []string {
 
 // ToolURLsFor returns URLs for tools metadata.
 func (m *MirrorList) ToolURLsFor(toolName string) []string {
-	host := platformHost()
+	host := m.host
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))
 	for _, base := range all {
@@ -109,7 +119,7 @@ func (m *MirrorList) ProbeURL(version string, major int) string {
 	if !isQt68Plus(version, major) {
 		return ""
 	}
-	host := platformHost()
+	host := m.host
 	verStr := versionToRepoStr(version, major)
 	folder := fmt.Sprintf("qt%d_%s", major, verStr)
 	return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/%s/Updates.xml", m.primary, host, folder, folder)
@@ -118,13 +128,13 @@ func (m *MirrorList) ProbeURL(version string, major int) string {
 // DirectoryURL returns the HTML directory listing URL for discovering available versions.
 // Deprecated: prefer DirectoryURLs which includes fallback mirrors.
 func (m *MirrorList) DirectoryURL() string {
-	host := platformHost()
+	host := m.host
 	return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/", m.primary, host)
 }
 
 // DirectoryURLs returns directory listing URLs for all mirrors in order.
 func (m *MirrorList) DirectoryURLs() []string {
-	host := platformHost()
+	host := m.host
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))
 	for _, base := range all {
@@ -157,13 +167,21 @@ func major_minor(major int, minor string) string {
 	return fmt.Sprintf("%d%s", major, minor)
 }
 
-// platformHost returns the repository host path component for the current OS/arch.
-func platformHost() string {
+// PlatformHost returns the repository host path component for the current OS/arch.
+func PlatformHost() string {
 	switch runtime.GOOS {
 	case "windows":
+		if runtime.GOARCH == "arm64" {
+			return "windows_arm64"
+		}
 		return "windows_x86"
 	case "darwin":
 		return "mac_x64"
+	case "linux":
+		if runtime.GOARCH == "arm64" {
+			return "linux_arm64"
+		}
+		return "linux_x64"
 	default:
 		return "linux_x64"
 	}

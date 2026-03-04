@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/trollixx/qvm/internal/repository"
 	"github.com/urfave/cli/v3"
 )
 
@@ -62,4 +64,23 @@ var quietFlag = &cli.BoolFlag{
 var dryRunFlag = &cli.BoolFlag{
 	Name:  "dry-run",
 	Usage: "resolve and print archives that would be downloaded, without installing",
+}
+
+var hostFlag = &cli.StringFlag{
+	Name:      "host",
+	Usage:     "host platform override; valid values: " + strings.Join(repository.ValidHosts, ", ") + " (default: auto-detect)",
+	Validator: validateHost,
+}
+
+// validateHost returns an error if host is non-empty and not in ValidHosts.
+func validateHost(host string) error {
+	if host == "" {
+		return nil
+	}
+	for _, h := range repository.ValidHosts {
+		if host == h {
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown host %q: valid hosts are %s", host, strings.Join(repository.ValidHosts, ", "))
 }

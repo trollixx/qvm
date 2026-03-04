@@ -96,7 +96,7 @@ func runMirrorList(ctx context.Context, _ *cli.Command) error {
 	urls := dedupURLs(cfg.Repository.URL, filtered)
 
 	fmt.Fprintf(os.Stdout, "Probing %d mirrors...\n\n", len(urls))
-	results := repository.ProbeURLs(ctx, urls, probeTimeoutSeconds)
+	results := repository.ProbeURLs(ctx, urls, probeTimeoutSeconds, repository.PlatformHost())
 
 	primary := cfg.Repository.URL
 	fastestURL := ""
@@ -170,7 +170,7 @@ func mirrorSelectAuto(ctx context.Context, cfg *config.Config) error {
 	urls := dedupURLs(cfg.Repository.URL, filtered)
 
 	fmt.Fprintf(os.Stdout, "Probing %d mirrors...\n\n", len(urls))
-	results := repository.ProbeURLs(ctx, urls, probeTimeoutSeconds)
+	results := repository.ProbeURLs(ctx, urls, probeTimeoutSeconds, repository.PlatformHost())
 
 	for _, r := range results {
 		if r.Reachable {
@@ -211,7 +211,7 @@ func mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL string) err
 	}
 
 	fmt.Fprintf(os.Stdout, "Probing %s...\n", mirrorDisplayName(rawURL))
-	results := repository.ProbeURLs(ctx, []string{rawURL}, probeTimeoutSeconds)
+	results := repository.ProbeURLs(ctx, []string{rawURL}, probeTimeoutSeconds, repository.PlatformHost())
 	if len(results) == 0 || !results[0].Reachable {
 		return fmt.Errorf("mirror %s is not reachable (timeout or HTTP error)", mirrorDisplayName(rawURL))
 	}
