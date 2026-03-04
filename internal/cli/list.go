@@ -21,7 +21,7 @@ func newListCommand() *cli.Command {
 		Name:      "list",
 		Aliases:   []string{"ls"},
 		Usage:     "List installed or available Qt versions and tools",
-		ArgsUsage: "[qt | qt@<version> | tools]",
+		ArgsUsage: "[qt | qt@<major>[.<minor>[.<patch>]] | tools]",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "all",
@@ -42,7 +42,7 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	// qt@<version> detail view — always fetches remote metadata.
+	// qt@<version> detail or filtered view — always fetches remote metadata.
 	if strings.HasPrefix(arg, "qt@") {
 		version := strings.TrimPrefix(arg, "qt@")
 		cfg, err := config.Load()
@@ -53,11 +53,31 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return fmt.Errorf("initializing fetcher: %w", err)
 		}
-		return runListQtVersion(ctx, fetcher, version, format)
+
+		vf, err := qtmeta.ParseVersionFilter(version)
+		if err != nil {
+			return fmt.Errorf("invalid version %q: %w", version, err)
+		}
+
+		// Full version (e.g. "6.8.3") → detail view.
+		// Partial version (e.g. "6" or "6.9") → filtered list view.
+		if vf.IsFullVersion() {
+			return runListQtVersion(ctx, fetcher, version, format)
+		}
+
+		registry, err := storage.NewRegistryManager()
+		if err != nil {
+			return fmt.Errorf("opening registry: %w", err)
+		}
+		reg, err := registry.Load()
+		if err != nil {
+			return fmt.Errorf("loading registry: %w", err)
+		}
+		return runListQtFiltered(ctx, fetcher, reg, vf, format)
 	}
 
 	if arg != "" && arg != "qt" && arg != "tools" {
-		return fmt.Errorf("unknown list target %q\n\nUsage:\n  qvm list                 Show installed versions\n  qvm list --all           Show all available versions\n  qvm list qt@<version>    Show version details (archs, modules)", arg)
+		return fmt.Errorf("unknown list target %q\n\nUsage:\n  qvm list                 Show installed versions\n  qvm list --all           Show all available versions\n  qvm list qt@6            Show all Qt 6.x versions\n  qvm list qt@6.8          Show all Qt 6.8.x versions\n  qvm list qt@6.8.3        Show version details (archs, modules)", arg)
 	}
 
 	if showAll {
@@ -246,15 +266,7 @@ func runListAllQt(ctx context.Context, fetcher *repository.MetadataFetcher, reg 
 
 	for _, major := range majors {
 		vers := byMajor[major]
-		// Sort by semantic version descending.
-		sort.Slice(vers, func(i, j int) bool {
-			vi, erri := qtmeta.ParseVersion(vers[i].Version)
-			vj, errj := qtmeta.ParseVersion(vers[j].Version)
-			if erri != nil || errj != nil {
-				return vers[i].Version > vers[j].Version
-			}
-			return vj.Less(vi) // descending
-		})
+		sortVersionsDesc(vers)
 
 		fmt.Fprintf(os.Stdout, "\nQt %d\n", major)
 
@@ -270,24 +282,55 @@ func runListAllQt(ctx context.Context, fetcher *repository.MetadataFetcher, reg 
 				label = "Latest"
 			}
 
-			date := ""
-			if !v.ReleaseDate.IsZero() {
-				date = v.ReleaseDate.Format("2006-01-02")
-			}
-
-			suffix := ""
-			if archs, ok := installedVersions[v.Version]; ok {
-				if len(archs) == 1 {
-					suffix = fmt.Sprintf("  \u2713 installed (%s)", archs[0])
-				} else {
-					suffix = fmt.Sprintf("  \u2713 installed (%d archs)", len(archs))
-				}
-			} else if v.Version == recommendedVersion {
-				suffix = "   \u2190 recommended"
-			}
-
-			fmt.Fprintf(os.Stdout, "  %-10s %-16s %s%s\n", v.Version, label, date, suffix)
+			printVersionRow(v, label, installedVersions, recommendedVersion)
 		}
+	}
+
+	fmt.Fprintln(os.Stdout, "\nRun 'qvm list qt@<version>' to see available targets and modules.")
+	return nil
+}
+
+func runListQtFiltered(ctx context.Context, fetcher *repository.MetadataFetcher, reg *storage.Registry, vf qtmeta.VersionFilter, format string) error {
+	versions, err := fetcher.FetchAllQtVersions(ctx)
+	if err != nil {
+		return fmt.Errorf("fetching Qt versions: %w", err)
+	}
+
+	var filtered []repository.QtVersionInfo
+	for _, v := range versions {
+		if vf.MatchesString(v.Version) {
+			filtered = append(filtered, v)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return fmt.Errorf("no Qt versions matching %q found\n\nRun 'qvm list --all' to see all available versions.", vf.String())
+	}
+
+	if format == "json" {
+		return printJSON(filtered)
+	}
+
+	sortVersionsDesc(filtered)
+
+	installedVersions := map[string][]string{}
+	for _, q := range reg.Qt {
+		installedVersions[q.Version] = append(installedVersions[q.Version], q.Arch)
+	}
+
+	recommendedVersion := newestLTSPatch(filtered)
+
+	fmt.Fprintf(os.Stdout, "Qt versions matching %s\n\n", vf.String())
+
+	for _, v := range filtered {
+		label := ""
+		if v.IsPreview {
+			label = "Preview"
+		} else if v.IsLTS {
+			label = "LTS"
+		}
+
+		printVersionRow(v, label, installedVersions, recommendedVersion)
 	}
 
 	fmt.Fprintln(os.Stdout, "\nRun 'qvm list qt@<version>' to see available targets and modules.")
@@ -412,6 +455,37 @@ func runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, 
 	}
 
 	return nil
+}
+
+func sortVersionsDesc(vers []repository.QtVersionInfo) {
+	sort.Slice(vers, func(i, j int) bool {
+		vi, erri := qtmeta.ParseVersion(vers[i].Version)
+		vj, errj := qtmeta.ParseVersion(vers[j].Version)
+		if erri != nil || errj != nil {
+			return vers[i].Version > vers[j].Version
+		}
+		return vj.Less(vi)
+	})
+}
+
+func printVersionRow(v repository.QtVersionInfo, label string, installed map[string][]string, recommended string) {
+	date := ""
+	if !v.ReleaseDate.IsZero() {
+		date = v.ReleaseDate.Format("2006-01-02")
+	}
+
+	suffix := ""
+	if archs, ok := installed[v.Version]; ok {
+		if len(archs) == 1 {
+			suffix = fmt.Sprintf("  \u2713 installed (%s)", archs[0])
+		} else {
+			suffix = fmt.Sprintf("  \u2713 installed (%d archs)", len(archs))
+		}
+	} else if v.Version == recommended {
+		suffix = "   \u2190 recommended"
+	}
+
+	fmt.Fprintf(os.Stdout, "  %-10s %-16s %s%s\n", v.Version, label, date, suffix)
 }
 
 // newestLTSPatch returns the version string of the newest patch release within

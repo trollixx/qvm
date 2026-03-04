@@ -65,6 +65,92 @@ func MajorVersion(s string) int {
 	return v.Major
 }
 
+// VersionFilter represents a partial or full version specification used for
+// filtering. It can match major-only ("6"), major.minor ("6.9"), or exact
+// major.minor.patch ("6.9.0").
+type VersionFilter struct {
+	Major    int
+	Minor    int
+	Patch    int
+	HasMinor bool
+	HasPatch bool
+}
+
+// ParseVersionFilter parses a partial or full version string.
+// Accepted formats: "6", "6.9", "6.9.0".
+func ParseVersionFilter(s string) (VersionFilter, error) {
+	parts := strings.Split(s, ".")
+	if len(parts) < 1 || len(parts) > 3 {
+		return VersionFilter{}, fmt.Errorf("invalid version filter %q: expected major[.minor[.patch]]", s)
+	}
+
+	major, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return VersionFilter{}, fmt.Errorf("invalid major version in %q: %w", s, err)
+	}
+
+	vf := VersionFilter{Major: major}
+
+	if len(parts) >= 2 {
+		minor, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return VersionFilter{}, fmt.Errorf("invalid minor version in %q: %w", s, err)
+		}
+		vf.Minor = minor
+		vf.HasMinor = true
+	}
+
+	if len(parts) == 3 {
+		patch, err := strconv.Atoi(parts[2])
+		if err != nil {
+			return VersionFilter{}, fmt.Errorf("invalid patch version in %q: %w", s, err)
+		}
+		vf.Patch = patch
+		vf.HasPatch = true
+	}
+
+	return vf, nil
+}
+
+// IsFullVersion returns true if the filter specifies all three components.
+func (vf VersionFilter) IsFullVersion() bool {
+	return vf.HasMinor && vf.HasPatch
+}
+
+// Matches reports whether a parsed Version matches this filter.
+func (vf VersionFilter) Matches(v Version) bool {
+	if v.Major != vf.Major {
+		return false
+	}
+	if vf.HasMinor && v.Minor != vf.Minor {
+		return false
+	}
+	if vf.HasPatch && v.Patch != vf.Patch {
+		return false
+	}
+	return true
+}
+
+// MatchesString reports whether a version string like "6.9.0" matches this filter.
+func (vf VersionFilter) MatchesString(version string) bool {
+	v, err := ParseVersion(version)
+	if err != nil {
+		return false
+	}
+	return vf.Matches(v)
+}
+
+// String returns the filter as originally specified (e.g. "6", "6.9", "6.9.0").
+func (vf VersionFilter) String() string {
+	if vf.HasPatch {
+		return fmt.Sprintf("%d.%d.%d", vf.Major, vf.Minor, vf.Patch)
+	}
+	if vf.HasMinor {
+		return fmt.Sprintf("%d.%d", vf.Major, vf.Minor)
+	}
+	return strconv.Itoa(vf.Major)
+}
+
 // knownLTSVersions lists Qt versions with LTS status.
 var knownLTSVersions = map[string]bool{
 	"5.9":  true,

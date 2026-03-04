@@ -74,6 +74,65 @@ func TestIsLTS(t *testing.T) {
 	}
 }
 
+func TestParseVersionFilter(t *testing.T) {
+	tests := []struct {
+		input    string
+		wantStr  string
+		wantFull bool
+		wantErr  bool
+	}{
+		{"6", "6", false, false},
+		{"6.9", "6.9", false, false},
+		{"6.9.0", "6.9.0", true, false},
+		{"5.15.18", "5.15.18", true, false},
+		{"", "", false, true},
+		{"abc", "", false, true},
+		{"6.abc", "", false, true},
+		{"6.9.abc", "", false, true},
+		{"1.2.3.4", "", false, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			vf, err := ParseVersionFilter(tc.input)
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantStr, vf.String())
+			assert.Equal(t, tc.wantFull, vf.IsFullVersion())
+		})
+	}
+}
+
+func TestVersionFilterMatches(t *testing.T) {
+	tests := []struct {
+		filter  string
+		version string
+		want    bool
+	}{
+		// Major-only filter.
+		{"6", "6.8.3", true},
+		{"6", "6.10.0", true},
+		{"6", "5.15.18", false},
+		// Major.minor filter.
+		{"6.8", "6.8.0", true},
+		{"6.8", "6.8.3", true},
+		{"6.8", "6.9.0", false},
+		{"6.8", "5.8.0", false},
+		// Full version filter.
+		{"6.8.3", "6.8.3", true},
+		{"6.8.3", "6.8.0", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.filter+"_vs_"+tc.version, func(t *testing.T) {
+			vf, err := ParseVersionFilter(tc.filter)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, vf.MatchesString(tc.version))
+		})
+	}
+}
+
 func TestMajorVersion(t *testing.T) {
 	assert.Equal(t, 6, MajorVersion("6.10.0"))
 	assert.Equal(t, 5, MajorVersion("5.15.18"))
