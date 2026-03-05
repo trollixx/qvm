@@ -724,7 +724,7 @@ func buildArchiveRefs(pkg packageXML, baseURL string) []ArchiveRef {
 
 		refs = append(refs, ArchiveRef{
 			URL:      baseURL + pkg.Name + "/" + diskFilename,
-			Filename: filename,
+			Filename: diskFilename,
 			SHA1:     sha1,
 			Size:     sizeByFile[diskFilename],
 		})

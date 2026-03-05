@@ -581,12 +581,12 @@ func TestFetchExtensions_Integration(t *testing.T) {
 	weKey := "qt.qt6.6102.addons.qtwebengine.win64_msvc2022_64"
 	weArcs := vi.PackageArchives[weKey]
 	require.NotEmpty(t, weArcs, "expected archives for %s", weKey)
-	assert.Equal(t, "qtwebengine-Windows-msvc.7z", weArcs[0].Filename)
+	assert.Equal(t, "6.10.2-0-202503010000qtwebengine-Windows-msvc.7z", weArcs[0].Filename)
 
 	pdfKey := "qt.qt6.6102.addons.qtpdf.win64_msvc2022_64"
 	pdfArcs := vi.PackageArchives[pdfKey]
 	require.NotEmpty(t, pdfArcs, "expected archives for %s", pdfKey)
-	assert.Equal(t, "qtpdf-Windows-msvc.7z", pdfArcs[0].Filename)
+	assert.Equal(t, "6.10.2-0-202503010000qtpdf-Windows-msvc.7z", pdfArcs[0].Filename)
 }
 
 func TestFetchExtensions_SkipsPreQt68(t *testing.T) {
