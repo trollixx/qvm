@@ -53,13 +53,24 @@ func NewMetadataFetcher(client *Client, cache *Cache, mirrors *MirrorList) *Meta
 }
 
 // FetchQtVersion fetches metadata for a specific Qt version.
+// For Qt 6.8+, it also fetches extension modules (qtwebengine, qtpdf) and
+// merges them into the result as regular add-on modules.
 func (f *MetadataFetcher) FetchQtVersion(ctx context.Context, version string) (*RepoIndex, error) {
 	major := qtmeta.MajorVersion(version)
 	if major == 0 {
 		return nil, fmt.Errorf("invalid version %q", version)
 	}
 	urls := f.mirrors.URLsFor(version, major)
-	return f.fetchFromURLs(ctx, urls)
+	idx, err := f.fetchFromURLs(ctx, urls)
+	if err != nil {
+		return nil, err
+	}
+
+	// Augment with extension modules (Qt 6.8+).
+	for i := range idx.QtVersions {
+		f.fetchExtensions(ctx, &idx.QtVersions[i])
+	}
+	return idx, nil
 }
 
 // FetchAllQtVersions fetches the list of available Qt versions by parsing
@@ -243,6 +254,96 @@ func (f *MetadataFetcher) FetchAllTools(ctx context.Context) ([]ToolInfo, error)
 		tools = append(tools, *tool)
 	}
 	return tools, nil
+}
+
+// fetchExtensions fetches extension modules (qtwebengine, qtpdf) for Qt 6.8+
+// and merges them into vi as regular add-on modules.
+func (f *MetadataFetcher) fetchExtensions(ctx context.Context, vi *QtVersionInfo) {
+	if !isQt68Plus(vi.Version, vi.Major) {
+		return
+	}
+	if vi.PackageArchives == nil {
+		vi.PackageArchives = make(map[string][]ArchiveRef)
+	}
+
+	verStr := versionToRepoStr(vi.Version, vi.Major)
+	prefix := fmt.Sprintf("qt.qt%d.%s", vi.Major, verStr)
+
+	for _, moduleName := range ExtensionModuleNames() {
+		for _, arch := range vi.Archs {
+			urls := f.mirrors.ExtensionURLsFor(moduleName, vi.Version, vi.Major, arch.Name)
+			if len(urls) == 0 {
+				continue
+			}
+			body, successURL, err := f.fetchRaw(ctx, urls)
+			if err != nil {
+				// Extension not available for this arch — skip silently.
+				continue
+			}
+			f.processExtensionXML(body, dirURL(successURL), vi, moduleName, arch.Name, prefix)
+		}
+
+		// Register the module in vi.Modules if any archives were found.
+		addonKeyPrefix := prefix + ".addons." + moduleName + "."
+		hasArchives := false
+		for key := range vi.PackageArchives {
+			if strings.HasPrefix(key, addonKeyPrefix) {
+				hasArchives = true
+				break
+			}
+		}
+		if hasArchives {
+			found := false
+			for _, m := range vi.Modules {
+				if m.Name == moduleName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				vi.Modules = append(vi.Modules, Module{
+					Name:        moduleName,
+					DisplayName: extensionDisplayName(moduleName),
+				})
+			}
+		}
+	}
+}
+
+// processExtensionXML parses an extension Updates.xml and stores archives
+// in vi.PackageArchives using the standard addon key format so the resolver
+// works unchanged.
+func (f *MetadataFetcher) processExtensionXML(body []byte, baseURL string, vi *QtVersionInfo, moduleName, arch, prefix string) {
+	var upd updatesXML
+	if err := xml.Unmarshal(body, &upd); err != nil {
+		return
+	}
+
+	for _, pkg := range upd.Packages {
+		if pkg.DownloadableArchives == "" {
+			continue
+		}
+		refs := buildArchiveRefs(pkg, baseURL)
+		if len(refs) == 0 {
+			continue
+		}
+		// Map extension package key to standard addon key.
+		// e.g. store as "qt.qt6.6102.addons.qtwebengine.win64_msvc2022_64"
+		addonKey := prefix + ".addons." + moduleName + "." + arch
+		vi.PackageArchives[addonKey] = append(vi.PackageArchives[addonKey], refs...)
+	}
+}
+
+// extensionDisplayName returns a human-readable name for an extension module.
+func extensionDisplayName(name string) string {
+	switch name {
+	case "qtwebengine":
+		return "Qt WebEngine"
+	case "qtpdf":
+		return "Qt PDF"
+	default:
+		return name
+	}
 }
 
 func (f *MetadataFetcher) fetchFromURLs(ctx context.Context, urls []string) (*RepoIndex, error) {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -507,4 +508,124 @@ func essentialModuleNamesForArch(archs []Arch, archName string) []string {
 		}
 	}
 	return nil
+}
+
+// --- fetchExtensions integration ---
+
+func TestFetchExtensions_Integration(t *testing.T) {
+	// Extension Updates.xml for qtwebengine with one package.
+	extensionXML := []byte(`<?xml version="1.0" encoding="UTF-8"?><Updates>
+		<PackageUpdate>
+			<Name>extensions.qtwebengine.6102.win64_msvc2022_64</Name>
+			<DisplayName>Qt WebEngine</DisplayName>
+			<Virtual>false</Virtual>
+			<Version>6.10.2-0-202503010000</Version>
+			<DownloadableArchives>qtwebengine-Windows-msvc.7z</DownloadableArchives>
+			<ReleaseDate>2025-03-01</ReleaseDate>
+		</PackageUpdate>
+	</Updates>`)
+
+	extensionPdfXML := []byte(`<?xml version="1.0" encoding="UTF-8"?><Updates>
+		<PackageUpdate>
+			<Name>extensions.qtpdf.6102.win64_msvc2022_64</Name>
+			<DisplayName>Qt PDF</DisplayName>
+			<Virtual>false</Virtual>
+			<Version>6.10.2-0-202503010000</Version>
+			<DownloadableArchives>qtpdf-Windows-msvc.7z</DownloadableArchives>
+			<ReleaseDate>2025-03-01</ReleaseDate>
+		</PackageUpdate>
+	</Updates>`)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/extensions/qtwebengine/6102/msvc2022_64/"):
+			w.Write(extensionXML)
+		case strings.Contains(r.URL.Path, "/extensions/qtpdf/6102/msvc2022_64/"):
+			w.Write(extensionPdfXML)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	vi := &QtVersionInfo{
+		Version: "6.10.2",
+		Major:   6,
+		Archs: []Arch{
+			{Name: "win64_msvc2022_64", DisplayName: "MSVC 2022"},
+		},
+		PackageArchives: make(map[string][]ArchiveRef),
+	}
+
+	client := NewClient(10)
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	cache := &Cache{dir: t.TempDir()}
+	fetcher := NewMetadataFetcher(client, cache, mirrors)
+
+	fetcher.fetchExtensions(context.Background(), vi)
+
+	// Check modules were registered.
+	moduleNames := addonModuleNames(vi.Modules)
+	assert.Contains(t, moduleNames, "qtwebengine")
+	assert.Contains(t, moduleNames, "qtpdf")
+
+	// Check display names.
+	byName := map[string]string{}
+	for _, m := range vi.Modules {
+		byName[m.Name] = m.DisplayName
+	}
+	assert.Equal(t, "Qt WebEngine", byName["qtwebengine"])
+	assert.Equal(t, "Qt PDF", byName["qtpdf"])
+
+	// Check archives stored under standard addon key.
+	weKey := "qt.qt6.6102.addons.qtwebengine.win64_msvc2022_64"
+	weArcs := vi.PackageArchives[weKey]
+	require.NotEmpty(t, weArcs, "expected archives for %s", weKey)
+	assert.Equal(t, "qtwebengine-Windows-msvc.7z", weArcs[0].Filename)
+
+	pdfKey := "qt.qt6.6102.addons.qtpdf.win64_msvc2022_64"
+	pdfArcs := vi.PackageArchives[pdfKey]
+	require.NotEmpty(t, pdfArcs, "expected archives for %s", pdfKey)
+	assert.Equal(t, "qtpdf-Windows-msvc.7z", pdfArcs[0].Filename)
+}
+
+func TestFetchExtensions_SkipsPreQt68(t *testing.T) {
+	vi := &QtVersionInfo{
+		Version: "6.7.3",
+		Major:   6,
+		Archs:   []Arch{{Name: "win64_msvc2022_64"}},
+	}
+
+	client := NewClient(10)
+	mirrors := NewMirrorList("https://example.com/", nil, "windows_x86")
+	cache := &Cache{dir: t.TempDir()}
+	fetcher := NewMetadataFetcher(client, cache, mirrors)
+
+	// Should be a no-op for pre-6.8 versions (no network calls).
+	fetcher.fetchExtensions(context.Background(), vi)
+	assert.Empty(t, vi.Modules)
+}
+
+func TestFetchExtensions_GracefulOnMissingExtension(t *testing.T) {
+	// Server that always returns 404.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	vi := &QtVersionInfo{
+		Version:         "6.10.2",
+		Major:           6,
+		Archs:           []Arch{{Name: "win64_msvc2022_64"}},
+		PackageArchives: make(map[string][]ArchiveRef),
+	}
+
+	client := NewClient(10)
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	cache := &Cache{dir: t.TempDir()}
+	fetcher := NewMetadataFetcher(client, cache, mirrors)
+
+	// Should not panic or add modules when extensions are unavailable.
+	fetcher.fetchExtensions(context.Background(), vi)
+	assert.Empty(t, vi.Modules)
 }

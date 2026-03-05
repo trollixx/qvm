@@ -167,6 +167,51 @@ func major_minor(major int, minor string) string {
 	return fmt.Sprintf("%d%s", major, minor)
 }
 
+// ExtensionModuleNames returns the list of known Qt extension modules.
+// Starting from Qt 6.8.0, these modules are served from a separate
+// extensions/ repository path instead of the main desktop Updates.xml.
+func ExtensionModuleNames() []string {
+	return []string{"qtwebengine", "qtpdf"}
+}
+
+// ExtensionURLsFor returns URLs for an extension module's Updates.xml.
+// Extension repos live at:
+//
+//	{base}online/qtsdkrepository/{host}/extensions/{module}/{compactVer}/{archSubdir}/Updates.xml
+func (m *MirrorList) ExtensionURLsFor(moduleName, version string, major int, arch string) []string {
+	if !isQt68Plus(version, major) {
+		return nil
+	}
+	host := m.host
+	verStr := versionToRepoStr(version, major)
+	archDir := extensionArchSubdir(arch)
+	all := append([]string{m.primary}, m.fallbacks...)
+	urls := make([]string, 0, len(all))
+	for _, base := range all {
+		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/extensions/%s/%s/%s/Updates.xml",
+			base, host, moduleName, verStr, archDir))
+	}
+	return urls
+}
+
+// extensionArchSubdir maps a Qt arch name to the subdirectory name used in extension repos.
+// e.g. "win64_msvc2022_64" → "msvc2022_64", "linux_x64_gcc" → "gcc".
+func extensionArchSubdir(arch string) string {
+	// Strip well-known platform prefixes.
+	prefixes := []string{
+		"win64_",
+		"linux_x64_",
+		"linux_arm64_",
+		"mac_x64_",
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(arch, p) {
+			return arch[len(p):]
+		}
+	}
+	return arch
+}
+
 // PlatformHost returns the repository host path component for the current OS/arch.
 func PlatformHost() string {
 	switch runtime.GOOS {

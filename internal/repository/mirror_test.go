@@ -211,3 +211,65 @@ func TestFolderToVersionInfo(t *testing.T) {
 		}
 	})
 }
+
+func TestExtensionArchSubdir(t *testing.T) {
+	tests := []struct {
+		arch string
+		want string
+	}{
+		{"win64_msvc2022_64", "msvc2022_64"},
+		{"win64_msvc2022_arm64_cross_compiled", "msvc2022_arm64_cross_compiled"},
+		{"win64_mingw", "mingw"},
+		{"win64_llvm_mingw", "llvm_mingw"},
+		{"linux_x64_gcc", "gcc"},
+		{"linux_arm64_gcc_arm64", "gcc_arm64"},
+		{"mac_x64_clang_64", "clang_64"},
+		{"macos", "macos"}, // no prefix match, returned as-is
+	}
+	for _, tc := range tests {
+		t.Run(tc.arch, func(t *testing.T) {
+			assert.Equal(t, tc.want, extensionArchSubdir(tc.arch))
+		})
+	}
+}
+
+func TestExtensionURLsFor(t *testing.T) {
+	m := NewMirrorList(
+		"https://download.qt.io/",
+		[]string{"https://mirror.example.com/"},
+		"windows_x86",
+	)
+
+	t.Run("Qt 6.10.2", func(t *testing.T) {
+		urls := m.ExtensionURLsFor("qtwebengine", "6.10.2", 6, "win64_msvc2022_64")
+		require.Len(t, urls, 2)
+		assert.Equal(t,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/extensions/qtwebengine/6102/msvc2022_64/Updates.xml",
+			urls[0])
+		assert.Equal(t,
+			"https://mirror.example.com/online/qtsdkrepository/windows_x86/extensions/qtwebengine/6102/msvc2022_64/Updates.xml",
+			urls[1])
+	})
+
+	t.Run("Qt 6.8.3 mingw", func(t *testing.T) {
+		urls := m.ExtensionURLsFor("qtpdf", "6.8.3", 6, "win64_mingw")
+		require.Len(t, urls, 2)
+		assert.Contains(t, urls[0], "/extensions/qtpdf/683/mingw/Updates.xml")
+	})
+
+	t.Run("pre-6.8 returns nil", func(t *testing.T) {
+		urls := m.ExtensionURLsFor("qtwebengine", "6.7.3", 6, "win64_msvc2022_64")
+		assert.Nil(t, urls)
+	})
+
+	t.Run("Qt 5 returns nil", func(t *testing.T) {
+		urls := m.ExtensionURLsFor("qtwebengine", "5.15.18", 5, "win64_msvc2019_64")
+		assert.Nil(t, urls)
+	})
+}
+
+func TestExtensionModuleNames(t *testing.T) {
+	names := ExtensionModuleNames()
+	assert.Contains(t, names, "qtwebengine")
+	assert.Contains(t, names, "qtpdf")
+}
