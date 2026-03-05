@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -308,6 +309,11 @@ func (f *MetadataFetcher) fetchExtensions(ctx context.Context, vi *QtVersionInfo
 			}
 		}
 	}
+
+	// Keep modules sorted alphabetically.
+	sort.Slice(vi.Modules, func(i, j int) bool {
+		return vi.Modules[i].Name < vi.Modules[j].Name
+	})
 }
 
 // processExtensionXML parses an extension Updates.xml and stores archives
