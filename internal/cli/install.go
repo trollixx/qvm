@@ -252,49 +252,81 @@ func printDryRun(ev install.ProgressEvent) {
 	fmt.Fprintf(os.Stdout, "  %s%s\n", ev.Archive, size)
 }
 
-func printProgress(ev install.ProgressEvent) {
-	// \r\033[K moves cursor to start of line and clears to end (ANSI escape).
-	cr := "\r\033[K"
-	if !stderrIsTTY {
-		cr = "\n"
-	}
+// progressTracker keeps state for multi-line download progress on a TTY.
+type progressTracker struct {
+	lines map[string]int // archive name → line index (0-based from first download line)
+	total int            // number of lines printed so far
+}
 
+var dlTracker progressTracker
+
+func printProgress(ev install.ProgressEvent) {
 	switch ev.Phase {
 	case "resolving":
 		fmt.Fprintf(os.Stderr, "Resolving archives...\n")
 	case "downloading":
-		if ev.Archive != "" {
-			counter := ""
-			if ev.ArchiveTotal > 0 {
-				counter = fmt.Sprintf(" [%d/%d]", ev.ArchiveIndex, ev.ArchiveTotal)
-			}
-			pct := ""
-			if ev.BytesTotal > 0 {
-				pct = fmt.Sprintf(" %.0f%%", float64(ev.BytesDone)/float64(ev.BytesTotal)*100)
-			}
-			speed := ""
-			if ev.Speed > 0 {
-				speed = fmt.Sprintf(" @ %s/s", formatSize(int64(ev.Speed)))
-			}
-			fmt.Fprintf(os.Stderr, "%sDownloading %s%s%s%s", cr, ev.Archive, counter, pct, speed)
+		if ev.Archive == "" {
+			// Reset tracker for each install.
+			dlTracker = progressTracker{lines: make(map[string]int)}
+			return
+		}
+		line := formatDownloadLine(ev)
+		if !stderrIsTTY {
+			fmt.Fprintf(os.Stderr, "%s\n", line)
+			return
+		}
+
+		idx, exists := dlTracker.lines[ev.Archive]
+		if !exists {
+			// New file — append a new line.
+			idx = dlTracker.total
+			dlTracker.lines[ev.Archive] = idx
+			dlTracker.total++
+			fmt.Fprintf(os.Stderr, "%s\n", line)
+		} else {
+			// Existing file — move cursor up, overwrite, move back down.
+			up := dlTracker.total - idx
+			fmt.Fprintf(os.Stderr, "\033[%dA\r\033[K%s\033[%dB\r", up, line, up)
 		}
 	case "verifying":
-		fmt.Fprintf(os.Stderr, "\nVerifying %s...\n", ev.Archive)
+		fmt.Fprintf(os.Stderr, "Verifying %s...\n", ev.Archive)
 	case "extracting":
 		if ev.Archive != "" {
 			pct := ""
 			if ev.BytesTotal > 0 {
 				pct = fmt.Sprintf(" %.0f%%", float64(ev.BytesDone)/float64(ev.BytesTotal)*100)
 			}
-			fmt.Fprintf(os.Stderr, "%sExtracting %s%s", cr, ev.Archive, pct)
+			if stderrIsTTY {
+				fmt.Fprintf(os.Stderr, "\r\033[KExtracting %s%s", ev.Archive, pct)
+			} else {
+				fmt.Fprintf(os.Stderr, "Extracting %s%s\n", ev.Archive, pct)
+			}
 		} else {
-			fmt.Fprintf(os.Stderr, "\nExtracting archives...\n")
+			fmt.Fprintf(os.Stderr, "Extracting archives...\n")
 		}
 	case "patching":
-		fmt.Fprintf(os.Stderr, "\nPatching qt.conf...\n")
+		if stderrIsTTY {
+			fmt.Fprintf(os.Stderr, "\r\033[K")
+		}
+		fmt.Fprintf(os.Stderr, "Patching qt.conf...\n")
 	case "registering":
 		fmt.Fprintf(os.Stderr, "Registering installation...\n")
 	case "done":
+		if stderrIsTTY {
+			fmt.Fprintf(os.Stderr, "\r\033[K")
+		}
 		fmt.Fprintf(os.Stderr, "Done.\n")
 	}
+}
+
+func formatDownloadLine(ev install.ProgressEvent) string {
+	pct := ""
+	if ev.BytesTotal > 0 {
+		pct = fmt.Sprintf(" %3.0f%%", float64(ev.BytesDone)/float64(ev.BytesTotal)*100)
+	}
+	speed := ""
+	if ev.Speed > 0 {
+		speed = fmt.Sprintf(" @ %s/s", formatSize(int64(ev.Speed)))
+	}
+	return fmt.Sprintf("  %s%s%s", ev.Archive, pct, speed)
 }
