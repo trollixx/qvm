@@ -99,8 +99,12 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 	// Determine arch.
 	arch := cmd.String("arch")
 	if arch == "" {
-		plat := platform.Current()
-		arch = plat.DefaultArch(version)
+		if host != "" {
+			arch = platform.DefaultArchForHost(host, version)
+		}
+		if arch == "" {
+			arch = platform.Current().DefaultArch(version)
+		}
 	}
 
 	// Normalize docs/examples: if flag was set with no values, use ["*"].
