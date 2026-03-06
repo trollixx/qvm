@@ -156,9 +156,9 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 		archives = append(archives, resolveSourcesArchives(vi, prefix)...)
 	}
 
-	// Debug info.
+	// Debug info — scoped to all installed modules.
 	if opts.DebugInfo {
-		archives = append(archives, resolveDebugInfoArchives(vi, prefix, opts.Arch)...)
+		archives = append(archives, resolveDebugInfoArchives(vi, prefix, opts.Arch, allModules)...)
 	}
 
 	if len(archives) == 0 {
@@ -208,18 +208,64 @@ func resolveSourcesArchives(vi *QtVersionInfo, prefix string) []ResolvedArchive 
 	return result
 }
 
-func resolveDebugInfoArchives(vi *QtVersionInfo, prefix, arch string) []ResolvedArchive {
+func resolveDebugInfoArchives(vi *QtVersionInfo, prefix, arch string, modules []string) []ResolvedArchive {
+	// Build a set of installed module names for filtering individual archives.
+	moduleSet := make(map[string]bool, len(modules))
+	for _, m := range modules {
+		moduleSet[m] = true
+	}
+
 	var result []ResolvedArchive
 	for pkg, refs := range vi.PackageArchives {
-		if strings.HasPrefix(pkg, prefix) && (strings.Contains(pkg, "debug_info") || strings.Contains(pkg, "debuginfo")) {
-			if arch == "" || strings.HasSuffix(pkg, "."+arch) || strings.Contains(pkg, "."+arch+".") {
-				for _, ref := range refs {
-					result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
+		if !strings.HasPrefix(pkg, prefix) || (!strings.Contains(pkg, "debug_info") && !strings.Contains(pkg, "debuginfo")) {
+			continue
+		}
+		if arch != "" && !strings.HasSuffix(pkg, "."+arch) && !strings.Contains(pkg, "."+arch+".") {
+			continue
+		}
+		for _, ref := range refs {
+			if len(moduleSet) > 0 {
+				modName := archiveModuleName(ref.Filename)
+				if modName != "" && !moduleSet[modName] {
+					continue
 				}
 			}
+			result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
 		}
 	}
 	return result
+}
+
+// archiveModuleName extracts the Qt module name from an archive filename.
+// Filenames follow the pattern: "{version_prefix}{module}-{OS}-...-debug-symbols.7z"
+// e.g. "6.10.2-0-202601261212qtbase-Windows-...-debug-symbols.7z" → "qtbase"
+// or simply "qtbase-Windows-msvc.7z" → "qtbase" (no version prefix).
+func archiveModuleName(filename string) string {
+	if filename == "" {
+		return ""
+	}
+	// If the filename starts with a letter, there's no version prefix.
+	if (filename[0] >= 'a' && filename[0] <= 'z') || (filename[0] >= 'A' && filename[0] <= 'Z') {
+		if dashIdx := strings.IndexByte(filename, '-'); dashIdx > 0 {
+			return filename[:dashIdx]
+		}
+		return filename
+	}
+	// Skip the version-timestamp prefix by finding a digit-to-letter transition.
+	for i := 1; i < len(filename); i++ {
+		ch := filename[i]
+		prev := filename[i-1]
+		isLetter := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+		isPrevDigit := prev >= '0' && prev <= '9'
+		if isLetter && isPrevDigit {
+			rest := filename[i:]
+			if dashIdx := strings.IndexByte(rest, '-'); dashIdx > 0 {
+				return rest[:dashIdx]
+			}
+			return rest
+		}
+	}
+	return ""
 }
 
 // ResolveTool resolves archives for a named tool at a specific version.

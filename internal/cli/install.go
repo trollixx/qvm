@@ -43,8 +43,8 @@ func newInstallCommand() *cli.Command {
 				Usage: "install Qt sources",
 			},
 			&cli.BoolFlag{
-				Name:  "debug-info",
-				Usage: "install debug information files",
+				Name:  "debug-symbols",
+				Usage: "install debug symbol files",
 			},
 			forceFlag,
 			dirFlag,
@@ -82,7 +82,7 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 
 	modules := cmd.StringSlice("modules")
 	sources := cmd.Bool("sources")
-	debugInfo := cmd.Bool("debug-info")
+	debugInfo := cmd.Bool("debug-symbols")
 
 	cfg, err := config.Load()
 	if err != nil {

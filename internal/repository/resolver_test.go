@@ -112,6 +112,64 @@ func TestResolveArchives_NoPrefixForAlreadyPrefixed(t *testing.T) {
 	assert.Len(t, archives, 2) // essentials + qtcharts
 }
 
+func TestArchiveModuleName(t *testing.T) {
+	tests := []struct {
+		filename string
+		want     string
+	}{
+		{"6.10.2-0-202601261212qtbase-Windows-debug-symbols.7z", "qtbase"},
+		{"6.10.2-0-202601261212qtimageformats-Windows-debug-symbols.7z", "qtimageformats"},
+		{"6.10.2-0-202601261212qt3d-Windows-debug-symbols.7z", "qt3d"},
+		{"qtbase-Windows-msvc.7z", "qtbase"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.filename, func(t *testing.T) {
+			assert.Equal(t, tc.want, archiveModuleName(tc.filename))
+		})
+	}
+}
+
+func TestResolveArchives_DebugInfoScopedToModules(t *testing.T) {
+	arch := "win64_msvc2022_64"
+	vi := testVersionInfo(arch, "qtcharts", "qtimageformats", "qt3d")
+	// Add a debug_info package with archives for all modules.
+	debugPkg := "qt.qt6.6102.debug_info." + arch
+	vi.PackageArchives[debugPkg] = []ArchiveRef{
+		{URL: "http://x/qtbase-dbg.7z", Filename: "6.10.2-0-202503010000qtbase-Windows-debug-symbols.7z"},
+		{URL: "http://x/qtcharts-dbg.7z", Filename: "6.10.2-0-202503010000qtcharts-Windows-debug-symbols.7z"},
+		{URL: "http://x/qtimageformats-dbg.7z", Filename: "6.10.2-0-202503010000qtimageformats-Windows-debug-symbols.7z"},
+		{URL: "http://x/qt3d-dbg.7z", Filename: "6.10.2-0-202503010000qt3d-Windows-debug-symbols.7z"},
+		{URL: "http://x/qtdeclarative-dbg.7z", Filename: "6.10.2-0-202503010000qtdeclarative-Windows-debug-symbols.7z"},
+	}
+	vi.Archs[0].EssentialModules = []string{"qtbase", "qtdeclarative"}
+
+	archives, err := resolveArchives(vi, ResolveOptions{
+		Version:        "6.10.2",
+		Arch:           arch,
+		Modules:        []string{"qtcharts", "qtimageformats"},
+		SkipEssentials: true,
+		DebugInfo:      true,
+	})
+	require.NoError(t, err)
+
+	// Should include: qtcharts addon + qtimageformats addon + debug for
+	// essentials (qtbase, qtdeclarative) + requested addons (qtcharts, qtimageformats).
+	// Should NOT include qt3d debug symbols.
+	var debugFiles []string
+	for _, a := range archives {
+		if a.Name == debugPkg {
+			debugFiles = append(debugFiles, a.Ref.Filename)
+		}
+	}
+	assert.Len(t, debugFiles, 4, "expected debug symbols for 4 modules (2 essential + 2 requested)")
+	assert.Contains(t, debugFiles, "6.10.2-0-202503010000qtbase-Windows-debug-symbols.7z")
+	assert.Contains(t, debugFiles, "6.10.2-0-202503010000qtdeclarative-Windows-debug-symbols.7z")
+	assert.Contains(t, debugFiles, "6.10.2-0-202503010000qtcharts-Windows-debug-symbols.7z")
+	assert.Contains(t, debugFiles, "6.10.2-0-202503010000qtimageformats-Windows-debug-symbols.7z")
+	assert.NotContains(t, debugFiles, "6.10.2-0-202503010000qt3d-Windows-debug-symbols.7z")
+}
+
 func TestResolveArchives_SkipEssentials(t *testing.T) {
 	vi := testVersionInfo("win64_msvc2022_64", "qtcharts")
 	archives, err := resolveArchives(vi, ResolveOptions{

@@ -183,7 +183,7 @@ func buildExtrasLine(extras storage.InstalledExtras) string {
 		parts = append(parts, "sources")
 	}
 	if extras.DebugInfo {
-		parts = append(parts, "debug-info")
+		parts = append(parts, "debug-symbols")
 	}
 	return strings.Join(parts, ", ")
 }
@@ -436,7 +436,7 @@ func runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, 
 		supp = append(supp, "sources")
 	}
 	if vi.HasDebugInfo {
-		supp = append(supp, "debug-info")
+		supp = append(supp, "debug-symbols")
 	}
 
 	if len(supp) > 0 {

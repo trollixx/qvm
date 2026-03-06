@@ -23,7 +23,7 @@ $Env:Qt6_DIR=$(qvm path qt@6.8.3)
 ## Features
 
 - Install any Qt version (5.x / 6.x) with a single command.
-- Install Qt add-on modules, documentation, examples, sources, and debug info.
+- Install Qt add-on modules, documentation, examples, sources, and debug symbols.
 - Install Qt tools (Qt Creator).
 - Parallel downloads with retry and progress reporting.
 - Auto-detect the best compiler/ABI for the current machine.
@@ -90,7 +90,7 @@ qvm install <tool>[@<version>] [flags]
 | `--docs` | Install documentation for all selected modules |
 | `--examples` | Install examples for all selected modules |
 | `--sources` | Install Qt source code |
-| `--debug-info` | Install debug information files |
+| `--debug-symbols` | Install debug symbol files |
 | `--host` | Host platform override (e.g. `windows_arm64`, `linux_arm64`). Auto-detected if omitted. |
 | `--force` | Re-install even if already present |
 | `--dir` | Override Qt installation directory |

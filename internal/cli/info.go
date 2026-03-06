@@ -153,7 +153,7 @@ func printQtInfo(q storage.InstalledQt) {
 		fmt.Fprintf(os.Stdout, "  Sources:      yes\n")
 	}
 	if q.Extras.DebugInfo {
-		fmt.Fprintf(os.Stdout, "  Debug info:   yes\n")
+		fmt.Fprintf(os.Stdout, "  Debug symbols: yes\n")
 	}
 
 	// Show qmake path.
