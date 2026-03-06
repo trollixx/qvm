@@ -143,19 +143,11 @@ func printQtInfo(q storage.InstalledQt) {
 		fmt.Fprintf(os.Stdout, "  Modules:      (essentials only)\n")
 	}
 
-	if len(q.Extras.Docs) > 0 {
-		if len(q.Extras.Docs) == 1 && q.Extras.Docs[0] == "*" {
-			fmt.Fprintf(os.Stdout, "  Docs:         all modules\n")
-		} else {
-			fmt.Fprintf(os.Stdout, "  Docs:         %s\n", strings.Join(q.Extras.Docs, ", "))
-		}
+	if q.Extras.Docs {
+		fmt.Fprintf(os.Stdout, "  Docs:         yes\n")
 	}
-	if len(q.Extras.Examples) > 0 {
-		if len(q.Extras.Examples) == 1 && q.Extras.Examples[0] == "*" {
-			fmt.Fprintf(os.Stdout, "  Examples:     all modules\n")
-		} else {
-			fmt.Fprintf(os.Stdout, "  Examples:     %s\n", strings.Join(q.Extras.Examples, ", "))
-		}
+	if q.Extras.Examples {
+		fmt.Fprintf(os.Stdout, "  Examples:     yes\n")
 	}
 	if q.Extras.Sources {
 		fmt.Fprintf(os.Stdout, "  Sources:      yes\n")

@@ -30,13 +30,13 @@ func newInstallCommand() *cli.Command {
 				Aliases: []string{"m"},
 				Usage:   "comma-separated list of add-on modules to install (e.g. charts,webengine)",
 			},
-			&cli.StringSliceFlag{
+			&cli.BoolFlag{
 				Name:  "docs",
-				Usage: "install documentation; list modules (--docs=charts,webengine) or omit value for all (--docs)",
+				Usage: "install documentation for all selected modules",
 			},
-			&cli.StringSliceFlag{
+			&cli.BoolFlag{
 				Name:  "examples",
-				Usage: "install examples; list modules (--examples=charts,webengine) or omit value for all (--examples)",
+				Usage: "install examples for all selected modules",
 			},
 			&cli.BoolFlag{
 				Name:  "sources",
@@ -81,8 +81,6 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 	host := cmd.String("host")
 
 	modules := cmd.StringSlice("modules")
-	docs := cmd.StringSlice("docs")
-	examples := cmd.StringSlice("examples")
 	sources := cmd.Bool("sources")
 	debugInfo := cmd.Bool("debug-info")
 
@@ -107,14 +105,6 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 		}
 	}
 
-	// Normalize docs/examples: if flag was set with no values, use ["*"].
-	if cmd.IsSet("docs") && len(docs) == 0 {
-		docs = []string{"*"}
-	}
-	if cmd.IsSet("examples") && len(examples) == 0 {
-		examples = []string{"*"}
-	}
-
 	installRoot := cmd.String("dir")
 	if installRoot == "" {
 		installRoot = cfg.Install.Dir
@@ -124,8 +114,8 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 		Version:     version,
 		Arch:        arch,
 		Modules:     modules,
-		Docs:        docs,
-		Examples:    examples,
+		Docs:        cmd.Bool("docs"),
+		Examples:    cmd.Bool("examples"),
 		Sources:     sources,
 		DebugInfo:   debugInfo,
 		InstallRoot: installRoot,

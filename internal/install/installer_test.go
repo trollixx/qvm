@@ -65,59 +65,6 @@ func TestDiffSlices(t *testing.T) {
 	}
 }
 
-func TestDiffDocs(t *testing.T) {
-	tests := []struct {
-		name      string
-		requested []string
-		installed []string
-		want      []string
-	}{
-		{
-			name:      "empty requested returns nil",
-			requested: nil,
-			installed: []string{"a"},
-			want:      nil,
-		},
-		{
-			name:      "installed has wildcard returns nil",
-			requested: []string{"a", "b"},
-			installed: []string{"*"},
-			want:      nil,
-		},
-		{
-			name:      "requested wildcard passes through",
-			requested: []string{"*"},
-			installed: []string{"a"},
-			want:      []string{"*"},
-		},
-		{
-			name:      "both wildcard returns nil",
-			requested: []string{"*"},
-			installed: []string{"*"},
-			want:      nil,
-		},
-		{
-			name:      "normal diff",
-			requested: []string{"a", "b", "c"},
-			installed: []string{"a"},
-			want:      []string{"b", "c"},
-		},
-		{
-			name:      "empty installed",
-			requested: []string{"a"},
-			installed: nil,
-			want:      []string{"a"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := diffDocs(tt.requested, tt.installed)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestMergeSlices(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -172,59 +119,6 @@ func TestMergeSlices(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := mergeSlices(tt.existing, tt.additions)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestMergeDocs(t *testing.T) {
-	tests := []struct {
-		name      string
-		existing  []string
-		additions []string
-		want      []string
-	}{
-		{
-			name:      "existing has wildcard",
-			existing:  []string{"*"},
-			additions: []string{"a", "b"},
-			want:      []string{"*"},
-		},
-		{
-			name:      "additions has wildcard",
-			existing:  []string{"a", "b"},
-			additions: []string{"*"},
-			want:      []string{"*"},
-		},
-		{
-			name:      "both have wildcard",
-			existing:  []string{"*"},
-			additions: []string{"*"},
-			want:      []string{"*"},
-		},
-		{
-			name:      "normal merge",
-			existing:  []string{"a"},
-			additions: []string{"b"},
-			want:      []string{"a", "b"},
-		},
-		{
-			name:      "both empty",
-			existing:  nil,
-			additions: nil,
-			want:      []string{},
-		},
-		{
-			name:      "no wildcard with overlap",
-			existing:  []string{"a", "b"},
-			additions: []string{"b", "c"},
-			want:      []string{"a", "b", "c"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := mergeDocs(tt.existing, tt.additions)
 			assert.Equal(t, tt.want, got)
 		})
 	}

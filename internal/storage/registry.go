@@ -14,10 +14,10 @@ const registryVersion = 1
 
 // InstalledExtras holds extra content installed alongside a Qt version.
 type InstalledExtras struct {
-	Docs      []string `json:"docs,omitempty"`
-	Examples  []string `json:"examples,omitempty"`
-	Sources   bool     `json:"sources,omitempty"`
-	DebugInfo bool     `json:"debug_info,omitempty"`
+	Docs      bool `json:"docs,omitempty"`
+	Examples  bool `json:"examples,omitempty"`
+	Sources   bool `json:"sources,omitempty"`
+	DebugInfo bool `json:"debug_info,omitempty"`
 }
 
 // InstalledQt describes a single installed Qt SDK target.

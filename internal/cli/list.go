@@ -173,19 +173,11 @@ func printInstalledTools(reg *storage.Registry) {
 
 func buildExtrasLine(extras storage.InstalledExtras) string {
 	var parts []string
-	if len(extras.Docs) > 0 {
-		if len(extras.Docs) == 1 && extras.Docs[0] == "*" {
-			parts = append(parts, "docs (all)")
-		} else {
-			parts = append(parts, fmt.Sprintf("docs (%s)", strings.Join(extras.Docs, ", ")))
-		}
+	if extras.Docs {
+		parts = append(parts, "docs")
 	}
-	if len(extras.Examples) > 0 {
-		if len(extras.Examples) == 1 && extras.Examples[0] == "*" {
-			parts = append(parts, "examples (all)")
-		} else {
-			parts = append(parts, fmt.Sprintf("examples (%s)", strings.Join(extras.Examples, ", ")))
-		}
+	if extras.Examples {
+		parts = append(parts, "examples")
 	}
 	if extras.Sources {
 		parts = append(parts, "sources")

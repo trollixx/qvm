@@ -86,9 +86,9 @@ qvm install <tool>[@<version>] [flags]
 | --- | --- |
 | `--arch`, `-a` | Compiler/ABI target (e.g. `win64_msvc2022_64`, `gcc_64`, `macos`). Auto-detected if omitted. |
 | `--target` | Qt platform: `desktop` (default), `android`, `wasm`, `ios`, `winrt` |
-| `--modules`, `-m` | Comma-separated add-on modules (e.g. `qtcharts,qtwebengine`) |
-| `--docs` | Install documentation. Omit value for all docs (`--docs`), or specify modules (`--docs=qtcharts`) |
-| `--examples` | Install examples. Same syntax as `--docs` |
+| `--modules`, `-m` | Comma-separated add-on modules (e.g. `qtcharts,qtwebengine`). The `qt` prefix is optional (`charts` and `qtcharts` both work). |
+| `--docs` | Install documentation for all selected modules |
+| `--examples` | Install examples for all selected modules |
 | `--sources` | Install Qt source code |
 | `--debug-info` | Install debug information files |
 | `--force` | Re-install even if already present |

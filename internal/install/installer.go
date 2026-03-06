@@ -40,8 +40,8 @@ type Options struct {
 	Version     string
 	Arch        string
 	Modules     []string
-	Docs        []string // "*" = all selected
-	Examples    []string
+	Docs        bool
+	Examples    bool
 	Sources     bool
 	DebugInfo   bool
 	InstallRoot string // e.g. C:\Qt
@@ -97,14 +97,14 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		// Delta: only resolve what is not already installed.
 		resolveOpts.SkipEssentials = true
 		resolveOpts.Modules = diffSlices(normalizeModuleNames(opts.Modules), existingQt.Modules)
-		resolveOpts.Docs = diffDocs(opts.Docs, existingQt.Extras.Docs)
-		resolveOpts.Examples = diffDocs(opts.Examples, existingQt.Extras.Examples)
+		resolveOpts.Docs = opts.Docs && !existingQt.Extras.Docs
+		resolveOpts.Examples = opts.Examples && !existingQt.Extras.Examples
 		resolveOpts.Sources = opts.Sources && !existingQt.Extras.Sources
 		resolveOpts.DebugInfo = opts.DebugInfo && !existingQt.Extras.DebugInfo
 
 		if len(resolveOpts.Modules) == 0 &&
-			len(resolveOpts.Docs) == 0 &&
-			len(resolveOpts.Examples) == 0 &&
+			!resolveOpts.Docs &&
+			!resolveOpts.Examples &&
 			!resolveOpts.Sources &&
 			!resolveOpts.DebugInfo {
 			return ErrUpToDate
@@ -280,8 +280,8 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		entry.InstalledAt = existingQt.InstalledAt
 		entry.Modules = mergeSlices(existingQt.Modules, opts.Modules)
 		entry.Extras = storage.InstalledExtras{
-			Docs:      mergeDocs(existingQt.Extras.Docs, opts.Docs),
-			Examples:  mergeDocs(existingQt.Extras.Examples, opts.Examples),
+			Docs:      existingQt.Extras.Docs || opts.Docs,
+			Examples:  existingQt.Extras.Examples || opts.Examples,
 			Sources:   existingQt.Extras.Sources || opts.Sources,
 			DebugInfo: existingQt.Extras.DebugInfo || opts.DebugInfo,
 		}
@@ -459,24 +459,6 @@ func diffSlices(requested, installed []string) []string {
 	return diff
 }
 
-// diffDocs computes the delta for docs/examples lists, handling "*" (all) semantics.
-// If installed already contains "*", everything is already installed → return nil.
-// If requested is "*" and installed has some entries, still need to install remaining → return "*".
-func diffDocs(requested, installed []string) []string {
-	if len(requested) == 0 {
-		return nil
-	}
-	// If already installed everything, nothing to do.
-	if len(installed) == 1 && installed[0] == "*" {
-		return nil
-	}
-	// If requesting everything, pass through.
-	if len(requested) == 1 && requested[0] == "*" {
-		return requested
-	}
-	return diffSlices(requested, installed)
-}
-
 // mergeSlices returns the union of existing and new without duplicates,
 // preserving order (existing first, then any new additions).
 func mergeSlices(existing, additions []string) []string {
@@ -494,18 +476,3 @@ func mergeSlices(existing, additions []string) []string {
 	return result
 }
 
-// mergeDocs merges existing and new doc/example lists, handling "*" semantics.
-func mergeDocs(existing, additions []string) []string {
-	// If either side is "*" (all), the result is "*".
-	for _, s := range existing {
-		if s == "*" {
-			return existing
-		}
-	}
-	for _, s := range additions {
-		if s == "*" {
-			return additions
-		}
-	}
-	return mergeSlices(existing, additions)
-}

@@ -14,8 +14,8 @@ type ResolveOptions struct {
 	Arch           string   // e.g. "win64_msvc2022_64"
 	TargetPlatform string   // e.g. "desktop", "android", "wasm"; defaults to "desktop"
 	Modules        []string // add-on module names; nil = essentials only
-	Docs           []string // "*" = all selected modules, or specific names
-	Examples       []string // same semantics as Docs
+	Docs           bool
+	Examples       bool
 	Sources        bool
 	DebugInfo      bool
 	SkipEssentials bool // true when the essential bundle is already installed
@@ -89,12 +89,23 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 
 	var archives []ResolvedArchive
 
+	// Collect the module names that are being installed (essentials + addons)
+	// so docs/examples can be scoped to them.
+	var installedModules []string
+
 	// Essential archives for the arch (skipped when already installed).
 	if !opts.SkipEssentials {
 		essentialPkg := prefix + "." + opts.Arch
 		if refs, ok := vi.PackageArchives[essentialPkg]; ok {
 			for _, ref := range refs {
 				archives = append(archives, ResolvedArchive{Name: essentialPkg, Ref: ref})
+			}
+		}
+		// Essential modules are tracked on the arch.
+		for _, a := range vi.Archs {
+			if a.Name == opts.Arch {
+				installedModules = append(installedModules, a.EssentialModules...)
+				break
 			}
 		}
 	}
@@ -106,6 +117,7 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 			for _, ref := range refs {
 				archives = append(archives, ResolvedArchive{Name: addonPkg, Ref: ref})
 			}
+			installedModules = append(installedModules, mod)
 			continue
 		}
 		// Auto-prefix "qt" and retry.
@@ -116,6 +128,7 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 				for _, ref := range refs {
 					archives = append(archives, ResolvedArchive{Name: addonPkg, Ref: ref})
 				}
+				installedModules = append(installedModules, qtMod)
 				continue
 			}
 		}
@@ -126,14 +139,14 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 		return nil, qerr.SuggestModule(mod, available)
 	}
 
-	// Documentation.
-	if len(opts.Docs) > 0 {
-		archives = append(archives, resolveDocArchives(vi, prefix, opts.Docs)...)
+	// Documentation — scoped to installed modules.
+	if opts.Docs {
+		archives = append(archives, resolveDocArchives(vi, prefix, installedModules)...)
 	}
 
-	// Examples.
-	if len(opts.Examples) > 0 {
-		archives = append(archives, resolveExamplesArchives(vi, prefix, opts.Examples)...)
+	// Examples — scoped to installed modules.
+	if opts.Examples {
+		archives = append(archives, resolveExamplesArchives(vi, prefix, installedModules)...)
 	}
 
 	// Sources.
@@ -155,21 +168,11 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 
 func resolveDocArchives(vi *QtVersionInfo, prefix string, modules []string) []ResolvedArchive {
 	var result []ResolvedArchive
-	if len(modules) == 1 && modules[0] == "*" {
-		for pkg, refs := range vi.PackageArchives {
-			if strings.HasPrefix(pkg, prefix+".doc.") {
-				for _, ref := range refs {
-					result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
-				}
-			}
-		}
-	} else {
-		for _, mod := range modules {
-			pkg := prefix + ".doc." + mod
-			if refs, ok := vi.PackageArchives[pkg]; ok {
-				for _, ref := range refs {
-					result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
-				}
+	for _, mod := range modules {
+		pkg := prefix + ".doc." + mod
+		if refs, ok := vi.PackageArchives[pkg]; ok {
+			for _, ref := range refs {
+				result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
 			}
 		}
 	}
@@ -178,21 +181,11 @@ func resolveDocArchives(vi *QtVersionInfo, prefix string, modules []string) []Re
 
 func resolveExamplesArchives(vi *QtVersionInfo, prefix string, modules []string) []ResolvedArchive {
 	var result []ResolvedArchive
-	if len(modules) == 1 && modules[0] == "*" {
-		for pkg, refs := range vi.PackageArchives {
-			if strings.HasPrefix(pkg, prefix+".examples.") {
-				for _, ref := range refs {
-					result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
-				}
-			}
-		}
-	} else {
-		for _, mod := range modules {
-			pkg := prefix + ".examples." + mod
-			if refs, ok := vi.PackageArchives[pkg]; ok {
-				for _, ref := range refs {
-					result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
-				}
+	for _, mod := range modules {
+		pkg := prefix + ".examples." + mod
+		if refs, ok := vi.PackageArchives[pkg]; ok {
+			for _, ref := range refs {
+				result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
 			}
 		}
 	}
