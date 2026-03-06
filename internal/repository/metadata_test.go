@@ -15,9 +15,10 @@ import (
 
 // packagesXML builds a minimal Updates.xml body from a slice of package descriptors.
 func packagesXML(pkgs []struct{ name, virtual, archives string }) []byte {
-	return packagesXMLFull(func() []struct {
+	return packagesXMLFull(func() (out []struct {
 		name, displayName, virtual, archives string
-	} {
+	},
+	) {
 		for _, p := range pkgs {
 			out = append(out, struct{ name, displayName, virtual, archives string }{
 				p.name, "", p.virtual, p.archives,
