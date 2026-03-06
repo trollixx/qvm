@@ -112,6 +112,81 @@ func TestResolveArchives_NoPrefixForAlreadyPrefixed(t *testing.T) {
 	assert.Len(t, archives, 2) // essentials + qtcharts
 }
 
+// testVersionInfoQt5 builds a Qt 5 QtVersionInfo with the given addon packages
+// using the Qt 5 naming scheme (no "addons" segment).
+func testVersionInfoQt5(arch string, addonModules ...string) *QtVersionInfo {
+	vi := &QtVersionInfo{
+		Version: "5.15.2",
+		Major:   5,
+		Archs:   []Arch{{Name: arch}},
+		PackageArchives: map[string][]ArchiveRef{
+			"qt.qt5.5152." + arch: {{URL: "http://x/qtbase.7z", Filename: "qtbase.7z"}},
+		},
+	}
+	for _, mod := range addonModules {
+		pkg := "qt.qt5.5152." + mod + "." + arch
+		vi.PackageArchives[pkg] = []ArchiveRef{{URL: "http://x/" + mod + ".7z", Filename: mod + ".7z"}}
+		vi.Modules = append(vi.Modules, Module{Name: mod})
+	}
+	return vi
+}
+
+func TestResolveArchives_Qt5_ExactModuleName(t *testing.T) {
+	vi := testVersionInfoQt5("win64_msvc2019_64", "qtcharts", "qtwebengine")
+	archives, err := resolveArchives(vi, ResolveOptions{
+		Version: "5.15.2",
+		Arch:    "win64_msvc2019_64",
+		Modules: []string{"qtwebengine"},
+	})
+	require.NoError(t, err)
+
+	var names []string
+	for _, a := range archives {
+		names = append(names, a.Name)
+	}
+	assert.Contains(t, names, "qt.qt5.5152.qtwebengine.win64_msvc2019_64")
+}
+
+func TestResolveArchives_Qt5_AutoPrefixQt(t *testing.T) {
+	vi := testVersionInfoQt5("win64_msvc2019_64", "qtcharts", "qtwebengine")
+	archives, err := resolveArchives(vi, ResolveOptions{
+		Version: "5.15.2",
+		Arch:    "win64_msvc2019_64",
+		Modules: []string{"webengine", "charts"},
+	})
+	require.NoError(t, err)
+
+	var names []string
+	for _, a := range archives {
+		names = append(names, a.Name)
+	}
+	assert.Contains(t, names, "qt.qt5.5152.qtwebengine.win64_msvc2019_64")
+	assert.Contains(t, names, "qt.qt5.5152.qtcharts.win64_msvc2019_64")
+}
+
+func TestResolveArchives_EssentialModuleSkipped(t *testing.T) {
+	// "qtimageformats" is an essential module — requesting it should not error.
+	vi := testVersionInfoQt5("win64_msvc2019_64", "qtcharts")
+	vi.Archs[0].EssentialModules = []string{"qtbase", "qtimageformats", "qtwebchannel"}
+
+	archives, err := resolveArchives(vi, ResolveOptions{
+		Version: "5.15.2",
+		Arch:    "win64_msvc2019_64",
+		Modules: []string{"imageformats", "charts", "webchannel"},
+	})
+	require.NoError(t, err)
+
+	var names []string
+	for _, a := range archives {
+		names = append(names, a.Name)
+	}
+	// qtcharts should be resolved as an addon.
+	assert.Contains(t, names, "qt.qt5.5152.qtcharts.win64_msvc2019_64")
+	// imageformats and webchannel are essentials — skipped, no error.
+	assert.NotContains(t, names, "qtimageformats")
+	assert.NotContains(t, names, "qtwebchannel")
+}
+
 func TestArchiveModuleName(t *testing.T) {
 	tests := []struct {
 		filename string

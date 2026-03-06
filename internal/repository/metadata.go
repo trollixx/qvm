@@ -593,10 +593,21 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 		return
 	}
 
-	// Register addon module from 5-part package: qt.qt6.683.addons.qt3d
+	// Register addon module. Two naming schemes exist:
+	//   Qt 6:  qt.qt6.683.addons.qt3d          (5-part, module at parts[4])
+	//   Qt 5:  qt.qt5.5152.qtcharts             (4-part, module at parts[3])
 	// This must happen before the arch check so module-only packages are not skipped.
+	var moduleName string
 	if len(parts) >= 5 && parts[3] == "addons" {
-		moduleName := parts[4]
+		moduleName = parts[4]
+	} else if len(parts) == 4 && extractTarget(parts) == "" {
+		candidate := parts[3]
+		skip := map[string]bool{"doc": true, "examples": true, "sources": true, "debug_info": true, "addons": true}
+		if !skip[candidate] {
+			moduleName = candidate
+		}
+	}
+	if moduleName != "" {
 		displayName := pkg.DisplayName
 		if displayName == "" {
 			displayName = moduleName

@@ -491,6 +491,35 @@ func TestProbePreviewVersions(t *testing.T) {
 	assert.False(t, versions[3].IsPreview, "5.15.18 should not be preview (pre-6.8)")
 }
 
+// Qt 5 real-world naming: no "addons" segment in package names.
+// Meta-packages are 4-part (qt.qt5.XXXX.moduleName), target packages are
+// 5-part virtual (qt.qt5.XXXX.moduleName.arch).
+func TestParseRepoIndex_Qt5RealWorldModules(t *testing.T) {
+	xml := packagesXML([]struct{ name, virtual, archives string }{
+		{"qt.qt5.5152.win64_msvc2019_64", "false", "qtbase-Windows-msvc.7z"},
+		// 4-part module meta-packages (non-virtual, no archives).
+		{"qt.qt5.5152.qtcharts", "false", ""},
+		{"qt.qt5.5152.qtwebengine", "false", ""},
+		// 5-part virtual target packages (have archives).
+		{"qt.qt5.5152.qtcharts.win64_msvc2019_64", "true", "qtcharts-Windows-msvc.7z"},
+		{"qt.qt5.5152.qtwebengine.win64_msvc2019_64", "true", "qtwebengine-Windows-msvc.7z"},
+	})
+
+	idx, err := parseRepoIndex(xml, "")
+	require.NoError(t, err)
+	require.Len(t, idx.QtVersions, 1)
+
+	vi := idx.QtVersions[0]
+	assert.Equal(t, "5.15.2", vi.Version)
+
+	// Modules should be discovered from the 4-part meta-packages.
+	assert.ElementsMatch(t, []string{"qtcharts", "qtwebengine"}, addonModuleNames(vi.Modules))
+
+	// Archives should be stored from the 5-part virtual packages.
+	assert.NotEmpty(t, vi.PackageArchives["qt.qt5.5152.qtcharts.win64_msvc2019_64"])
+	assert.NotEmpty(t, vi.PackageArchives["qt.qt5.5152.qtwebengine.win64_msvc2019_64"])
+}
+
 // --- cacheKeyFromURL ---
 
 func TestCacheKeyFromURL(t *testing.T) {
