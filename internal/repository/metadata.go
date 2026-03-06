@@ -101,7 +101,7 @@ func (f *MetadataFetcher) probePreviewVersions(ctx context.Context, versions []Q
 	// Collect indices of versions that need probing (Qt 6.8+ only).
 	var indices []int
 	for i, v := range versions {
-		if isQt68Plus(v.Version, v.Major) {
+		if isQt68Plus(v.Version) {
 			indices = append(indices, i)
 		}
 	}
@@ -134,13 +134,9 @@ func (f *MetadataFetcher) probePreviewVersions(ctx context.Context, versions []Q
 }
 
 // isPreviewVersion performs a HEAD request to the combined Updates.xml URL for
-// a Qt version. Returns true if the URL returns 404 (preview/unreleased).
-// For pre-6.8 versions, always returns false.
+// a Qt 6.8+ version. Returns true if the URL returns 404 (preview/unreleased).
+// Callers must ensure version is Qt 6.8+.
 func (f *MetadataFetcher) isPreviewVersion(ctx context.Context, version string, major int) bool {
-	if !isQt68Plus(version, major) {
-		return false
-	}
-
 	probeURL := f.mirrors.ProbeURL(version, major)
 	if probeURL == "" {
 		return false
@@ -261,7 +257,7 @@ func (f *MetadataFetcher) FetchAllTools(ctx context.Context) ([]ToolInfo, error)
 // fetchExtensions fetches extension modules (qtwebengine, qtpdf) for Qt 6.8+
 // and merges them into vi as regular add-on modules.
 func (f *MetadataFetcher) fetchExtensions(ctx context.Context, vi *QtVersionInfo) {
-	if !isQt68Plus(vi.Version, vi.Major) {
+	if !isQt68Plus(vi.Version) {
 		return
 	}
 	if vi.PackageArchives == nil {

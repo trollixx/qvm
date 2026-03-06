@@ -493,8 +493,8 @@ func newestLTSPatch(vers []repository.QtVersionInfo) string {
 		if err != nil {
 			continue
 		}
-		if pv.Minor > bestMinor {
-			bestMinor = pv.Minor
+		if pv.Minor() > bestMinor {
+			bestMinor = pv.Minor()
 		}
 	}
 	if bestMinor < 0 {
@@ -509,7 +509,7 @@ func newestLTSPatch(vers []repository.QtVersionInfo) string {
 		if err != nil {
 			continue
 		}
-		if pv.Minor == bestMinor {
+		if pv.Minor() == bestMinor {
 			return v.Version
 		}
 	}

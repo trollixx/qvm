@@ -4,7 +4,12 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+
+	"github.com/trollixx/qvm/pkg/qtmeta"
 )
+
+// qt68 is the version threshold for Qt 6.8+ repository layout changes.
+var qt68 = qtmeta.MustParseVersion("6.8.0")
 
 // Mirror holds a base URL for the Qt repository.
 type Mirror struct {
@@ -84,7 +89,7 @@ func (m *MirrorList) ToolURLsFor(toolName string) []string {
 func buildURL(base, host, version string, major int) string {
 	verStr := versionToRepoStr(version, major)
 	folder := fmt.Sprintf("qt%d_%s", major, verStr)
-	if isQt68Plus(version, major) {
+	if isQt68Plus(version) {
 		// Two-level: qt6_680/qt6_680/Updates.xml
 		return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/%s/Updates.xml", base, host, folder, folder)
 	}
@@ -92,23 +97,12 @@ func buildURL(base, host, version string, major int) string {
 }
 
 // isQt68Plus reports whether version is Qt 6.8.0 or later.
-func isQt68Plus(version string, major int) bool {
-	if major < 6 {
+func isQt68Plus(version string) bool {
+	v, err := qtmeta.ParseVersion(version)
+	if err != nil {
 		return false
 	}
-	// Parse minor version from the compact string.
-	// "6.8.0" → minor=8, "6.7.3" → minor=7
-	parts := strings.SplitN(version, ".", 3)
-	if len(parts) < 2 {
-		return false
-	}
-	minor := 0
-	for _, ch := range parts[1] {
-		if ch >= '0' && ch <= '9' {
-			minor = minor*10 + int(ch-'0')
-		}
-	}
-	return minor >= 8
+	return v.GTE(qt68)
 }
 
 // ProbeURL returns the combined Updates.xml URL used to detect whether a
@@ -116,7 +110,7 @@ func isQt68Plus(version string, major int) bool {
 // Updates.xml at qt6_XXXX/qt6_XXXX/Updates.xml; preview versions do not.
 // Returns "" for pre-6.8 versions.
 func (m *MirrorList) ProbeURL(version string, major int) string {
-	if !isQt68Plus(version, major) {
+	if !isQt68Plus(version) {
 		return ""
 	}
 	host := m.host
@@ -179,7 +173,7 @@ func ExtensionModuleNames() []string {
 //
 //	{base}online/qtsdkrepository/{host}/extensions/{module}/{compactVer}/{archSubdir}/Updates.xml
 func (m *MirrorList) ExtensionURLsFor(moduleName, version string, major int, arch string) []string {
-	if !isQt68Plus(version, major) {
+	if !isQt68Plus(version) {
 		return nil
 	}
 	host := m.host
@@ -229,7 +223,7 @@ func (m *MirrorList) SrcDocExURLsFor(version string, major int) []string {
 	verStr := versionToRepoStr(version, major)
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))
-	if isQt68Plus(version, major) {
+	if isQt68Plus(version) {
 		folder := fmt.Sprintf("qt%d_%s_unix_line_endings_src", major, verStr)
 		for _, base := range all {
 			urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/all_os/qt/%s/Updates.xml", base, folder))

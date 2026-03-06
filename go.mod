@@ -6,6 +6,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/bodgit/sevenzip v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
+	github.com/hashicorp/go-version v1.8.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/sahilm/fuzzy v0.1.1

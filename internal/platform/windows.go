@@ -14,11 +14,11 @@ func (w *Windows) DefaultInstallDir() string {
 }
 
 func (w *Windows) DefaultArch(qtVersion string) string {
-	// Qt 6 dropped MSVC 2019 support; always default to MSVC 2022.
-	if len(qtVersion) > 0 && qtVersion[0] == '6' {
-		return "win64_msvc2022_64"
+	// Qt 6.6+ requires MSVC 2022 — no compiler probing needed.
+	if msvc := windowsDefaultMSVC(qtVersion); msvc == "win64_msvc2022_64" {
+		return msvc
 	}
-	// Qt 5: prefer whatever MSVC is installed on this machine.
+	// Pre-6.6 (including Qt 5): prefer whatever MSVC is installed.
 	if hasMSVC("2019") {
 		return "win64_msvc2019_64"
 	}

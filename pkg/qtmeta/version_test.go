@@ -32,9 +32,9 @@ func TestParseVersion(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantMajor, v.Major)
-			assert.Equal(t, tc.wantMinor, v.Minor)
-			assert.Equal(t, tc.wantPatch, v.Patch)
+			assert.Equal(t, tc.wantMajor, v.Major())
+			assert.Equal(t, tc.wantMinor, v.Minor())
+			assert.Equal(t, tc.wantPatch, v.Patch())
 		})
 	}
 }
