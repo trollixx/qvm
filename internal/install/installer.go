@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/trollixx/qvm/internal/repository"
@@ -95,7 +96,7 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	if existingQt != nil {
 		// Delta: only resolve what is not already installed.
 		resolveOpts.SkipEssentials = true
-		resolveOpts.Modules = diffSlices(opts.Modules, existingQt.Modules)
+		resolveOpts.Modules = diffSlices(normalizeModuleNames(opts.Modules), existingQt.Modules)
 		resolveOpts.Docs = diffDocs(opts.Docs, existingQt.Extras.Docs)
 		resolveOpts.Examples = diffDocs(opts.Examples, existingQt.Extras.Examples)
 		resolveOpts.Sources = opts.Sources && !existingQt.Extras.Sources
@@ -109,7 +110,7 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 			return ErrUpToDate
 		}
 	} else {
-		resolveOpts.Modules = opts.Modules
+		resolveOpts.Modules = normalizeModuleNames(opts.Modules)
 		resolveOpts.Docs = opts.Docs
 		resolveOpts.Examples = opts.Examples
 		resolveOpts.Sources = opts.Sources
@@ -428,6 +429,19 @@ func copyBuf(dst *os.File, src *os.File) (int64, error) {
 			return total, err
 		}
 	}
+}
+
+// normalizeModuleNames ensures each module name has the "qt" prefix,
+// matching the canonical form used in Qt's metadata and the registry.
+func normalizeModuleNames(modules []string) []string {
+	out := make([]string, len(modules))
+	for i, m := range modules {
+		if !strings.HasPrefix(m, "qt") {
+			m = "qt" + m
+		}
+		out[i] = m
+	}
+	return out
 }
 
 // diffSlices returns elements in requested that are not in installed.

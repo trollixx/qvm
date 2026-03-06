@@ -230,6 +230,56 @@ func TestMergeDocs(t *testing.T) {
 	}
 }
 
+func TestNormalizeModuleNames(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  []string
+	}{
+		{
+			name:  "already prefixed",
+			input: []string{"qtcharts", "qtwebengine"},
+			want:  []string{"qtcharts", "qtwebengine"},
+		},
+		{
+			name:  "missing prefix",
+			input: []string{"charts", "webengine"},
+			want:  []string{"qtcharts", "qtwebengine"},
+		},
+		{
+			name:  "mixed",
+			input: []string{"webengine", "qtcharts", "httpserver"},
+			want:  []string{"qtwebengine", "qtcharts", "qthttpserver"},
+		},
+		{
+			name:  "empty",
+			input: nil,
+			want:  []string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, normalizeModuleNames(tt.input))
+		})
+	}
+}
+
+func TestDiffSlices_WithNormalizedModules(t *testing.T) {
+	// Simulates the real scenario: user passes "webengine", registry has "qtwebengine".
+	// After normalization, diffSlices should see no difference.
+	requested := normalizeModuleNames([]string{"webengine", "imageformats", "httpserver"})
+	installed := []string{"qtwebengine", "qtimageformats", "qthttpserver"}
+	assert.Nil(t, diffSlices(requested, installed))
+}
+
+func TestDiffSlices_NormalizedWithNewModule(t *testing.T) {
+	// User requests modules including one that's not yet installed.
+	requested := normalizeModuleNames([]string{"webengine", "charts"})
+	installed := []string{"qtwebengine"}
+	got := diffSlices(requested, installed)
+	assert.Equal(t, []string{"qtcharts"}, got)
+}
+
 func TestSendProgress(t *testing.T) {
 	t.Run("nil channel does not panic", func(t *testing.T) {
 		assert.NotPanics(t, func() {

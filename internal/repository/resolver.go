@@ -78,6 +78,11 @@ func (r *Resolver) Resolve(ctx context.Context, opts ResolveOptions) ([]Resolved
 		}
 	}
 
+	return resolveArchives(vi, opts)
+}
+
+// resolveArchives resolves the concrete archives from a QtVersionInfo and options.
+func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive, error) {
 	major := vi.Major
 	verStr := versionToRepoStr(opts.Version, major)
 	prefix := fmt.Sprintf("qt.qt%d.%s", major, verStr)
@@ -101,27 +106,44 @@ func (r *Resolver) Resolve(ctx context.Context, opts ResolveOptions) ([]Resolved
 			for _, ref := range refs {
 				archives = append(archives, ResolvedArchive{Name: addonPkg, Ref: ref})
 			}
+			continue
 		}
+		// Auto-prefix "qt" and retry.
+		if !strings.HasPrefix(mod, "qt") {
+			qtMod := "qt" + mod
+			addonPkg = prefix + ".addons." + qtMod + "." + opts.Arch
+			if refs, ok := vi.PackageArchives[addonPkg]; ok {
+				for _, ref := range refs {
+					archives = append(archives, ResolvedArchive{Name: addonPkg, Ref: ref})
+				}
+				continue
+			}
+		}
+		var available []string
+		for _, m := range vi.ModulesForArch(opts.Arch) {
+			available = append(available, m.Name)
+		}
+		return nil, qerr.SuggestModule(mod, available)
 	}
 
 	// Documentation.
 	if len(opts.Docs) > 0 {
-		archives = append(archives, r.resolveDocArchives(vi, prefix, opts.Docs)...)
+		archives = append(archives, resolveDocArchives(vi, prefix, opts.Docs)...)
 	}
 
 	// Examples.
 	if len(opts.Examples) > 0 {
-		archives = append(archives, r.resolveExamplesArchives(vi, prefix, opts.Examples)...)
+		archives = append(archives, resolveExamplesArchives(vi, prefix, opts.Examples)...)
 	}
 
 	// Sources.
 	if opts.Sources {
-		archives = append(archives, r.resolveSourcesArchives(vi, prefix)...)
+		archives = append(archives, resolveSourcesArchives(vi, prefix)...)
 	}
 
 	// Debug info.
 	if opts.DebugInfo {
-		archives = append(archives, r.resolveDebugInfoArchives(vi, prefix, opts.Arch)...)
+		archives = append(archives, resolveDebugInfoArchives(vi, prefix, opts.Arch)...)
 	}
 
 	if len(archives) == 0 {
@@ -131,7 +153,7 @@ func (r *Resolver) Resolve(ctx context.Context, opts ResolveOptions) ([]Resolved
 	return archives, nil
 }
 
-func (r *Resolver) resolveDocArchives(vi *QtVersionInfo, prefix string, modules []string) []ResolvedArchive {
+func resolveDocArchives(vi *QtVersionInfo, prefix string, modules []string) []ResolvedArchive {
 	var result []ResolvedArchive
 	if len(modules) == 1 && modules[0] == "*" {
 		for pkg, refs := range vi.PackageArchives {
@@ -154,7 +176,7 @@ func (r *Resolver) resolveDocArchives(vi *QtVersionInfo, prefix string, modules 
 	return result
 }
 
-func (r *Resolver) resolveExamplesArchives(vi *QtVersionInfo, prefix string, modules []string) []ResolvedArchive {
+func resolveExamplesArchives(vi *QtVersionInfo, prefix string, modules []string) []ResolvedArchive {
 	var result []ResolvedArchive
 	if len(modules) == 1 && modules[0] == "*" {
 		for pkg, refs := range vi.PackageArchives {
@@ -177,7 +199,7 @@ func (r *Resolver) resolveExamplesArchives(vi *QtVersionInfo, prefix string, mod
 	return result
 }
 
-func (r *Resolver) resolveSourcesArchives(vi *QtVersionInfo, prefix string) []ResolvedArchive {
+func resolveSourcesArchives(vi *QtVersionInfo, prefix string) []ResolvedArchive {
 	var result []ResolvedArchive
 	for pkg, refs := range vi.PackageArchives {
 		if strings.HasPrefix(pkg, prefix) {
@@ -191,7 +213,7 @@ func (r *Resolver) resolveSourcesArchives(vi *QtVersionInfo, prefix string) []Re
 	return result
 }
 
-func (r *Resolver) resolveDebugInfoArchives(vi *QtVersionInfo, prefix, arch string) []ResolvedArchive {
+func resolveDebugInfoArchives(vi *QtVersionInfo, prefix, arch string) []ResolvedArchive {
 	var result []ResolvedArchive
 	for pkg, refs := range vi.PackageArchives {
 		if strings.HasPrefix(pkg, prefix) && (strings.Contains(pkg, "debug_info") || strings.Contains(pkg, "debuginfo")) {

@@ -51,7 +51,7 @@ func SuggestModule(bad string, available []string) *QvmError {
 		}
 		err.Message += "\n\nDid you mean:\n" + joinLines(cmds)
 	} else {
-		err.Message += "\n\nRun 'qvm search " + bad + "' to search for modules."
+		err.Message += "\n\nRun 'qvm list qt@<version>' to see available modules."
 	}
 	return err
 }
