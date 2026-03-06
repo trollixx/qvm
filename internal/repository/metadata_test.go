@@ -491,6 +491,47 @@ func TestProbePreviewVersions(t *testing.T) {
 	assert.False(t, versions[3].IsPreview, "5.15.18 should not be preview (pre-6.8)")
 }
 
+// --- cacheKeyFromURL ---
+
+func TestCacheKeyFromURL(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{
+			"primary mirror",
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/Updates.xml",
+			"online/qtsdkrepository/windows_x86/desktop/qt6_683/Updates.xml",
+		},
+		{
+			"fallback mirror with extra path",
+			"https://mirrors.ocf.berkeley.edu/qt/online/qtsdkrepository/windows_x86/desktop/qt6_683/Updates.xml",
+			"online/qtsdkrepository/windows_x86/desktop/qt6_683/Updates.xml",
+		},
+		{
+			"extension URL",
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/extensions/qtwebengine/6102/msvc2022_64/Updates.xml",
+			"online/qtsdkrepository/windows_x86/extensions/qtwebengine/6102/msvc2022_64/Updates.xml",
+		},
+		{
+			"directory listing URL",
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/",
+			"online/qtsdkrepository/windows_x86/desktop/",
+		},
+		{
+			"no marker fallback",
+			"https://example.com/something/else",
+			"https://example.com/something/else",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, cacheKeyFromURL(tc.url))
+		})
+	}
+}
+
 // --- helpers ---
 
 func archNames(archs []Arch) []string {

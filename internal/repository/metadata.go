@@ -414,11 +414,17 @@ func (f *MetadataFetcher) fetchFromURLs(ctx context.Context, urls []string) (*Re
 }
 
 func (f *MetadataFetcher) fetchRaw(ctx context.Context, urls []string) (body []byte, successURL string, err error) {
+	if len(urls) == 0 {
+		return nil, "", fmt.Errorf("no URLs provided")
+	}
+
+	// Use a mirror-independent cache key so all mirrors share one cache entry.
+	cacheKey := cacheKeyFromURL(urls[0])
+
+	etag := f.cache.ETag(cacheKey)
+
 	var lastErr error
 	for _, url := range urls {
-		cacheKey := url
-		etag := f.cache.ETag(cacheKey)
-
 		body, newETag, fetchErr := f.client.FetchWithETag(ctx, url, etag)
 		if fetchErr != nil {
 			lastErr = fmt.Errorf("GET %s: %w", url, fetchErr)
@@ -436,19 +442,28 @@ func (f *MetadataFetcher) fetchRaw(ctx context.Context, urls []string) (body []b
 		}
 	}
 
-	// All mirrors failed — try stale cache for any URL.
-	for _, url := range urls {
-		stale, cacheErr := f.cache.LoadStale(url)
-		if cacheErr == nil && stale != nil {
-			fmt.Fprintf(os.Stderr, "warning: serving stale cached metadata (network unavailable)\n")
-			return stale, url, nil
-		}
+	// All mirrors failed — try stale cache.
+	stale, cacheErr := f.cache.LoadStale(cacheKey)
+	if cacheErr == nil && stale != nil {
+		fmt.Fprintf(os.Stderr, "warning: serving stale cached metadata (network unavailable)\n")
+		return stale, urls[0], nil
 	}
 
 	if lastErr != nil {
 		return nil, "", fmt.Errorf("all mirrors failed (last error: %w)\n\nURLs tried:\n%s", lastErr, urlList(urls))
 	}
 	return nil, "", fmt.Errorf("all mirrors failed and no cached data available\n\nURLs tried:\n%s", urlList(urls))
+}
+
+// cacheKeyFromURL strips the mirror base URL, returning the mirror-independent
+// path portion starting from "online/". If the marker is not found, the full
+// URL is returned as a fallback.
+func cacheKeyFromURL(rawURL string) string {
+	const marker = "online/"
+	if idx := strings.Index(rawURL, marker); idx >= 0 {
+		return rawURL[idx:]
+	}
+	return rawURL
 }
 
 // dirURL returns the directory portion of a URL (strips the last path component).
