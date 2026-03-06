@@ -24,13 +24,17 @@ func newInstallCommand() *cli.Command {
 		ArgsUsage:       "qt@<version> | <tool>[@<version>]",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
-			archFlag,
-			targetFlag,
+			// What to install.
 			&cli.StringSliceFlag{
 				Name:    "modules",
 				Aliases: []string{"m"},
 				Usage:   "comma-separated list of add-on modules to install (e.g. charts,webengine)",
 			},
+			archFlag,
+			targetFlag,
+			hostFlag,
+
+			// Extra content.
 			&cli.BoolFlag{
 				Name:  "docs",
 				Usage: "install documentation for all selected modules",
@@ -47,11 +51,12 @@ func newInstallCommand() *cli.Command {
 				Name:  "debug-symbols",
 				Usage: "install debug symbol files",
 			},
+
+			// Behavior.
 			forceFlag,
-			dirFlag,
-			quietFlag,
 			dryRunFlag,
-			hostFlag,
+			quietFlag,
+			dirFlag,
 		},
 		Action: runInstall,
 	}
