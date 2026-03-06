@@ -212,6 +212,38 @@ func extensionArchSubdir(arch string) string {
 	return arch
 }
 
+// SrcDocExURLsFor returns URLs for the src/doc/examples repository Updates.xml.
+// Qt 6.8+ moved these packages to a separate all_os repository:
+//
+//	{base}online/qtsdkrepository/all_os/qt/qt6_{ver}_unix_line_endings_src/Updates.xml
+//
+// Pre-6.8 Qt 6 versions used per-platform directories:
+//
+//	{base}online/qtsdkrepository/{host}/desktop/qt6_{ver}_src_doc_examples/Updates.xml
+//
+// Returns nil for Qt 5 (not supported).
+func (m *MirrorList) SrcDocExURLsFor(version string, major int) []string {
+	if major < 6 {
+		return nil
+	}
+	verStr := versionToRepoStr(version, major)
+	all := append([]string{m.primary}, m.fallbacks...)
+	urls := make([]string, 0, len(all))
+	if isQt68Plus(version, major) {
+		folder := fmt.Sprintf("qt%d_%s_unix_line_endings_src", major, verStr)
+		for _, base := range all {
+			urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/all_os/qt/%s/Updates.xml", base, folder))
+		}
+	} else {
+		host := m.host
+		folder := fmt.Sprintf("qt%d_%s_src_doc_examples", major, verStr)
+		for _, base := range all {
+			urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/Updates.xml", base, host, folder))
+		}
+	}
+	return urls
+}
+
 // PlatformHost returns the repository host path component for the current OS/arch.
 func PlatformHost() string {
 	switch runtime.GOOS {

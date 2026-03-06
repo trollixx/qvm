@@ -268,6 +268,47 @@ func TestExtensionURLsFor(t *testing.T) {
 	})
 }
 
+func TestSrcDocExURLsFor(t *testing.T) {
+	m := NewMirrorList(
+		"https://download.qt.io/",
+		[]string{"https://mirror.example.com/"},
+		"windows_x86",
+	)
+
+	t.Run("Qt 6.10.2 uses all_os", func(t *testing.T) {
+		urls := m.SrcDocExURLsFor("6.10.2", 6)
+		require.Len(t, urls, 2)
+		assert.Equal(t,
+			"https://download.qt.io/online/qtsdkrepository/all_os/qt/qt6_6102_unix_line_endings_src/Updates.xml",
+			urls[0])
+		assert.Equal(t,
+			"https://mirror.example.com/online/qtsdkrepository/all_os/qt/qt6_6102_unix_line_endings_src/Updates.xml",
+			urls[1])
+	})
+
+	t.Run("Qt 6.8.3 uses all_os", func(t *testing.T) {
+		urls := m.SrcDocExURLsFor("6.8.3", 6)
+		require.Len(t, urls, 2)
+		assert.Contains(t, urls[0], "/all_os/qt/qt6_683_unix_line_endings_src/Updates.xml")
+	})
+
+	t.Run("Qt 6.7.3 uses per-platform", func(t *testing.T) {
+		urls := m.SrcDocExURLsFor("6.7.3", 6)
+		require.Len(t, urls, 2)
+		assert.Equal(t,
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_673_src_doc_examples/Updates.xml",
+			urls[0])
+		assert.Equal(t,
+			"https://mirror.example.com/online/qtsdkrepository/windows_x86/desktop/qt6_673_src_doc_examples/Updates.xml",
+			urls[1])
+	})
+
+	t.Run("Qt 5 returns nil", func(t *testing.T) {
+		urls := m.SrcDocExURLsFor("5.15.18", 5)
+		assert.Nil(t, urls)
+	})
+}
+
 func TestExtensionModuleNames(t *testing.T) {
 	names := ExtensionModuleNames()
 	assert.Contains(t, names, "qtwebengine")

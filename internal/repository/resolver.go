@@ -13,7 +13,8 @@ type ResolveOptions struct {
 	Version        string
 	Arch           string   // e.g. "win64_msvc2022_64"
 	TargetPlatform string   // e.g. "desktop", "android", "wasm"; defaults to "desktop"
-	Modules        []string // add-on module names; nil = essentials only
+	Modules        []string // add-on module names to install (delta — only new ones)
+	AllModules     []string // all module names (existing + new) for scoping docs/examples
 	Docs           bool
 	Examples       bool
 	Sources        bool
@@ -89,23 +90,12 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 
 	var archives []ResolvedArchive
 
-	// Collect the module names that are being installed (essentials + addons)
-	// so docs/examples can be scoped to them.
-	var installedModules []string
-
 	// Essential archives for the arch (skipped when already installed).
 	if !opts.SkipEssentials {
 		essentialPkg := prefix + "." + opts.Arch
 		if refs, ok := vi.PackageArchives[essentialPkg]; ok {
 			for _, ref := range refs {
 				archives = append(archives, ResolvedArchive{Name: essentialPkg, Ref: ref})
-			}
-		}
-		// Essential modules are tracked on the arch.
-		for _, a := range vi.Archs {
-			if a.Name == opts.Arch {
-				installedModules = append(installedModules, a.EssentialModules...)
-				break
 			}
 		}
 	}
@@ -117,7 +107,6 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 			for _, ref := range refs {
 				archives = append(archives, ResolvedArchive{Name: addonPkg, Ref: ref})
 			}
-			installedModules = append(installedModules, mod)
 			continue
 		}
 		// Auto-prefix "qt" and retry.
@@ -128,7 +117,6 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 				for _, ref := range refs {
 					archives = append(archives, ResolvedArchive{Name: addonPkg, Ref: ref})
 				}
-				installedModules = append(installedModules, qtMod)
 				continue
 			}
 		}
@@ -139,14 +127,28 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 		return nil, qerr.SuggestModule(mod, available)
 	}
 
-	// Documentation — scoped to installed modules.
-	if opts.Docs {
-		archives = append(archives, resolveDocArchives(vi, prefix, installedModules)...)
+	// Build the full module list for scoping docs/examples.
+	// Use AllModules if provided (delta install), otherwise derive from
+	// the arch's essentials + requested addons.
+	allModules := opts.AllModules
+	if len(allModules) == 0 {
+		for _, a := range vi.Archs {
+			if a.Name == opts.Arch {
+				allModules = append(allModules, a.EssentialModules...)
+				break
+			}
+		}
+		allModules = append(allModules, opts.Modules...)
 	}
 
-	// Examples — scoped to installed modules.
+	// Documentation — scoped to all installed modules.
+	if opts.Docs {
+		archives = append(archives, resolveDocArchives(vi, prefix, allModules)...)
+	}
+
+	// Examples — scoped to all installed modules.
 	if opts.Examples {
-		archives = append(archives, resolveExamplesArchives(vi, prefix, installedModules)...)
+		archives = append(archives, resolveExamplesArchives(vi, prefix, allModules)...)
 	}
 
 	// Sources.

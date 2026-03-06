@@ -67,9 +67,10 @@ func (f *MetadataFetcher) FetchQtVersion(ctx context.Context, version string) (*
 		return nil, err
 	}
 
-	// Augment with extension modules (Qt 6.8+).
+	// Augment with extension modules (Qt 6.8+) and src/doc/examples.
 	for i := range idx.QtVersions {
 		f.fetchExtensions(ctx, &idx.QtVersions[i])
+		f.fetchSrcDocExamples(ctx, &idx.QtVersions[i])
 	}
 	return idx, nil
 }
@@ -352,6 +353,58 @@ func extensionDisplayName(name string) string {
 	}
 }
 
+// fetchSrcDocExamples fetches the separate src/doc/examples Updates.xml and
+// populates vi.PackageArchives and feature flags (HasDocs, HasExamples, HasSources).
+// This is needed because Qt 6.8+ moved these packages out of the main Updates.xml.
+// Pre-6.8 Qt 6 versions also have a separate _src_doc_examples repository.
+// Errors are silently ignored (non-fatal, like extensions).
+func (f *MetadataFetcher) fetchSrcDocExamples(ctx context.Context, vi *QtVersionInfo) {
+	if vi.Major < 6 {
+		return
+	}
+	urls := f.mirrors.SrcDocExURLsFor(vi.Version, vi.Major)
+	if len(urls) == 0 {
+		return
+	}
+	body, successURL, err := f.fetchRaw(ctx, urls)
+	if err != nil {
+		return
+	}
+
+	var upd updatesXML
+	if err := xml.Unmarshal(body, &upd); err != nil {
+		return
+	}
+
+	if vi.PackageArchives == nil {
+		vi.PackageArchives = make(map[string][]ArchiveRef)
+	}
+
+	baseURL := dirURL(successURL)
+	for _, pkg := range upd.Packages {
+		if pkg.DownloadableArchives == "" {
+			continue
+		}
+		refs := buildArchiveRefs(pkg, baseURL)
+		if len(refs) == 0 {
+			continue
+		}
+		vi.PackageArchives[pkg.Name] = refs
+
+		// Set feature flags.
+		nameLower := strings.ToLower(pkg.Name)
+		if strings.Contains(nameLower, ".doc.") || strings.HasSuffix(nameLower, ".doc") {
+			vi.HasDocs = true
+		}
+		if strings.Contains(nameLower, ".examples.") || strings.HasSuffix(nameLower, ".examples") {
+			vi.HasExamples = true
+		}
+		if strings.Contains(nameLower, ".src") || strings.Contains(nameLower, "sources") {
+			vi.HasSources = true
+		}
+	}
+}
+
 func (f *MetadataFetcher) fetchFromURLs(ctx context.Context, urls []string) (*RepoIndex, error) {
 	body, successURL, err := f.fetchRaw(ctx, urls)
 	if err != nil {
@@ -566,6 +619,10 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 		if strings.Contains(nameLower, "debug_info") || strings.Contains(nameLower, "debuginfo") {
 			vi.HasDebugInfo = true
 		}
+		// Store archives so they can be resolved for download.
+		if refs := buildArchiveRefs(pkg, baseURL); len(refs) > 0 {
+			vi.PackageArchives[pkg.Name] = refs
+		}
 		return
 	}
 
@@ -680,7 +737,9 @@ func parseToolIndex(body []byte, toolName, baseURL string) (*ToolInfo, error) {
 // in pkg, using baseURL to form the full download URL.
 //
 // Qt stores archive files on disk with a version+timestamp prefix:
-//   URL = baseURL + pkgName + "/" + pkg.Version + archiveFilename
+//
+//	URL = baseURL + pkgName + "/" + pkg.Version + archiveFilename
+//
 // e.g. "6.10.1-0-202511161843qtbase-Windows-...7z"
 // The DownloadableArchives field omits this prefix; pkg.Version supplies it.
 func buildArchiveRefs(pkg packageXML, baseURL string) []ArchiveRef {

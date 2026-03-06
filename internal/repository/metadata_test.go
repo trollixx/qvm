@@ -390,6 +390,39 @@ func TestParseRepoIndex_PackageArchivesURLs(t *testing.T) {
 	assert.Empty(t, vi.PackageArchives["qt.qt6.683.addons.qtcharts"])
 }
 
+func TestParseRepoIndex_DocArchivesStored(t *testing.T) {
+	base := "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/"
+	xml := packagesXML([]struct{ name, virtual, archives string }{
+		{"qt.qt6.683.win64_msvc2022_64", "false", "qtbase-Windows-msvc.7z"},
+		// Doc package — no arch, has archives.
+		{"qt.qt6.683.doc.qtcharts", "false", "qtcharts-doc.7z"},
+		{"qt.qt6.683.doc.qtbase", "false", "qtbase-doc.7z"},
+		// Examples package.
+		{"qt.qt6.683.examples.qtcharts", "false", "qtcharts-examples.7z"},
+	})
+
+	idx, err := parseRepoIndex(xml, base)
+	require.NoError(t, err)
+	require.Len(t, idx.QtVersions, 1)
+
+	vi := idx.QtVersions[0]
+	assert.True(t, vi.HasDocs)
+	assert.True(t, vi.HasExamples)
+
+	// Doc archives must be stored in PackageArchives.
+	docArcs := vi.PackageArchives["qt.qt6.683.doc.qtcharts"]
+	require.Len(t, docArcs, 1, "doc archives should be stored in PackageArchives")
+	assert.Equal(t, "qtcharts-doc.7z", docArcs[0].Filename)
+
+	docBaseArcs := vi.PackageArchives["qt.qt6.683.doc.qtbase"]
+	require.Len(t, docBaseArcs, 1)
+
+	// Example archives must be stored too.
+	exArcs := vi.PackageArchives["qt.qt6.683.examples.qtcharts"]
+	require.Len(t, exArcs, 1, "example archives should be stored in PackageArchives")
+	assert.Equal(t, "qtcharts-examples.7z", exArcs[0].Filename)
+}
+
 // --- parseDirectoryListing ---
 
 func TestParseDirectoryListing_IsPreviewNotSet(t *testing.T) {
@@ -604,6 +637,183 @@ func TestFetchExtensions_SkipsPreQt68(t *testing.T) {
 	// Should be a no-op for pre-6.8 versions (no network calls).
 	fetcher.fetchExtensions(context.Background(), vi)
 	assert.Empty(t, vi.Modules)
+}
+
+// --- fetchSrcDocExamples integration ---
+
+func TestFetchSrcDocExamples_Qt68Plus(t *testing.T) {
+	// Simulate the all_os src/doc/examples Updates.xml for Qt 6.10.2.
+	srcDocXML := []byte(`<?xml version="1.0" encoding="UTF-8"?><Updates>
+		<PackageUpdate>
+			<Name>qt.qt6.6102.doc.qtcharts</Name>
+			<Virtual>false</Virtual>
+			<Version>6.10.2-0-202503010000</Version>
+			<DownloadableArchives>qtcharts-doc.7z</DownloadableArchives>
+			<ReleaseDate>2025-03-01</ReleaseDate>
+		</PackageUpdate>
+		<PackageUpdate>
+			<Name>qt.qt6.6102.doc.qtbase</Name>
+			<Virtual>false</Virtual>
+			<Version>6.10.2-0-202503010000</Version>
+			<DownloadableArchives>qtbase-doc.7z</DownloadableArchives>
+			<ReleaseDate>2025-03-01</ReleaseDate>
+		</PackageUpdate>
+		<PackageUpdate>
+			<Name>qt.qt6.6102.examples</Name>
+			<Virtual>false</Virtual>
+			<Version>6.10.2-0-202503010000</Version>
+			<DownloadableArchives>qtbase-examples.7z</DownloadableArchives>
+			<ReleaseDate>2025-03-01</ReleaseDate>
+		</PackageUpdate>
+		<PackageUpdate>
+			<Name>qt.qt6.6102.examples.qtcharts</Name>
+			<Virtual>false</Virtual>
+			<Version>6.10.2-0-202503010000</Version>
+			<DownloadableArchives>qtcharts-examples.7z</DownloadableArchives>
+			<ReleaseDate>2025-03-01</ReleaseDate>
+		</PackageUpdate>
+		<PackageUpdate>
+			<Name>qt.qt6.6102.src</Name>
+			<Virtual>false</Virtual>
+			<Version>6.10.2-0-202503010000</Version>
+			<DownloadableArchives>qtbase-src.7z</DownloadableArchives>
+			<ReleaseDate>2025-03-01</ReleaseDate>
+		</PackageUpdate>
+		<PackageUpdate>
+			<Name>qt.qt6.6102.doc.virtual_only</Name>
+			<Virtual>false</Virtual>
+			<Version>6.10.2-0-202503010000</Version>
+			<DownloadableArchives></DownloadableArchives>
+			<ReleaseDate>2025-03-01</ReleaseDate>
+		</PackageUpdate>
+	</Updates>`)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/all_os/qt/qt6_6102_unix_line_endings_src/") {
+			w.Write(srcDocXML)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	vi := &QtVersionInfo{
+		Version:         "6.10.2",
+		Major:           6,
+		PackageArchives: make(map[string][]ArchiveRef),
+	}
+
+	client := NewClient(10)
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	cache := &Cache{dir: t.TempDir()}
+	fetcher := NewMetadataFetcher(client, cache, mirrors)
+
+	fetcher.fetchSrcDocExamples(context.Background(), vi)
+
+	// Feature flags.
+	assert.True(t, vi.HasDocs)
+	assert.True(t, vi.HasExamples)
+	assert.True(t, vi.HasSources)
+
+	// Doc archives.
+	docArcs := vi.PackageArchives["qt.qt6.6102.doc.qtcharts"]
+	require.Len(t, docArcs, 1)
+	assert.Contains(t, docArcs[0].Filename, "qtcharts-doc.7z")
+
+	docBaseArcs := vi.PackageArchives["qt.qt6.6102.doc.qtbase"]
+	require.Len(t, docBaseArcs, 1)
+
+	// Example archives.
+	exArcs := vi.PackageArchives["qt.qt6.6102.examples.qtcharts"]
+	require.Len(t, exArcs, 1)
+	assert.Contains(t, exArcs[0].Filename, "qtcharts-examples.7z")
+
+	// Source archives.
+	srcArcs := vi.PackageArchives["qt.qt6.6102.src"]
+	require.Len(t, srcArcs, 1)
+	assert.Contains(t, srcArcs[0].Filename, "qtbase-src.7z")
+
+	// Virtual-only package (empty DownloadableArchives) should not be stored.
+	assert.Empty(t, vi.PackageArchives["qt.qt6.6102.doc.virtual_only"])
+}
+
+func TestFetchSrcDocExamples_PreQt68(t *testing.T) {
+	srcDocXML := []byte(`<?xml version="1.0" encoding="UTF-8"?><Updates>
+		<PackageUpdate>
+			<Name>qt.qt6.673.doc.qtcharts</Name>
+			<Virtual>false</Virtual>
+			<Version>6.7.3-0-202410010000</Version>
+			<DownloadableArchives>qtcharts-doc.7z</DownloadableArchives>
+			<ReleaseDate>2024-10-01</ReleaseDate>
+		</PackageUpdate>
+	</Updates>`)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/desktop/qt6_673_src_doc_examples/") {
+			w.Write(srcDocXML)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	vi := &QtVersionInfo{
+		Version:         "6.7.3",
+		Major:           6,
+		PackageArchives: make(map[string][]ArchiveRef),
+	}
+
+	client := NewClient(10)
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	cache := &Cache{dir: t.TempDir()}
+	fetcher := NewMetadataFetcher(client, cache, mirrors)
+
+	fetcher.fetchSrcDocExamples(context.Background(), vi)
+
+	assert.True(t, vi.HasDocs)
+	docArcs := vi.PackageArchives["qt.qt6.673.doc.qtcharts"]
+	require.Len(t, docArcs, 1)
+}
+
+func TestFetchSrcDocExamples_SkipsQt5(t *testing.T) {
+	vi := &QtVersionInfo{
+		Version: "5.15.18",
+		Major:   5,
+	}
+
+	client := NewClient(10)
+	mirrors := NewMirrorList("https://example.com/", nil, "windows_x86")
+	cache := &Cache{dir: t.TempDir()}
+	fetcher := NewMetadataFetcher(client, cache, mirrors)
+
+	// Should be a no-op for Qt 5.
+	fetcher.fetchSrcDocExamples(context.Background(), vi)
+	assert.False(t, vi.HasDocs)
+	assert.False(t, vi.HasExamples)
+	assert.False(t, vi.HasSources)
+}
+
+func TestFetchSrcDocExamples_GracefulOnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	vi := &QtVersionInfo{
+		Version:         "6.10.2",
+		Major:           6,
+		PackageArchives: make(map[string][]ArchiveRef),
+	}
+
+	client := NewClient(10)
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	cache := &Cache{dir: t.TempDir()}
+	fetcher := NewMetadataFetcher(client, cache, mirrors)
+
+	// Should not panic when server returns 404.
+	fetcher.fetchSrcDocExamples(context.Background(), vi)
+	assert.False(t, vi.HasDocs)
+	assert.Empty(t, vi.PackageArchives)
 }
 
 func TestFetchExtensions_GracefulOnMissingExtension(t *testing.T) {

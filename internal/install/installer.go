@@ -93,10 +93,13 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		Arch:    opts.Arch,
 	}
 
+	normalizedModules := normalizeModuleNames(opts.Modules)
+
 	if existingQt != nil {
 		// Delta: only resolve what is not already installed.
 		resolveOpts.SkipEssentials = true
-		resolveOpts.Modules = diffSlices(normalizeModuleNames(opts.Modules), existingQt.Modules)
+		resolveOpts.Modules = diffSlices(normalizedModules, existingQt.Modules)
+		resolveOpts.AllModules = mergeSlices(existingQt.Modules, normalizedModules)
 		resolveOpts.Docs = opts.Docs && !existingQt.Extras.Docs
 		resolveOpts.Examples = opts.Examples && !existingQt.Extras.Examples
 		resolveOpts.Sources = opts.Sources && !existingQt.Extras.Sources
@@ -110,7 +113,7 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 			return ErrUpToDate
 		}
 	} else {
-		resolveOpts.Modules = normalizeModuleNames(opts.Modules)
+		resolveOpts.Modules = normalizedModules
 		resolveOpts.Docs = opts.Docs
 		resolveOpts.Examples = opts.Examples
 		resolveOpts.Sources = opts.Sources
