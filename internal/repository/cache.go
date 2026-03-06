@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
 )
 
 // Cache manages on-disk gzip-compressed XML metadata files.

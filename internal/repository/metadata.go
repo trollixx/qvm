@@ -17,20 +17,20 @@ import (
 
 // updatesXML mirrors the top-level Updates.xml structure.
 type updatesXML struct {
-	XMLName  xml.Name        `xml:"Updates"`
-	Packages []packageXML    `xml:"PackageUpdate"`
+	XMLName  xml.Name     `xml:"Updates"`
+	Packages []packageXML `xml:"PackageUpdate"`
 }
 
 type packageXML struct {
-	Name                 string `xml:"Name"`
-	DisplayName          string `xml:"DisplayName"`
-	Description          string `xml:"Description"`
-	Version              string `xml:"Version"`
-	ReleaseDate          string `xml:"ReleaseDate"`
-	DownloadableArchives string `xml:"DownloadableArchives"`
-	SHA1                 string `xml:"ArchiveSHA1"` // Comma-separated SHA1s matching DownloadableArchives
-	Dependencies         string `xml:"Dependencies"`
-	Virtual              string `xml:"Virtual"`
+	Name                 string          `xml:"Name"`
+	DisplayName          string          `xml:"DisplayName"`
+	Description          string          `xml:"Description"`
+	Version              string          `xml:"Version"`
+	ReleaseDate          string          `xml:"ReleaseDate"`
+	DownloadableArchives string          `xml:"DownloadableArchives"`
+	SHA1                 string          `xml:"ArchiveSHA1"` // Comma-separated SHA1s matching DownloadableArchives
+	Dependencies         string          `xml:"Dependencies"`
+	Virtual              string          `xml:"Virtual"`
 	UpdateFiles          []updateFileXML `xml:"UpdateFile"`
 }
 
@@ -511,8 +511,8 @@ func parseRepoIndex(body []byte, baseURL string) (*RepoIndex, error) {
 type pkgClass int
 
 const (
-	pkgClassQt   pkgClass = iota
-	pkgClassTool pkgClass = iota
+	pkgClassQt    pkgClass = iota
+	pkgClassTool  pkgClass = iota
 	pkgClassOther pkgClass = iota
 )
 

@@ -274,9 +274,9 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	// Register — merge with existing entry when doing a delta install.
 	sendProgress(progressCh, ProgressEvent{Phase: "registering"})
 	entry := storage.InstalledQt{
-		Version:    opts.Version,
-		Arch:       opts.Arch,
-		InstallDir: installDir,
+		Version:     opts.Version,
+		Arch:        opts.Arch,
+		InstallDir:  installDir,
 		InstalledAt: time.Now(),
 	}
 	if existingQt != nil {
@@ -413,7 +413,7 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	return err
 }
 
-func copyBuf(dst *os.File, src *os.File) (int64, error) {
+func copyBuf(dst, src *os.File) (int64, error) {
 	buf := make([]byte, 32*1024)
 	var total int64
 	for {
@@ -478,4 +478,3 @@ func mergeSlices(existing, additions []string) []string {
 	}
 	return result
 }
-

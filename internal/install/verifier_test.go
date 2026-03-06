@@ -19,8 +19,8 @@ func sha1Hex(data []byte) string {
 func TestVerifyFile(t *testing.T) {
 	tests := []struct {
 		name         string
-		content      []byte  // file content; nil means don't create the file
-		expectedSHA1 string  // empty = skip verification
+		content      []byte // file content; nil means don't create the file
+		expectedSHA1 string // empty = skip verification
 		wantErr      bool
 		errContains  string
 	}{

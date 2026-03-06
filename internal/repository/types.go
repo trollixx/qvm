@@ -5,17 +5,17 @@ import "time"
 // ArchiveRef describes a single downloadable archive within a package.
 type ArchiveRef struct {
 	URL      string `json:"url"`
-	Filename string `json:"filename"`           // e.g. "qtbase-Windows-...7z"
-	SHA1     string `json:"sha1"`               // Expected SHA1 hex digest
-	Size     int64  `json:"size,omitempty"`     // Compressed size in bytes (may be 0 if unknown)
+	Filename string `json:"filename"`       // e.g. "qtbase-Windows-...7z"
+	SHA1     string `json:"sha1"`           // Expected SHA1 hex digest
+	Size     int64  `json:"size,omitempty"` // Compressed size in bytes (may be 0 if unknown)
 }
 
 // Module describes an installable Qt module.
 type Module struct {
-	Name        string       `json:"name"`                  // e.g. "qtcharts"
-	DisplayName string       `json:"display_name"`          // e.g. "Qt Charts"
+	Name        string       `json:"name"`                   // e.g. "qtcharts"
+	DisplayName string       `json:"display_name"`           // e.g. "Qt Charts"
 	IsEssential bool         `json:"is_essential,omitempty"` // true = always installed (set when building an arch-specific list)
-	Archives    []ArchiveRef `json:"archives,omitempty"`    // archives for this module (may depend on arch)
+	Archives    []ArchiveRef `json:"archives,omitempty"`     // archives for this module (may depend on arch)
 }
 
 // Arch describes a build arch (OS + compiler combination).
@@ -86,8 +86,8 @@ type ToolVersionInfo struct {
 
 // ToolInfo describes an installable tool (e.g. qtcreator, cmake).
 type ToolInfo struct {
-	Name     string            `json:"name"`              // e.g. "qtcreator"
-	Display  string            `json:"display"`           // e.g. "Qt Creator"
+	Name     string            `json:"name"`    // e.g. "qtcreator"
+	Display  string            `json:"display"` // e.g. "Qt Creator"
 	Versions []ToolVersionInfo `json:"versions,omitempty"`
 }
 

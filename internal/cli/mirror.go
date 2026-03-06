@@ -21,13 +21,13 @@ func newMirrorCommand() *cli.Command {
 		Action: runMirrorList,
 		Commands: []*cli.Command{
 			{
-				Name:  "list",
-				Usage: "Probe cached mirrors and display latency",
+				Name:   "list",
+				Usage:  "Probe cached mirrors and display latency",
 				Action: runMirrorList,
 			},
 			{
-				Name:  "refresh",
-				Usage: "Fetch the latest mirror list from Qt and update the local cache",
+				Name:   "refresh",
+				Usage:  "Fetch the latest mirror list from Qt and update the local cache",
 				Action: runMirrorRefresh,
 			},
 			{
@@ -226,7 +226,7 @@ func mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL string) err
 }
 
 // filterBlacklist returns mirrors with any blacklisted URLs removed.
-func filterBlacklist(mirrors []string, blacklist []string) []string {
+func filterBlacklist(mirrors, blacklist []string) []string {
 	if len(blacklist) == 0 {
 		return mirrors
 	}

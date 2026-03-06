@@ -15,15 +15,15 @@ import (
 
 // packagesXML builds a minimal Updates.xml body from a slice of package descriptors.
 func packagesXML(pkgs []struct{ name, virtual, archives string }) []byte {
-	return packagesXMLFull(func() (out []struct {
+	return packagesXMLFull(func() []struct {
 		name, displayName, virtual, archives string
-	}) {
+	} {
 		for _, p := range pkgs {
 			out = append(out, struct{ name, displayName, virtual, archives string }{
 				p.name, "", p.virtual, p.archives,
 			})
 		}
-		return
+		return out
 	}())
 }
 
@@ -85,11 +85,11 @@ func TestExtractTarget(t *testing.T) {
 	}{
 		{[]string{"qt", "qt6", "683", "win64_msvc2022_64"}, "win64_msvc2022_64"},
 		{[]string{"qt", "qt6", "683", "addons", "qtcharts", "win64_msvc2022_64"}, "win64_msvc2022_64"},
-		{[]string{"qt", "qt6", "683", "addons", "qtcharts"}, ""},  // module name, no target
-		{[]string{"qt", "qt6", "683", "addons"}, ""},              // no last target
+		{[]string{"qt", "qt6", "683", "addons", "qtcharts"}, ""}, // module name, no target
+		{[]string{"qt", "qt6", "683", "addons"}, ""},             // no last target
 		{[]string{"qt", "qt6", "683", "win64_mingw"}, "win64_mingw"},
-		{[]string{"qt", "qt6", "683", "macos"}, "macos"},          // macos special case
-		{[]string{"qt", "qt6", "683", "doc"}, ""},                 // skip list
+		{[]string{"qt", "qt6", "683", "macos"}, "macos"}, // macos special case
+		{[]string{"qt", "qt6", "683", "doc"}, ""},        // skip list
 		{[]string{"qt", "qt6", "683", "examples"}, ""},
 		{[]string{"qt", "qt6", "683", "sources"}, ""},
 		{[]string{"qt", "qt6", "683", "debug_info"}, ""},
@@ -102,9 +102,10 @@ func TestExtractTarget(t *testing.T) {
 // --- parseRepoIndex ---
 
 // Qt 6.8.3 structure:
-//   4-part non-virtual: essential target packages (have archives)
-//   5-part non-virtual: addon module meta-packages (no archives) ← key case
-//   6-part virtual:     addon target packages (have archives, but are virtual)
+//
+//	4-part non-virtual: essential target packages (have archives)
+//	5-part non-virtual: addon module meta-packages (no archives) ← key case
+//	6-part virtual:     addon target packages (have archives, but are virtual)
 func TestParseRepoIndex_Qt683Modules(t *testing.T) {
 	xml := packagesXML([]struct{ name, virtual, archives string }{
 		{"qt.qt6.683.win64_msvc2022_64", "false", "qtbase-Windows-msvc.7z"},
@@ -456,7 +457,7 @@ func TestProbePreviewVersions(t *testing.T) {
 	// Set up a test HTTP server that returns 200 for released versions
 	// and 404 for preview versions.
 	released := map[string]bool{
-		"/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/Updates.xml":  true,
+		"/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/Updates.xml":   true,
 		"/online/qtsdkrepository/windows_x86/desktop/qt6_6100/qt6_6100/Updates.xml": true,
 	}
 

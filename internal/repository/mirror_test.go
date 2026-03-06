@@ -100,11 +100,19 @@ func TestBuildURL_Qt5_SingleLevel(t *testing.T) {
 }
 
 func TestIsQt68Plus(t *testing.T) {
-	trueFor := []struct{ version string; major int }{
+	trueFor := []struct {
+		version string
+		major   int
+	}{
 		{"6.8.0", 6}, {"6.8.3", 6}, {"6.9.0", 6}, {"6.10.0", 6}, {"6.11.0", 6},
 	}
-	falseFor := []struct{ version string; major int }{
-		{"6.7.3", 6}, {"6.5.3", 6}, {"6.2.0", 6},
+	falseFor := []struct {
+		version string
+		major   int
+	}{
+		{"6.7.3", 6},
+		{"6.5.3", 6},
+		{"6.2.0", 6},
 		{"5.15.18", 5}, // Qt 5 always false
 	}
 

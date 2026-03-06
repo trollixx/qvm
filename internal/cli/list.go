@@ -373,7 +373,7 @@ func runListAllTools(ctx context.Context, fetcher *repository.MetadataFetcher, r
 
 // --- Version detail view ---
 
-func runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, version string, format string) error {
+func runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, version, format string) error {
 	idx, err := fetcher.FetchQtVersion(ctx, version)
 	if err != nil {
 		return fmt.Errorf("fetching metadata for Qt %s: %w", version, err)

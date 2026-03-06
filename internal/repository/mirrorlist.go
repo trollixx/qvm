@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
 )
 
 // MirrorListURL is the Qt project page that lists community download mirrors.

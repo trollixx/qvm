@@ -12,4 +12,3 @@ func homeDir() (string, error) {
 	}
 	return h, nil
 }
-

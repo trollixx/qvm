@@ -162,4 +162,3 @@ func printQtInfo(q storage.InstalledQt) {
 		fmt.Fprintf(os.Stdout, "  qmake:        %s\n", qmakePath)
 	}
 }
-
