@@ -266,12 +266,15 @@ func printProgress(ev install.ProgressEvent) {
 			dlTracker = progressTracker{lines: make(map[string]int)}
 			return
 		}
-		line := formatDownloadLine(ev)
 		if !stderrIsTTY {
-			fmt.Fprintf(os.Stderr, "%s\n", line)
+			// Non-TTY: only print when a file finishes downloading.
+			if ev.BytesTotal > 0 && ev.BytesDone == ev.BytesTotal {
+				fmt.Fprintf(os.Stderr, "  Downloaded %s\n", ev.Archive)
+			}
 			return
 		}
 
+		line := formatDownloadLine(ev)
 		idx, exists := dlTracker.lines[ev.Archive]
 		if !exists {
 			// New file — append a new line.
@@ -288,15 +291,14 @@ func printProgress(ev install.ProgressEvent) {
 		fmt.Fprintf(os.Stderr, "Verifying %s...\n", ev.Archive)
 	case "extracting":
 		if ev.Archive != "" {
-			pct := ""
-			if ev.BytesTotal > 0 {
-				pct = fmt.Sprintf(" %.0f%%", float64(ev.BytesDone)/float64(ev.BytesTotal)*100)
-			}
 			if stderrIsTTY {
+				pct := ""
+				if ev.BytesTotal > 0 {
+					pct = fmt.Sprintf(" %.0f%%", float64(ev.BytesDone)/float64(ev.BytesTotal)*100)
+				}
 				fmt.Fprintf(os.Stderr, "\r\033[KExtracting %s%s", ev.Archive, pct)
-			} else {
-				fmt.Fprintf(os.Stderr, "Extracting %s%s\n", ev.Archive, pct)
 			}
+			// Non-TTY: skip per-file extraction updates entirely.
 		} else {
 			fmt.Fprintf(os.Stderr, "Extracting archives...\n")
 		}
