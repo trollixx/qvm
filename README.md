@@ -91,6 +91,7 @@ qvm install <tool>[@<version>] [flags]
 | `--examples` | Install examples for all selected modules |
 | `--sources` | Install Qt source code |
 | `--debug-info` | Install debug information files |
+| `--host` | Host platform override (e.g. `windows_arm64`, `linux_arm64`). Auto-detected if omitted. |
 | `--force` | Re-install even if already present |
 | `--dir` | Override Qt installation directory |
 | `--dry-run` | Resolve and print archives without downloading |
