@@ -267,9 +267,12 @@ func printProgress(ev install.ProgressEvent) {
 			return
 		}
 		if !stderrIsTTY {
-			// Non-TTY: only print when a file finishes downloading.
+			// Non-TTY: only print once when a file finishes downloading.
 			if ev.BytesTotal > 0 && ev.BytesDone == ev.BytesTotal {
-				fmt.Fprintf(os.Stderr, "  Downloaded %s\n", ev.Archive)
+				if _, reported := dlTracker.lines[ev.Archive]; !reported {
+					dlTracker.lines[ev.Archive] = 0
+					fmt.Fprintf(os.Stderr, "  Downloaded %s\n", ev.Archive)
+				}
 			}
 			return
 		}
