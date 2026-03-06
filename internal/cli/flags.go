@@ -1,12 +1,20 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/trollixx/qvm/internal/repository"
 	"github.com/urfave/cli/v3"
 )
+
+// showHelpOnNotFound is a CommandNotFound handler that shows the command's help
+// instead of printing "No help topic for ...". This is needed because positional
+// args (e.g. "qt@5.15.2") are mistaken for subcommands when --help is used.
+func showHelpOnNotFound(_ context.Context, cmd *cli.Command, _ string) {
+	cli.ShowSubcommandHelp(cmd)
+}
 
 // validateFormat returns an error if format is not a supported output format.
 func validateFormat(format string) error {

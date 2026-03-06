@@ -14,10 +14,11 @@ import (
 
 func newUninstallCommand() *cli.Command {
 	return &cli.Command{
-		Name:      "uninstall",
-		Aliases:   []string{"remove"},
-		Usage:     "Uninstall a Qt version or tool",
-		ArgsUsage: "qt@<version> | <tool>@<version>",
+		Name:            "uninstall",
+		Aliases:         []string{"remove"},
+		Usage:           "Uninstall a Qt version or tool",
+		ArgsUsage:       "qt@<version> | <tool>@<version>",
+		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			archFlag,
 			yesFlag,

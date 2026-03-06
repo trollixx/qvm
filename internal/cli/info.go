@@ -13,10 +13,11 @@ import (
 
 func newInfoCommand() *cli.Command {
 	return &cli.Command{
-		Name:      "info",
-		Aliases:   []string{"show"},
-		Usage:     "Show detailed info about an installed Qt version or tool",
-		ArgsUsage: "qt@<version> | <tool>[@<version>]",
+		Name:            "info",
+		Aliases:         []string{"show"},
+		Usage:           "Show detailed info about an installed Qt version or tool",
+		ArgsUsage:       "qt@<version> | <tool>[@<version>]",
+		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			archFlag,
 			formatFlag,

@@ -13,9 +13,10 @@ import (
 
 func newPathCommand() *cli.Command {
 	return &cli.Command{
-		Name:      "path",
-		Usage:     "Print the install directory of a Qt version or tool",
-		ArgsUsage: "qt@<version> | <tool>[@<version>]",
+		Name:            "path",
+		Usage:           "Print the install directory of a Qt version or tool",
+		ArgsUsage:       "qt@<version> | <tool>[@<version>]",
+		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			archFlag,
 		},

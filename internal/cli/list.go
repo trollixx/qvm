@@ -18,10 +18,11 @@ import (
 
 func newListCommand() *cli.Command {
 	return &cli.Command{
-		Name:      "list",
-		Aliases:   []string{"ls"},
-		Usage:     "List installed or available Qt versions and tools",
-		ArgsUsage: "[qt | qt@<major>[.<minor>[.<patch>]] | tools]",
+		Name:            "list",
+		Aliases:         []string{"ls"},
+		Usage:           "List installed or available Qt versions and tools",
+		ArgsUsage:       "[qt | qt@<major>[.<minor>[.<patch>]] | tools]",
+		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "all",
