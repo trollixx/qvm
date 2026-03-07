@@ -29,8 +29,8 @@ func newListCommand() *cli.Command {
 				Name:  "all",
 				Usage: "show all available versions, not just installed",
 			},
-			formatFlag,
-			hostFlag,
+			newFormatFlag(),
+			newHostFlag(),
 		},
 		Action: runList,
 	}

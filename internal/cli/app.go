@@ -16,7 +16,7 @@ import (
 
 // Version is the current qvm version string.
 // Override at build time: go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=1.2.3".
-var Version = "dev"
+var Version = "dev" //nolint:gochecknoglobals // set by build ldflags
 
 // NewApp creates and configures the qvm CLI application.
 func NewApp() *cli.Command {

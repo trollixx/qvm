@@ -8,16 +8,13 @@ import (
 	"github.com/trollixx/qvm/pkg/qtmeta"
 )
 
-// qt68 is the version threshold for Qt 6.8+ repository layout changes.
-var qt68 = qtmeta.MustParseVersion("6.8.0")
-
 // Mirror holds a base URL for the Qt repository.
 type Mirror struct {
 	URL string
 }
 
 // ValidHosts lists the recognized host platform identifiers for Qt repositories.
-var ValidHosts = []string{
+var ValidHosts = []string{ //nolint:gochecknoglobals // exported package-level data used by callers
 	"windows_x86",
 	"windows_arm64",
 	"linux_x64",
@@ -105,7 +102,7 @@ func isQt68Plus(version string) bool {
 	if err != nil {
 		return false
 	}
-	return v.GTE(qt68)
+	return v.GTE(qtmeta.MustParseVersion("6.8.0"))
 }
 
 // ProbeURL returns the combined Updates.xml URL used to detect whether a

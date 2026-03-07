@@ -15,8 +15,6 @@ import (
 	"github.com/trollixx/qvm/internal/platform"
 )
 
-var stderrIsTTY = isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())
-
 func newInstallCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "install",
@@ -31,9 +29,9 @@ func newInstallCommand() *cli.Command {
 				Aliases: []string{"m"},
 				Usage:   "comma-separated list of add-on modules to install (e.g. charts,webengine)",
 			},
-			archFlag,
-			targetFlag,
-			hostFlag,
+			newArchFlag(),
+			newTargetFlag(),
+			newHostFlag(),
 
 			// Extra content.
 			&cli.BoolFlag{
@@ -54,10 +52,10 @@ func newInstallCommand() *cli.Command {
 			},
 
 			// Behavior.
-			forceFlag,
-			dryRunFlag,
-			quietFlag,
-			dirFlag,
+			newForceFlag(),
+			newDryRunFlag(),
+			newQuietFlag(),
+			newDirFlag(),
 		},
 		Action: runInstall,
 	}
@@ -139,13 +137,14 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 	doneCh := make(chan struct{})
 
 	dryRun := cmd.Bool("dry-run")
+	printer := newProgressPrinter()
 	go func() {
 		defer close(doneCh)
 		for ev := range progressCh {
 			if ev.Phase == "dryrun" {
 				printDryRun(ev)
 			} else if !quiet {
-				printProgress(ev)
+				printer.print(ev)
 			}
 		}
 	}()
@@ -217,11 +216,12 @@ func runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
 	progressCh := make(chan install.ProgressEvent, 256)
 	doneCh := make(chan struct{})
 
+	printer := newProgressPrinter()
 	go func() {
 		defer close(doneCh)
 		for ev := range progressCh {
 			if !quiet {
-				printProgress(ev)
+				printer.print(ev)
 			}
 		}
 	}()
@@ -251,29 +251,36 @@ func printDryRun(ev install.ProgressEvent) {
 	fmt.Fprintf(os.Stdout, "  %s%s\n", ev.Archive, size)
 }
 
-// progressTracker keeps state for multi-line download progress on a TTY.
-type progressTracker struct {
+// progressPrinter renders install progress events to stderr.
+// isTTY controls whether cursor-movement escape sequences are used.
+type progressPrinter struct {
+	isTTY bool
 	lines map[string]int // archive name -> line index (0-based from first download line)
 	total int            // number of lines printed so far
 }
 
-var dlTracker progressTracker
+func newProgressPrinter() *progressPrinter {
+	return &progressPrinter{
+		isTTY: isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()),
+	}
+}
 
-func printProgress(ev install.ProgressEvent) {
+func (p *progressPrinter) print(ev install.ProgressEvent) {
 	switch ev.Phase {
 	case "resolving":
 		fmt.Fprintf(os.Stderr, "Resolving archives...\n")
 	case "downloading":
 		if ev.Archive == "" {
 			// Reset tracker for each install.
-			dlTracker = progressTracker{lines: make(map[string]int)}
+			p.lines = make(map[string]int)
+			p.total = 0
 			return
 		}
-		if !stderrIsTTY {
+		if !p.isTTY {
 			// Non-TTY: only print once when a file finishes downloading.
 			if ev.BytesTotal > 0 && ev.BytesDone == ev.BytesTotal {
-				if _, reported := dlTracker.lines[ev.Archive]; !reported {
-					dlTracker.lines[ev.Archive] = 0
+				if _, reported := p.lines[ev.Archive]; !reported {
+					p.lines[ev.Archive] = 0
 					fmt.Fprintf(os.Stderr, "  Downloaded %s\n", ev.Archive)
 				}
 			}
@@ -281,23 +288,23 @@ func printProgress(ev install.ProgressEvent) {
 		}
 
 		line := formatDownloadLine(ev)
-		idx, exists := dlTracker.lines[ev.Archive]
+		idx, exists := p.lines[ev.Archive]
 		if !exists {
 			// New file - append a new line.
-			idx = dlTracker.total
-			dlTracker.lines[ev.Archive] = idx
-			dlTracker.total++
+			idx = p.total
+			p.lines[ev.Archive] = idx
+			p.total++
 			fmt.Fprintf(os.Stderr, "%s\n", line)
 		} else {
 			// Existing file - move cursor up, overwrite, move back down.
-			up := dlTracker.total - idx
+			up := p.total - idx
 			fmt.Fprintf(os.Stderr, "\033[%dA\r\033[K%s\033[%dB\r", up, line, up)
 		}
 	case "verifying":
 		fmt.Fprintf(os.Stderr, "Verifying %s...\n", ev.Archive)
 	case "extracting":
 		if ev.Archive != "" {
-			if stderrIsTTY {
+			if p.isTTY {
 				pct := ""
 				if ev.BytesTotal > 0 {
 					pct = fmt.Sprintf(" %.0f%%", float64(ev.BytesDone)/float64(ev.BytesTotal)*100)
@@ -309,14 +316,14 @@ func printProgress(ev install.ProgressEvent) {
 			fmt.Fprintf(os.Stderr, "Extracting archives...\n")
 		}
 	case "patching":
-		if stderrIsTTY {
+		if p.isTTY {
 			fmt.Fprintf(os.Stderr, "\r\033[K")
 		}
 		fmt.Fprintf(os.Stderr, "Patching qt.conf...\n")
 	case "registering":
 		fmt.Fprintf(os.Stderr, "Registering installation...\n")
 	case "done":
-		if stderrIsTTY {
+		if p.isTTY {
 			fmt.Fprintf(os.Stderr, "\r\033[K")
 		}
 		fmt.Fprintf(os.Stderr, "Done.\n")

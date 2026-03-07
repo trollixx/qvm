@@ -12,7 +12,8 @@ import (
 
 // -- parseMirrorListHTML -------------------------------------------------------
 
-var mirrorListFixtureHTML = []byte(`<!DOCTYPE html>
+var mirrorListFixtureHTML = []byte( //nolint:gochecknoglobals // shared test fixture
+	`<!DOCTYPE html>
 <html><head><title>Qt Mirror List</title></head><body>
 <nav>
   <a href="https://download.qt.io/">Qt Downloads</a>

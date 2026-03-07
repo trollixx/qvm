@@ -163,22 +163,20 @@ func (vf VersionFilter) String() string {
 	return strconv.Itoa(vf.Major)
 }
 
-// knownLTSVersions lists Qt versions with LTS status.
-var knownLTSVersions = map[string]bool{
-	"5.9":  true,
-	"5.12": true,
-	"5.15": true,
-	"6.2":  true,
-	"6.5":  true,
-	"6.8":  true,
-}
-
 // IsLTS reports whether a version is a known LTS release.
 func IsLTS(s string) bool {
+	ltsVersions := map[string]bool{
+		"5.9":  true,
+		"5.12": true,
+		"5.15": true,
+		"6.2":  true,
+		"6.5":  true,
+		"6.8":  true,
+	}
 	v, err := ParseVersion(s)
 	if err != nil {
 		return false
 	}
 	key := fmt.Sprintf("%d.%d", v.Major(), v.Minor())
-	return knownLTSVersions[key]
+	return ltsVersions[key]
 }

@@ -40,7 +40,7 @@ func newCacheCommand() *cli.Command {
 						Name:  "all",
 						Usage: "Remove all download archives and metadata cache",
 					},
-					yesFlag,
+					newYesFlag(),
 				},
 				Action: runCacheClean,
 			},

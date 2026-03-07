@@ -20,8 +20,8 @@ func newInfoCommand() *cli.Command {
 		ArgsUsage:       "qt@<version> | <tool>[@<version>]",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
-			archFlag,
-			formatFlag,
+			newArchFlag(),
+			newFormatFlag(),
 		},
 		Action: runInfo,
 	}

@@ -18,30 +18,27 @@ type TargetMeta struct {
 	OS          TargetOS
 }
 
-// knownTargets lists well-known Qt target strings with display names.
-var knownTargets = []TargetMeta{
-	// Windows
-	{Name: "win64_msvc2022_64", DisplayName: "MSVC 2022, 64-bit", OS: Windows},
-	{Name: "win64_msvc2022_arm64", DisplayName: "MSVC 2022, ARM64", OS: Windows},
-	{Name: "win64_msvc2019_64", DisplayName: "MSVC 2019, 64-bit", OS: Windows},
-	{Name: "win64_mingw", DisplayName: "MinGW 13.1, 64-bit", OS: Windows},
-	{Name: "win64_llvm_mingw", DisplayName: "LLVM/Clang MinGW, 64-bit", OS: Windows},
-	// Linux
-	{Name: "gcc_64", DisplayName: "GCC, 64-bit", OS: Linux},
-	{Name: "linux_gcc_64", DisplayName: "GCC, 64-bit", OS: Linux},
-	// macOS
-	{Name: "macos", DisplayName: "macOS (universal)", OS: MacOS},
-	{Name: "clang_64", DisplayName: "Clang, 64-bit", OS: MacOS},
-}
-
-var knownTargetMap map[string]TargetMeta
-
-func init() {
-	knownTargetMap = make(map[string]TargetMeta)
-	for _, t := range knownTargets {
-		knownTargetMap[t.Name] = t
+var knownTargetMap = func() map[string]TargetMeta { //nolint:gochecknoglobals // package-level target lookup table
+	targets := []TargetMeta{
+		// Windows
+		{Name: "win64_msvc2022_64", DisplayName: "MSVC 2022, 64-bit", OS: Windows},
+		{Name: "win64_msvc2022_arm64", DisplayName: "MSVC 2022, ARM64", OS: Windows},
+		{Name: "win64_msvc2019_64", DisplayName: "MSVC 2019, 64-bit", OS: Windows},
+		{Name: "win64_mingw", DisplayName: "MinGW 13.1, 64-bit", OS: Windows},
+		{Name: "win64_llvm_mingw", DisplayName: "LLVM/Clang MinGW, 64-bit", OS: Windows},
+		// Linux
+		{Name: "gcc_64", DisplayName: "GCC, 64-bit", OS: Linux},
+		{Name: "linux_gcc_64", DisplayName: "GCC, 64-bit", OS: Linux},
+		// macOS
+		{Name: "macos", DisplayName: "macOS (universal)", OS: MacOS},
+		{Name: "clang_64", DisplayName: "Clang, 64-bit", OS: MacOS},
 	}
-}
+	m := make(map[string]TargetMeta, len(targets))
+	for _, t := range targets {
+		m[t.Name] = t
+	}
+	return m
+}()
 
 // LookupTarget returns metadata for a target string.
 func LookupTarget(name string) (TargetMeta, bool) {

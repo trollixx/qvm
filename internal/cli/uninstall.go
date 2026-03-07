@@ -21,8 +21,8 @@ func newUninstallCommand() *cli.Command {
 		ArgsUsage:       "qt@<version> | <tool>@<version>",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
-			archFlag,
-			yesFlag,
+			newArchFlag(),
+			newYesFlag(),
 		},
 		Action: runUninstall,
 	}

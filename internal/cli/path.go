@@ -19,7 +19,7 @@ func newPathCommand() *cli.Command {
 		ArgsUsage:       "qt@<version> | <tool>[@<version>]",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
-			archFlag,
+			newArchFlag(),
 		},
 		Action: runPath,
 	}

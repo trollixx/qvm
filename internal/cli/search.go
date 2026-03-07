@@ -26,8 +26,8 @@ func newSearchCommand() *cli.Command {
 		Usage:     "Search for Qt modules or tools",
 		ArgsUsage: "<query>",
 		Flags: []cli.Flag{
-			formatFlag,
-			hostFlag,
+			newFormatFlag(),
+			newHostFlag(),
 		},
 		Action: runSearch,
 	}

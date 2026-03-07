@@ -21,7 +21,7 @@ func (w *Windows) DefaultArch(qtVersion string) string {
 	if err != nil {
 		return "win64_msvc2019_64"
 	}
-	if v.GTE(qt66) {
+	if v.GTE(qtmeta.MustParseVersion(qt66)) {
 		return "win64_msvc2022_64"
 	}
 	if v.Major() < 6 {

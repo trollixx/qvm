@@ -2,8 +2,8 @@ package platform
 
 import "github.com/trollixx/qvm/pkg/qtmeta"
 
-// qt66 is the version threshold where Qt switched to MSVC 2022.
-var qt66 = qtmeta.MustParseVersion("6.6.0")
+// qt66 is the Qt version threshold where MSVC 2022 became the default.
+const qt66 = "6.6.0"
 
 // Platform provides platform-specific information and defaults.
 type Platform interface {
@@ -43,7 +43,7 @@ func windowsDefaultMSVC(qtVersion string) string {
 	if err != nil {
 		return "win64_msvc2019_64"
 	}
-	if v.GTE(qt66) {
+	if v.GTE(qtmeta.MustParseVersion(qt66)) {
 		return "win64_msvc2022_64"
 	}
 	return "win64_msvc2019_64"

@@ -28,62 +28,81 @@ func validateFormat(format string) error {
 	}
 }
 
-// Shared flag definitions used across commands.
+// Shared flag constructor functions used across commands.
+// Each command gets its own flag instance to avoid shared state.
 
-var formatFlag = &cli.StringFlag{
-	Name:      "format",
-	Aliases:   []string{"f"},
-	Value:     "text",
-	Usage:     "output format: text or json",
-	Validator: validateFormat,
+func newFormatFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:      "format",
+		Aliases:   []string{"f"},
+		Value:     "text",
+		Usage:     "output format: text or json",
+		Validator: validateFormat,
+	}
 }
 
-var archFlag = &cli.StringFlag{
-	Name:    "arch",
-	Aliases: []string{"a"},
-	Usage:   "compiler/ABI target, e.g. win64_msvc2022_64",
+func newArchFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:    "arch",
+		Aliases: []string{"a"},
+		Usage:   "compiler/ABI target, e.g. win64_msvc2022_64",
+	}
 }
 
-var targetFlag = &cli.StringFlag{
-	Name:  "target",
-	Value: "desktop",
-	Usage: "Qt target platform: desktop, android, wasm, ios, winrt",
+func newTargetFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:  "target",
+		Value: "desktop",
+		Usage: "Qt target platform: desktop, android, wasm, ios, winrt",
+	}
 }
 
-var dirFlag = &cli.StringFlag{
-	Name:  "dir",
-	Usage: "override Qt install directory",
+func newDirFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:  "dir",
+		Usage: "override Qt install directory",
+	}
 }
 
-var yesFlag = &cli.BoolFlag{
-	Name:    "yes",
-	Aliases: []string{"y"},
-	Usage:   "skip confirmation prompts",
+func newYesFlag() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:    "yes",
+		Aliases: []string{"y"},
+		Usage:   "skip confirmation prompts",
+	}
 }
 
-var forceFlag = &cli.BoolFlag{
-	Name:  "force",
-	Usage: "re-install even if already installed",
+func newForceFlag() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:  "force",
+		Usage: "re-install even if already installed",
+	}
 }
 
-var quietFlag = &cli.BoolFlag{
-	Name:    "quiet",
-	Aliases: []string{"q"},
-	Usage:   "suppress progress output (for scripting)",
+func newQuietFlag() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:    "quiet",
+		Aliases: []string{"q"},
+		Usage:   "suppress progress output (for scripting)",
+	}
 }
 
-var dryRunFlag = &cli.BoolFlag{
-	Name:  "dry-run",
-	Usage: "resolve and print archives that would be downloaded, without installing",
+func newDryRunFlag() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:  "dry-run",
+		Usage: "resolve and print archives that would be downloaded, without installing",
+	}
 }
 
-var hostFlag = &cli.StringFlag{
-	Name: "host",
-	Usage: "host platform override; valid values: " + strings.Join(
-		repository.ValidHosts,
-		", ",
-	) + " (default: auto-detect)",
-	Validator: validateHost,
+func newHostFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name: "host",
+		Usage: "host platform override; valid values: " + strings.Join(
+			repository.ValidHosts,
+			", ",
+		) + " (default: auto-detect)",
+		Validator: validateHost,
+	}
 }
 
 // validateHost returns an error if host is non-empty and not in ValidHosts.
