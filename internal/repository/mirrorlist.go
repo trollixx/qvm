@@ -34,7 +34,7 @@ func NewMirrorListCache() (*MirrorListCache, error) {
 		return nil, fmt.Errorf("determining mirror cache path: %w", err)
 	}
 	dir := filepath.Join(base, "qvm")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("creating cache dir: %w", err)
 	}
 	return &MirrorListCache{path: filepath.Join(dir, "mirrors.json")}, nil
@@ -73,7 +73,7 @@ func (c *MirrorListCache) Load() ([]string, error) {
 
 // Save writes mirrors to the cache file, overwriting any previous contents.
 func (c *MirrorListCache) Save(mirrors []string) error {
-	if err := os.MkdirAll(filepath.Dir(c.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(c.path), 0o750); err != nil {
 		return err
 	}
 	d := mirrorListData{Mirrors: mirrors, FetchedAt: time.Now().UTC()}
@@ -81,7 +81,7 @@ func (c *MirrorListCache) Save(mirrors []string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(c.path, data, 0o644)
+	return os.WriteFile(c.path, data, 0o600)
 }
 
 // FetchMirrorList downloads Qt's mirror list page and returns the mirror base URLs.

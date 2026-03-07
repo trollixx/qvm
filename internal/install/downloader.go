@@ -43,7 +43,7 @@ func DownloadCacheDir() (string, error) {
 		return "", fmt.Errorf("determining download cache dir: %w", err)
 	}
 	dir := filepath.Join(base, "qvm", "downloads")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return "", fmt.Errorf("creating download cache dir: %w", err)
 	}
 	return dir, nil
@@ -111,7 +111,7 @@ func (d *Downloader) downloadOne(
 			return dest, nil
 		}
 		// Cached file is corrupt - re-download.
-		os.Remove(dest)
+		_ = os.Remove(dest)
 	}
 
 	// Check for a partial download to resume.
@@ -120,7 +120,7 @@ func (d *Downloader) downloadOne(
 		partSize := fi.Size()
 		// If the part file is larger than expected, it's corrupt - start fresh.
 		if arch.Size > 0 && partSize > arch.Size {
-			os.Remove(part)
+			_ = os.Remove(part)
 		} else {
 			rangeStart = partSize
 		}
@@ -161,7 +161,7 @@ func (d *Downloader) downloadOne(
 		rangeStart = 0
 	}
 
-	f, err := os.OpenFile(part, flag, 0o644)
+	f, err := os.OpenFile(part, flag, 0o600)
 	if err != nil {
 		return "", err
 	}

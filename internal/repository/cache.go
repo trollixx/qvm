@@ -23,7 +23,7 @@ func NewCache() (*Cache, error) {
 		return nil, fmt.Errorf("determining cache dir: %w", err)
 	}
 	dir := filepath.Join(base, "qvm", "metadata")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("creating cache dir %s: %w", dir, err)
 	}
 	return &Cache{dir: dir}, nil
@@ -66,11 +66,11 @@ func (c *Cache) Store(key string, body []byte, etag string) error {
 	if err := gz.Close(); err != nil {
 		return err
 	}
-	if err := os.WriteFile(fn, buf.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(fn, buf.Bytes(), 0o600); err != nil {
 		return err
 	}
 	if etag != "" {
-		_ = os.WriteFile(c.etagFilename(key), []byte(etag), 0o644)
+		_ = os.WriteFile(c.etagFilename(key), []byte(etag), 0o600)
 	}
 	return nil
 }

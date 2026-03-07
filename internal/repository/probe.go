@@ -60,7 +60,7 @@ func probeOne(ctx context.Context, client *http.Client, base, host string) Probe
 		return ProbeResult{URL: base}
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 	if resp.StatusCode >= 400 {
 		return ProbeResult{URL: base}
 	}

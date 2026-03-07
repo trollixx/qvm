@@ -146,12 +146,12 @@ func (m *RegistryManager) Save(r *Registry) error {
 	if err != nil {
 		return fmt.Errorf("encoding registry: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(m.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(m.path), 0o750); err != nil {
 		return fmt.Errorf("creating registry directory: %w", err)
 	}
 	// Atomic write via temp file.
 	tmp := m.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return fmt.Errorf("writing registry tmp: %w", err)
 	}
 	if err := os.Rename(tmp, m.path); err != nil {

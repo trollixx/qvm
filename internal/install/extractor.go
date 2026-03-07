@@ -14,6 +14,9 @@ import (
 	"github.com/trollixx/qvm/pkg/archive"
 )
 
+// maxExtractedFileSize is the per-entry decompression limit to mitigate zip-bomb attacks.
+const maxExtractedFileSize = 2 * 1024 * 1024 * 1024 // 2 GiB
+
 // ExtractionEvent is emitted during archive extraction.
 type ExtractionEvent struct {
 	Archive    string
@@ -46,7 +49,7 @@ func extractOne(archivePath, destDir string, eventCh chan<- ExtractionEvent) err
 }
 
 func extract7z(src, destDir, name string, eventCh chan<- ExtractionEvent) error {
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
+	if err := os.MkdirAll(destDir, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 		return err
 	}
 	progress := func(done, total int64) {
@@ -62,7 +65,7 @@ func extract7z(src, destDir, name string, eventCh chan<- ExtractionEvent) error 
 }
 
 func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error {
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
+	if err := os.MkdirAll(destDir, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 		return err
 	}
 
@@ -115,18 +118,18 @@ func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o755); err != nil {
+			if err := os.MkdirAll(target, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 				return fmt.Errorf("creating directory %s: %w", target, err)
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 				return fmt.Errorf("creating parent directory for %s: %w", target, err)
 			}
 			out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode&0o777))
 			if err != nil {
 				return fmt.Errorf("creating %s: %w", target, err)
 			}
-			n, copyErr := io.Copy(out, tr)
+			n, copyErr := io.Copy(out, io.LimitReader(tr, maxExtractedFileSize))
 			closeErr := out.Close()
 			if copyErr != nil {
 				return fmt.Errorf("extracting %s: %w", header.Name, copyErr)

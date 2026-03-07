@@ -2,10 +2,11 @@ package install
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,7 +21,11 @@ import (
 var ErrUpToDate = errors.New("already up to date")
 
 func randSuffix() string {
-	return fmt.Sprintf("%08x", rand.Uint32())
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic("crypto/rand.Read failed: " + err.Error())
+	}
+	return hex.EncodeToString(b[:])
 }
 
 // ProgressEvent is emitted by the installer pipeline.
@@ -152,7 +157,7 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	extractTmp := storage.TempDir(installDir) + "-" + randSuffix()
 	defer os.RemoveAll(extractTmp)
 
-	if err := os.MkdirAll(extractTmp, 0o755); err != nil {
+	if err := os.MkdirAll(extractTmp, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 		return fmt.Errorf("creating temp dir: %w", err)
 	}
 
@@ -240,7 +245,7 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	close(exCh)
 
 	// Move extracted content to final install dir.
-	if err := os.MkdirAll(filepath.Dir(installDir), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(installDir), 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 		return err
 	}
 	// If installDir already exists, merge (for adding modules later).
@@ -329,7 +334,7 @@ func (inst *Installer) InstallTool(ctx context.Context, opts ToolOptions, progre
 	extractTmp := opts.InstallDir + ".qvm-tmp-" + randSuffix()
 	defer os.RemoveAll(extractTmp)
 
-	if err := os.MkdirAll(extractTmp, 0o755); err != nil {
+	if err := os.MkdirAll(extractTmp, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 		return err
 	}
 
@@ -399,7 +404,7 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	}
 	defer in.Close()
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 		return err
 	}
 

@@ -72,10 +72,10 @@ func extractFile(f *sevenzip.File, destDir string, onBytes func(n int)) error {
 		return fmt.Errorf("path traversal blocked: %s", f.Name)
 	}
 	if f.FileInfo().IsDir() {
-		return os.MkdirAll(target, 0o755)
+		return os.MkdirAll(target, 0o755) //nolint:gosec // 0755 for Qt SDK
 	}
 
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 		return fmt.Errorf("creating directory for %s: %w", target, err)
 	}
 

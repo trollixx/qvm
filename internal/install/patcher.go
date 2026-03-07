@@ -49,18 +49,22 @@ func PatchQtConf(installDir string) error {
 				lines = append([]string{"[Paths]", "Prefix=" + prefix, ""}, lines...)
 			}
 		}
-		if err := os.WriteFile(qtConfPath, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+		if err := os.WriteFile(
+			qtConfPath,
+			[]byte(strings.Join(lines, "\n")),
+			0o644,
+		); err != nil { //nolint:gosec // 0644 ok
 			return fmt.Errorf("writing qt.conf: %w", err)
 		}
 		return nil
 	}
 
 	// No existing file - create a minimal one.
-	if err := os.MkdirAll(filepath.Dir(qtConfPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(qtConfPath), 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
 		return fmt.Errorf("creating bin dir for qt.conf: %w", err)
 	}
 	content := "[Paths]\nPrefix=" + prefix + "\n"
-	if err := os.WriteFile(qtConfPath, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(qtConfPath, []byte(content), 0o644); err != nil { //nolint:gosec // 0644 ok
 		return fmt.Errorf("writing qt.conf: %w", err)
 	}
 	return nil
