@@ -45,7 +45,8 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	if err := toml.Unmarshal(data, cfg); err != nil {
+	err = toml.Unmarshal(data, cfg)
+	if err != nil {
 		return nil, err
 	}
 
@@ -72,7 +73,8 @@ func Save(cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+	err = os.MkdirAll(filepath.Dir(path), 0o750)
+	if err != nil {
 		return err
 	}
 	data, err := toml.Marshal(cfg)

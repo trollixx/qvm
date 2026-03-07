@@ -115,8 +115,8 @@ func checkMetadataCache() {
 		if e.IsDir() {
 			continue
 		}
-		info, err := e.Info()
-		if err != nil {
+		info, infoErr := e.Info()
+		if infoErr != nil {
 			continue
 		}
 		if info.ModTime().After(newest) {

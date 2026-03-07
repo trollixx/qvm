@@ -22,7 +22,8 @@ func VerifyFile(path, expectedSHA1 string) error {
 	defer f.Close()
 
 	h := sha1.New() //nolint:gosec // SHA1 is mandated by Qt's package repository protocol; cannot substitute
-	if _, err := io.Copy(h, f); err != nil {
+	_, err = io.Copy(h, f)
+	if err != nil {
 		return fmt.Errorf("hashing %s: %w", path, err)
 	}
 

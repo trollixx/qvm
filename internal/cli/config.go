@@ -83,11 +83,13 @@ func runConfigSet(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := configSet(cfg, key, value); err != nil {
+	err = configSet(cfg, key, value)
+	if err != nil {
 		return err
 	}
 
-	if err := config.Save(cfg); err != nil {
+	err = config.Save(cfg)
+	if err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
 

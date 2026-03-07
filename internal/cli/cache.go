@@ -77,8 +77,8 @@ func runCacheList(_ context.Context, _ *cli.Command) error {
 
 	var totalBytes int64
 	for _, e := range files {
-		info, err := e.Info()
-		if err != nil {
+		info, infoErr := e.Info()
+		if infoErr != nil {
 			continue
 		}
 		name := e.Name()

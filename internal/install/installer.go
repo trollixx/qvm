@@ -159,7 +159,8 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	extractTmp := storage.TempDir(installDir) + "-" + randSuffix()
 	defer os.RemoveAll(extractTmp)
 
-	if err := os.MkdirAll(extractTmp, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
+	err = os.MkdirAll(extractTmp, 0o755) //nolint:gosec // 0755 for Qt SDK
+	if err != nil {
 		return fmt.Errorf("creating temp dir: %w", err)
 	}
 
@@ -215,7 +216,8 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	for i, path := range localPaths {
 		if refs[i].SHA1 != "" {
 			sendProgress(progressCh, ProgressEvent{Phase: "verifying", Archive: refs[i].Filename})
-			if err := VerifyFile(path, refs[i].SHA1); err != nil {
+			err = VerifyFile(path, refs[i].SHA1)
+			if err != nil {
 				return err
 			}
 		}
@@ -240,19 +242,23 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 			})
 		}
 	}()
-	if err := ExtractAll(localPaths, extractDir, exCh); err != nil {
+	err = ExtractAll(localPaths, extractDir, exCh)
+	if err != nil {
 		close(exCh)
 		return fmt.Errorf("extracting: %w", err)
 	}
 	close(exCh)
 
 	// Move extracted content to final install dir.
-	if err := os.MkdirAll(filepath.Dir(installDir), 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
+	err = os.MkdirAll(filepath.Dir(installDir), 0o755) //nolint:gosec // 0755 for Qt SDK
+	if err != nil {
 		return err
 	}
 	// If installDir already exists, merge (for adding modules later).
-	if _, err := os.Stat(installDir); os.IsNotExist(err) {
-		if err := os.Rename(extractDir, installDir); err != nil {
+	_, err = os.Stat(installDir)
+	if os.IsNotExist(err) {
+		err = os.Rename(extractDir, installDir)
+		if err != nil {
 			// Rename across drives may fail; fall back to copy.
 			err2 := copyDir(extractDir, installDir)
 			if err2 != nil {
@@ -261,14 +267,16 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		}
 	} else {
 		// Merge: copy new files over existing.
-		if err := copyDir(extractDir, installDir); err != nil {
+		err = copyDir(extractDir, installDir)
+		if err != nil {
 			return fmt.Errorf("merging into install dir: %w", err)
 		}
 	}
 
 	// Patch qt.conf.
 	sendProgress(progressCh, ProgressEvent{Phase: "patching"})
-	if err := PatchQtConf(installDir); err != nil {
+	err = PatchQtConf(installDir)
+	if err != nil {
 		// Non-fatal; warn but continue.
 		fmt.Fprintf(os.Stderr, "warning: patching qt.conf failed: %v\n", err)
 	}
@@ -307,7 +315,8 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		}
 		entry.SizeBytes = totalSize
 	}
-	if err := inst.registry.AddQt(entry); err != nil {
+	err = inst.registry.AddQt(entry)
+	if err != nil {
 		return fmt.Errorf("registering installation: %w", err)
 	}
 
@@ -337,7 +346,8 @@ func (inst *Installer) InstallTool(ctx context.Context, opts ToolOptions, progre
 	extractTmp := opts.InstallDir + ".qvm-tmp-" + randSuffix()
 	defer os.RemoveAll(extractTmp)
 
-	if err := os.MkdirAll(extractTmp, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
+	err = os.MkdirAll(extractTmp, 0o755) //nolint:gosec // 0755 for Qt SDK
+	if err != nil {
 		return err
 	}
 
@@ -358,7 +368,8 @@ func (inst *Installer) InstallTool(ctx context.Context, opts ToolOptions, progre
 	}
 
 	sendProgress(progressCh, ProgressEvent{Phase: "extracting"})
-	if err := ExtractAll(localPaths, opts.InstallDir, nil); err != nil {
+	err = ExtractAll(localPaths, opts.InstallDir, nil)
+	if err != nil {
 		return err
 	}
 
@@ -407,7 +418,8 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	}
 	defer in.Close()
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
+	err = os.MkdirAll(filepath.Dir(dst), 0o755) //nolint:gosec // 0755 for Qt SDK
+	if err != nil {
 		return err
 	}
 

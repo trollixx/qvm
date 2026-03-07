@@ -82,15 +82,15 @@ func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error
 	lower := strings.ToLower(src)
 	switch {
 	case strings.HasSuffix(lower, ".tar.xz"):
-		xzReader, err := xz.NewReader(f)
-		if err != nil {
-			return fmt.Errorf("creating xz reader for %s: %w", src, err)
+		xzReader, xzErr := xz.NewReader(f)
+		if xzErr != nil {
+			return fmt.Errorf("creating xz reader for %s: %w", src, xzErr)
 		}
 		reader = xzReader
 	case strings.HasSuffix(lower, ".tar.gz"):
-		gzReader, err := gzip.NewReader(f)
-		if err != nil {
-			return fmt.Errorf("creating gzip reader for %s: %w", src, err)
+		gzReader, gzErr := gzip.NewReader(f)
+		if gzErr != nil {
+			return fmt.Errorf("creating gzip reader for %s: %w", src, gzErr)
 		}
 		defer gzReader.Close()
 		reader = gzReader
@@ -102,8 +102,9 @@ func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error
 	cleanDest := filepath.Clean(destDir) + string(os.PathSeparator)
 
 	var bytesWritten int64
+	var header *tar.Header
 	for {
-		header, err := tr.Next()
+		header, err = tr.Next()
 		if err == io.EOF {
 			break
 		}
@@ -121,14 +122,17 @@ func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
+			err = os.MkdirAll(target, 0o755) //nolint:gosec // 0755 for Qt SDK
+			if err != nil {
 				return fmt.Errorf("creating directory %s: %w", target, err)
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
+			err = os.MkdirAll(filepath.Dir(target), 0o755) //nolint:gosec // 0755 for Qt SDK
+			if err != nil {
 				return fmt.Errorf("creating parent directory for %s: %w", target, err)
 			}
-			out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode&0o777))
+			var out *os.File
+			out, err = os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode&0o777))
 			if err != nil {
 				return fmt.Errorf("creating %s: %w", target, err)
 			}
@@ -148,7 +152,8 @@ func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error
 				}
 			}
 		case tar.TypeSymlink:
-			if err := os.Symlink(header.Linkname, target); err != nil {
+			err = os.Symlink(header.Linkname, target)
+			if err != nil {
 				return fmt.Errorf("creating symlink %s: %w", target, err)
 			}
 		}

@@ -37,7 +37,8 @@ func Extract(src, destDir string, progress ProgressFunc) error {
 				progress(done.Add(int64(n)), total)
 			}
 		}
-		if err := extractFile(f, destDir, cb); err != nil {
+		err = extractFile(f, destDir, cb)
+		if err != nil {
 			return err
 		}
 		// Ensure done is at least the file size even if cb was nil.
@@ -96,7 +97,8 @@ func extractFile(f *sevenzip.File, destDir string, onBytes func(n int)) error {
 	if onBytes != nil {
 		dst = &countingWriter{w: out, onWrite: onBytes}
 	}
-	if _, err := io.Copy(dst, rc); err != nil {
+	_, err = io.Copy(dst, rc)
+	if err != nil {
 		return fmt.Errorf("extracting %s: %w", f.Name, err)
 	}
 	return nil

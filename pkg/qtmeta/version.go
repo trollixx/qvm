@@ -104,7 +104,8 @@ func ParseVersionFilter(s string) (VersionFilter, error) {
 	vf := VersionFilter{Major: major}
 
 	if len(parts) >= 2 {
-		minor, err := strconv.Atoi(parts[1])
+		var minor int
+		minor, err = strconv.Atoi(parts[1])
 		if err != nil {
 			return VersionFilter{}, fmt.Errorf("invalid minor version in %q: %w", s, err)
 		}
@@ -113,7 +114,8 @@ func ParseVersionFilter(s string) (VersionFilter, error) {
 	}
 
 	if len(parts) == 3 {
-		patch, err := strconv.Atoi(parts[2])
+		var patch int
+		patch, err = strconv.Atoi(parts[2])
 		if err != nil {
 			return VersionFilter{}, fmt.Errorf("invalid patch version in %q: %w", s, err)
 		}

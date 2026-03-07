@@ -220,7 +220,8 @@ func runListAll(ctx context.Context, arg, format, host string) error {
 	case "tools":
 		return runListAllTools(ctx, fetcher, reg, format)
 	default:
-		if err := runListAllQt(ctx, fetcher, reg, format); err != nil {
+		err = runListAllQt(ctx, fetcher, reg, format)
+		if err != nil {
 			return err
 		}
 		fmt.Fprintln(os.Stdout)

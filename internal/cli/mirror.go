@@ -63,7 +63,8 @@ func runMirrorRefresh(ctx context.Context, _ *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("opening mirror list cache: %w", err)
 	}
-	if err := mlc.Save(mirrors); err != nil {
+	err = mlc.Save(mirrors)
+	if err != nil {
 		return fmt.Errorf("saving mirror list: %w", err)
 	}
 
@@ -191,7 +192,8 @@ func mirrorSelectAuto(ctx context.Context, cfg *config.Config) error {
 			return nil
 		}
 		cfg.Repository.URL = r.URL
-		if err := config.Save(cfg); err != nil {
+		err = config.Save(cfg)
+		if err != nil {
 			return fmt.Errorf("saving config: %w", err)
 		}
 		fmt.Fprintf(os.Stdout, "%s  Primary mirror set to: %s\n", checkOK, r.URL)

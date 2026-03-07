@@ -76,7 +76,8 @@ func hasMSVC(year string) bool {
 		return false
 	}
 
-	out, err := exec.CommandContext(context.Background(), vswhere, "-version", versionRange, "-property", "installationPath").Output()
+	out, err := exec.CommandContext(context.Background(), vswhere, "-version", versionRange, "-property", "installationPath").
+		Output()
 	if err == nil && len(strings.TrimSpace(string(out))) > 0 {
 		return true
 	}

@@ -23,7 +23,8 @@ func NewCache() (*Cache, error) {
 		return nil, fmt.Errorf("determining cache dir: %w", err)
 	}
 	dir := filepath.Join(base, "qvm", "metadata")
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	err = os.MkdirAll(dir, 0o750)
+	if err != nil {
 		return nil, fmt.Errorf("creating cache dir %s: %w", dir, err)
 	}
 	return &Cache{dir: dir}, nil

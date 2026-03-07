@@ -107,7 +107,8 @@ func runUninstallQt(
 		}
 	}
 
-	if err := storage.Cleanup(registry, version, arch, cfg.Install.Dir); err != nil {
+	err = storage.Cleanup(registry, version, arch, cfg.Install.Dir)
+	if err != nil {
 		return fmt.Errorf("uninstall failed: %w", err)
 	}
 
@@ -169,7 +170,8 @@ func runUninstallTool(
 		}
 	}
 
-	if err := storage.CleanupTool(registry, toolName, toolVersion, cfg.ToolsDir()); err != nil {
+	err = storage.CleanupTool(registry, toolName, toolVersion, cfg.ToolsDir())
+	if err != nil {
 		return fmt.Errorf("uninstall failed: %w", err)
 	}
 

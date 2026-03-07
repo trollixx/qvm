@@ -44,7 +44,8 @@ func Cleanup(reg *RegistryManager, version, arch, expectedRoot string) error {
 		if !isSafePath(q.InstallDir, expectedRoot) {
 			return fmt.Errorf("refusing to remove %s: path is outside expected root %s", q.InstallDir, expectedRoot)
 		}
-		if err := os.RemoveAll(q.InstallDir); err != nil && !os.IsNotExist(err) {
+		err = os.RemoveAll(q.InstallDir)
+		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("removing %s: %w", q.InstallDir, err)
 		}
 	}
@@ -74,7 +75,8 @@ func CleanupTool(reg *RegistryManager, name, version, expectedRoot string) error
 		if !isSafePath(t.InstallDir, expectedRoot) {
 			return fmt.Errorf("refusing to remove %s: path is outside expected root %s", t.InstallDir, expectedRoot)
 		}
-		if err := os.RemoveAll(t.InstallDir); err != nil && !os.IsNotExist(err) {
+		err = os.RemoveAll(t.InstallDir)
+		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("removing %s: %w", t.InstallDir, err)
 		}
 	}

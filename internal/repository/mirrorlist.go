@@ -34,7 +34,8 @@ func NewMirrorListCache() (*MirrorListCache, error) {
 		return nil, fmt.Errorf("determining mirror cache path: %w", err)
 	}
 	dir := filepath.Join(base, "qvm")
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	err = os.MkdirAll(dir, 0o750)
+	if err != nil {
 		return nil, fmt.Errorf("creating cache dir: %w", err)
 	}
 	return &MirrorListCache{path: filepath.Join(dir, "mirrors.json")}, nil
@@ -65,7 +66,8 @@ func (c *MirrorListCache) Load() ([]string, error) {
 		return nil, err
 	}
 	var d mirrorListData
-	if err := json.Unmarshal(data, &d); err != nil {
+	err = json.Unmarshal(data, &d)
+	if err != nil {
 		return nil, fmt.Errorf("parsing mirror list cache: %w", err)
 	}
 	return d.Mirrors, nil

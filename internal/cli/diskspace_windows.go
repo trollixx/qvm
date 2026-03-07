@@ -10,12 +10,13 @@ func diskSpace(path string) (uint64, uint64, error) {
 	}
 
 	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes uint64
-	if err := windows.GetDiskFreeSpaceEx(
+	err = windows.GetDiskFreeSpaceEx(
 		pathPtr,
 		&freeBytesAvailable,
 		&totalNumberOfBytes,
 		&totalNumberOfFreeBytes,
-	); err != nil {
+	)
+	if err != nil {
 		return 0, 0, err
 	}
 

@@ -103,7 +103,8 @@ func (m *RegistryManager) Load() (*Registry, error) {
 		return nil, fmt.Errorf("reading registry: %w", err)
 	}
 	var r Registry
-	if err := json.Unmarshal(data, &r); err != nil {
+	err = json.Unmarshal(data, &r)
+	if err != nil {
 		return nil, fmt.Errorf("parsing registry: %w", err)
 	}
 	if r.Version > registryVersion {
@@ -147,15 +148,18 @@ func (m *RegistryManager) Save(r *Registry) error {
 	if err != nil {
 		return fmt.Errorf("encoding registry: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(m.path), 0o750); err != nil {
+	err = os.MkdirAll(filepath.Dir(m.path), 0o750)
+	if err != nil {
 		return fmt.Errorf("creating registry directory: %w", err)
 	}
 	// Atomic write via temp file.
 	tmp := m.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	err = os.WriteFile(tmp, data, 0o600)
+	if err != nil {
 		return fmt.Errorf("writing registry tmp: %w", err)
 	}
-	if err := os.Rename(tmp, m.path); err != nil {
+	err = os.Rename(tmp, m.path)
+	if err != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("committing registry: %w", err)
 	}

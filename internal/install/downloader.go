@@ -43,7 +43,8 @@ func DownloadCacheDir() (string, error) {
 		return "", fmt.Errorf("determining download cache dir: %w", err)
 	}
 	dir := filepath.Join(base, "qvm", "downloads")
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	err = os.MkdirAll(dir, 0o750)
+	if err != nil {
 		return "", fmt.Errorf("creating download cache dir: %w", err)
 	}
 	return dir, nil
@@ -145,7 +146,8 @@ func (d *Downloader) downloadOne(
 
 	if resp.StatusCode == http.StatusRequestedRangeNotSatisfiable {
 		// .part file is already complete - just promote it.
-		if err := os.Rename(part, dest); err != nil {
+		err = os.Rename(part, dest)
+		if err != nil {
 			return "", err
 		}
 		sendEvent(eventCh, DownloadEvent{Filename: arch.Filename, Done: true})
@@ -210,7 +212,8 @@ func (d *Downloader) downloadOne(
 		return "", writeErr
 	}
 
-	if err := os.Rename(part, dest); err != nil {
+	err = os.Rename(part, dest)
+	if err != nil {
 		return "", err
 	}
 

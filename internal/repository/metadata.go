@@ -373,7 +373,8 @@ func (f *MetadataFetcher) fetchSrcDocExamples(ctx context.Context, vi *QtVersion
 	}
 
 	var upd updatesXML
-	if err := xml.Unmarshal(body, &upd); err != nil {
+	err = xml.Unmarshal(body, &upd)
+	if err != nil {
 		return
 	}
 
@@ -664,7 +665,8 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 	}
 	if archEntry == nil {
 		displayName := arch
-		if meta, ok := qtmeta.LookupTarget(arch); ok {
+		meta, found := qtmeta.LookupTarget(arch)
+		if found {
 			displayName = meta.DisplayName
 		}
 		vi.Archs = append(vi.Archs, Arch{Name: arch, DisplayName: displayName})
