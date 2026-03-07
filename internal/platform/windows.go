@@ -4,6 +4,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/trollixx/qvm/pkg/qtmeta"
 )
 
 // Windows implements Platform for Windows.
@@ -14,11 +16,18 @@ func (w *Windows) DefaultInstallDir() string {
 }
 
 func (w *Windows) DefaultArch(qtVersion string) string {
-	// Qt 6.6+ requires MSVC 2022 — no compiler probing needed.
-	if msvc := windowsDefaultMSVC(qtVersion); msvc == "win64_msvc2022_64" {
-		return msvc
+	v, err := qtmeta.ParseVersion(qtVersion)
+	if err != nil {
+		return "win64_msvc2019_64"
 	}
-	// Pre-6.6 (including Qt 5): prefer whatever MSVC is installed.
+	if v.GTE(qt66) {
+		return "win64_msvc2022_64"
+	}
+	if v.Major() < 6 {
+		// Qt 5 only ships msvc2019 archives.
+		return "win64_msvc2019_64"
+	}
+	// Qt 6.0-6.5: both msvc2019 and msvc2022 exist; prefer what's installed.
 	if hasMSVC("2019") {
 		return "win64_msvc2019_64"
 	}
