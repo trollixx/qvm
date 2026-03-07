@@ -8,12 +8,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/trollixx/qvm/internal/config"
 	"github.com/trollixx/qvm/internal/platform"
 	"github.com/trollixx/qvm/internal/repository"
 	"github.com/trollixx/qvm/internal/storage"
 	"github.com/trollixx/qvm/pkg/qtmeta"
-	"github.com/urfave/cli/v3"
 )
 
 func newListCommand() *cli.Command {
@@ -76,7 +77,10 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if arg != "" && arg != "qt" && arg != "tools" {
-		return fmt.Errorf("unknown list target %q\n\nUsage:\n  qvm list                 Show installed versions\n  qvm list --all           Show all available versions\n  qvm list qt@6            Show all Qt 6.x versions\n  qvm list qt@6.8          Show all Qt 6.8.x versions\n  qvm list qt@6.8.3        Show version details (archs, modules)", arg)
+		return fmt.Errorf(
+			"unknown list target %q\n\nUsage:\n  qvm list                 Show installed versions\n  qvm list --all           Show all available versions\n  qvm list qt@6            Show all Qt 6.x versions\n  qvm list qt@6.8          Show all Qt 6.8.x versions\n  qvm list qt@6.8.3        Show version details (archs, modules)",
+			arg,
+		)
 	}
 
 	if showAll {
@@ -225,7 +229,12 @@ func runListAll(ctx context.Context, arg, format, host string) error {
 	}
 }
 
-func runListAllQt(ctx context.Context, fetcher *repository.MetadataFetcher, reg *storage.Registry, format string) error {
+func runListAllQt(
+	ctx context.Context,
+	fetcher *repository.MetadataFetcher,
+	reg *storage.Registry,
+	format string,
+) error {
 	versions, err := fetcher.FetchAllQtVersions(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching Qt versions: %w", err)
@@ -281,7 +290,13 @@ func runListAllQt(ctx context.Context, fetcher *repository.MetadataFetcher, reg 
 	return nil
 }
 
-func runListQtFiltered(ctx context.Context, fetcher *repository.MetadataFetcher, reg *storage.Registry, vf qtmeta.VersionFilter, format string) error {
+func runListQtFiltered(
+	ctx context.Context,
+	fetcher *repository.MetadataFetcher,
+	reg *storage.Registry,
+	vf qtmeta.VersionFilter,
+	format string,
+) error {
 	versions, err := fetcher.FetchAllQtVersions(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching Qt versions: %w", err)
@@ -295,7 +310,10 @@ func runListQtFiltered(ctx context.Context, fetcher *repository.MetadataFetcher,
 	}
 
 	if len(filtered) == 0 {
-		return fmt.Errorf("no Qt versions matching %q found\n\nRun 'qvm list --all' to see all available versions.", vf.String())
+		return fmt.Errorf(
+			"no Qt versions matching %q found\n\nRun 'qvm list --all' to see all available versions.",
+			vf.String(),
+		)
 	}
 
 	if format == "json" {
@@ -328,7 +346,12 @@ func runListQtFiltered(ctx context.Context, fetcher *repository.MetadataFetcher,
 	return nil
 }
 
-func runListAllTools(ctx context.Context, fetcher *repository.MetadataFetcher, reg *storage.Registry, format string) error {
+func runListAllTools(
+	ctx context.Context,
+	fetcher *repository.MetadataFetcher,
+	reg *storage.Registry,
+	format string,
+) error {
 	tools, err := fetcher.FetchAllTools(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching tools: %w", err)
@@ -388,7 +411,10 @@ func runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, 
 		}
 	}
 	if vi == nil {
-		return fmt.Errorf("Qt version %s not found in repository\n\nRun 'qvm list --all' to see available versions.", version)
+		return fmt.Errorf(
+			"Qt version %s not found in repository\n\nRun 'qvm list --all' to see available versions.",
+			version,
+		)
 	}
 
 	vi.SetDefaultArch(platform.Current().DefaultArch(version))

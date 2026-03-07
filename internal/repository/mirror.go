@@ -71,7 +71,10 @@ func (m *MirrorList) ToolURLsFor(toolName string) []string {
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))
 	for _, base := range all {
-		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/tools_%s/Updates.xml", base, host, toolName))
+		urls = append(
+			urls,
+			fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/tools_%s/Updates.xml", base, host, toolName),
+		)
 	}
 	return urls
 }

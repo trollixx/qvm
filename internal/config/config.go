@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
+
 	toml "github.com/pelletier/go-toml/v2"
 )
 

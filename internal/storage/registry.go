@@ -36,6 +36,7 @@ func (q *InstalledQt) UnmarshalJSON(data []byte) error {
 	type Alias InstalledQt
 	var v struct {
 		Alias
+
 		Target string `json:"target"` // legacy field name
 	}
 	if err := json.Unmarshal(data, &v); err != nil {
@@ -105,7 +106,11 @@ func (m *RegistryManager) Load() (*Registry, error) {
 		return nil, fmt.Errorf("parsing registry: %w", err)
 	}
 	if r.Version > registryVersion {
-		return nil, fmt.Errorf("registry was written by a newer qvm version (version %d > %d); please upgrade qvm", r.Version, registryVersion)
+		return nil, fmt.Errorf(
+			"registry was written by a newer qvm version (version %d > %d); please upgrade qvm",
+			r.Version,
+			registryVersion,
+		)
 	}
 	if needsMigration(data) {
 		_ = m.Save(&r) // best-effort; a read failure here is non-fatal

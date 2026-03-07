@@ -238,12 +238,16 @@ func TestExtensionURLsFor(t *testing.T) {
 	t.Run("Qt 6.10.2", func(t *testing.T) {
 		urls := m.ExtensionURLsFor("qtwebengine", "6.10.2", 6, "win64_msvc2022_64")
 		require.Len(t, urls, 2)
-		assert.Equal(t,
+		assert.Equal(
+			t,
 			"https://download.qt.io/online/qtsdkrepository/windows_x86/extensions/qtwebengine/6102/msvc2022_64/Updates.xml",
-			urls[0])
-		assert.Equal(t,
+			urls[0],
+		)
+		assert.Equal(
+			t,
 			"https://mirror.example.com/online/qtsdkrepository/windows_x86/extensions/qtwebengine/6102/msvc2022_64/Updates.xml",
-			urls[1])
+			urls[1],
+		)
 	})
 
 	t.Run("Qt 6.8.3 mingw", func(t *testing.T) {
@@ -293,9 +297,11 @@ func TestSrcDocExURLsFor(t *testing.T) {
 		assert.Equal(t,
 			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_673_src_doc_examples/Updates.xml",
 			urls[0])
-		assert.Equal(t,
+		assert.Equal(
+			t,
 			"https://mirror.example.com/online/qtsdkrepository/windows_x86/desktop/qt6_673_src_doc_examples/Updates.xml",
-			urls[1])
+			urls[1],
+		)
 	})
 
 	t.Run("Qt 5 returns nil", func(t *testing.T) {

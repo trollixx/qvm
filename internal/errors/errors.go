@@ -32,6 +32,17 @@ type QvmError struct {
 	Cause       error
 }
 
+// New creates a QvmError with the given code and message.
+func New(code Code, message string) *QvmError {
+	return &QvmError{Code: code, Message: message}
+}
+
+// Newf creates a QvmError with a formatted message.
+func Newf(code Code, format string, args ...any) *QvmError {
+	return &QvmError{Code: code, Message: fmt.Sprintf(format, args...)}
+}
+
+// Error implements the error interface, including suggestions if present.
 func (e *QvmError) Error() string {
 	var sb strings.Builder
 	sb.WriteString(e.Message)
@@ -45,18 +56,9 @@ func (e *QvmError) Error() string {
 	return sb.String()
 }
 
+// Unwrap returns the cause of the error, if any.
 func (e *QvmError) Unwrap() error {
 	return e.Cause
-}
-
-// New creates a QvmError with the given code and message.
-func New(code Code, message string) *QvmError {
-	return &QvmError{Code: code, Message: message}
-}
-
-// Newf creates a QvmError with a formatted message.
-func Newf(code Code, format string, args ...any) *QvmError {
-	return &QvmError{Code: code, Message: fmt.Sprintf(format, args...)}
 }
 
 // Wrap wraps a cause error.

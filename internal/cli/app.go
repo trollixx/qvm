@@ -6,15 +6,16 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/trollixx/qvm/internal/config"
 	"github.com/trollixx/qvm/internal/install"
 	"github.com/trollixx/qvm/internal/repository"
 	"github.com/trollixx/qvm/internal/storage"
-	"github.com/urfave/cli/v3"
 )
 
 // Version is the current qvm version string.
-// Override at build time: go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=1.2.3"
+// Override at build time: go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=1.2.3".
 var Version = "dev"
 
 // NewApp creates and configures the qvm CLI application.
@@ -76,7 +77,10 @@ func buildFetcher(cfg *config.Config, host string) (*repository.MetadataFetcher,
 }
 
 // buildDeps constructs the full dependency chain from config.
-func buildDeps(cfg *config.Config, host string) (*repository.Resolver, *install.Installer, *storage.RegistryManager, error) {
+func buildDeps(
+	cfg *config.Config,
+	host string,
+) (*repository.Resolver, *install.Installer, *storage.RegistryManager, error) {
 	cache, err := repository.NewCache()
 	if err != nil {
 		return nil, nil, nil, err

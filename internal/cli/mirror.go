@@ -7,9 +7,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/trollixx/qvm/internal/config"
 	"github.com/trollixx/qvm/internal/repository"
-	"github.com/urfave/cli/v3"
 )
 
 const probeTimeoutSeconds = 8
@@ -207,7 +208,10 @@ func mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL string) err
 		return fmt.Errorf("invalid URL %q: %w", rawURL, err)
 	}
 	if isBlacklisted(rawURL, cfg.Repository.Blacklist) {
-		return fmt.Errorf("mirror %s is in the blacklist; remove it with: qvm config set repository.blacklist ...", mirrorDisplayName(rawURL))
+		return fmt.Errorf(
+			"mirror %s is in the blacklist; remove it with: qvm config set repository.blacklist ...",
+			mirrorDisplayName(rawURL),
+		)
 	}
 
 	fmt.Fprintf(os.Stdout, "Probing %s...\n", mirrorDisplayName(rawURL))

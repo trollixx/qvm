@@ -48,7 +48,7 @@ func Extract(src, destDir string, progress ProgressFunc) error {
 	return nil
 }
 
-// countingWriter wraps an io.Writer and calls onWrite(n) after each Write.
+// countingWriter wraps an [io.Writer] and calls onWrite(n) after each Write.
 type countingWriter struct {
 	w       io.Writer
 	onWrite func(n int)

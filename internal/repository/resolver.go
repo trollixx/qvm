@@ -249,7 +249,8 @@ func resolveDebugInfoArchives(vi *QtVersionInfo, prefix, arch string, modules []
 
 	var result []ResolvedArchive
 	for pkg, refs := range vi.PackageArchives {
-		if !strings.HasPrefix(pkg, prefix) || (!strings.Contains(pkg, "debug_info") && !strings.Contains(pkg, "debuginfo")) {
+		if !strings.HasPrefix(pkg, prefix) ||
+			(!strings.Contains(pkg, "debug_info") && !strings.Contains(pkg, "debuginfo")) {
 			continue
 		}
 		if arch != "" && !strings.HasSuffix(pkg, "."+arch) && !strings.Contains(pkg, "."+arch+".") {

@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/trollixx/qvm/internal/config"
 	"github.com/trollixx/qvm/internal/platform"
 	"github.com/trollixx/qvm/internal/repository"
 	"github.com/trollixx/qvm/internal/storage"
-	"github.com/urfave/cli/v3"
 )
 
 const (

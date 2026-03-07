@@ -8,10 +8,11 @@ import (
 	"strings"
 
 	"github.com/mattn/go-isatty"
+	"github.com/urfave/cli/v3"
+
 	"github.com/trollixx/qvm/internal/config"
 	"github.com/trollixx/qvm/internal/install"
 	"github.com/trollixx/qvm/internal/platform"
-	"github.com/urfave/cli/v3"
 )
 
 var stderrIsTTY = isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())
@@ -65,7 +66,9 @@ func newInstallCommand() *cli.Command {
 func runInstall(ctx context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
 	if arg == "" {
-		return fmt.Errorf("missing argument\n\nUsage:\n  qvm install qt@<version>         Install a Qt SDK\n  qvm install <tool>@<version>     Install a tool\n\nExamples:\n  qvm install qt@6.8.3\n  qvm install qtcreator@15.0.0")
+		return fmt.Errorf(
+			"missing argument\n\nUsage:\n  qvm install qt@<version>         Install a Qt SDK\n  qvm install <tool>@<version>     Install a tool\n\nExamples:\n  qvm install qt@6.8.3\n  qvm install qtcreator@15.0.0",
+		)
 	}
 
 	if arg == "qt" {

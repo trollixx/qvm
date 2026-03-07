@@ -11,6 +11,7 @@ import (
 	"time"
 
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
+
 	"github.com/trollixx/qvm/internal/repository"
 )
 
@@ -62,7 +63,11 @@ func NewDownloader(concurrency, timeoutSeconds int, destDir string) *Downloader 
 
 // DownloadAll downloads all archives in parallel, emitting events on eventCh.
 // Returns the local file paths in the same order as archives.
-func (d *Downloader) DownloadAll(ctx context.Context, archives []repository.ArchiveRef, eventCh chan<- DownloadEvent) ([]string, error) {
+func (d *Downloader) DownloadAll(
+	ctx context.Context,
+	archives []repository.ArchiveRef,
+	eventCh chan<- DownloadEvent,
+) ([]string, error) {
 	sem := make(chan struct{}, d.concurrency)
 	paths := make([]string, len(archives))
 	errs := make([]error, len(archives))
@@ -70,7 +75,7 @@ func (d *Downloader) DownloadAll(ctx context.Context, archives []repository.Arch
 
 	for i, arch := range archives {
 		wg.Add(1)
-		i, arch := i, arch
+
 		go func() {
 			defer wg.Done()
 			sem <- struct{}{}
@@ -91,7 +96,11 @@ func (d *Downloader) DownloadAll(ctx context.Context, archives []repository.Arch
 	return paths, nil
 }
 
-func (d *Downloader) downloadOne(ctx context.Context, arch repository.ArchiveRef, eventCh chan<- DownloadEvent) (string, error) {
+func (d *Downloader) downloadOne(
+	ctx context.Context,
+	arch repository.ArchiveRef,
+	eventCh chan<- DownloadEvent,
+) (string, error) {
 	dest := filepath.Join(d.destDir, arch.Filename)
 	part := dest + ".part"
 

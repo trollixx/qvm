@@ -173,7 +173,11 @@ func TestParseRepoIndex_VirtualSkipped(t *testing.T) {
 	require.Len(t, idx.QtVersions, 1)
 	assert.Empty(t, addonModuleNames(idx.QtVersions[0].Modules))
 	assert.Empty(t, essentialModuleNames(idx.QtVersions[0].Modules))
-	assert.ElementsMatch(t, []string{"qtbase"}, essentialModuleNamesForArch(idx.QtVersions[0].Archs, "win64_msvc2022_64"))
+	assert.ElementsMatch(
+		t,
+		[]string{"qtbase"},
+		essentialModuleNamesForArch(idx.QtVersions[0].Archs, "win64_msvc2022_64"),
+	)
 }
 
 // Qt 5 package naming.
@@ -567,15 +571,6 @@ func archNames(archs []Arch) []string {
 	names := make([]string, len(archs))
 	for i, a := range archs {
 		names[i] = a.Name
-	}
-	sort.Strings(names)
-	return names
-}
-
-func moduleNames(modules []Module) []string {
-	names := make([]string, len(modules))
-	for i, m := range modules {
-		names[i] = m.Name
 	}
 	sort.Strings(names)
 	return names

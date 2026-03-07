@@ -31,11 +31,19 @@ func TestDedupURLs_EmptyFallbacks(t *testing.T) {
 // -- mirrorDisplayName ---------------------------------------------------------
 
 func TestMirrorDisplayName_StripHTTPS(t *testing.T) {
-	assert.Equal(t, "download.qt.io/online/qtsdkrepository", mirrorDisplayName("https://download.qt.io/online/qtsdkrepository/"))
+	assert.Equal(
+		t,
+		"download.qt.io/online/qtsdkrepository",
+		mirrorDisplayName("https://download.qt.io/online/qtsdkrepository/"),
+	)
 }
 
 func TestMirrorDisplayName_StripHTTP(t *testing.T) {
-	assert.Equal(t, "download.qt.io/online/qtsdkrepository", mirrorDisplayName("http://download.qt.io/online/qtsdkrepository/"))
+	assert.Equal(
+		t,
+		"download.qt.io/online/qtsdkrepository",
+		mirrorDisplayName("http://download.qt.io/online/qtsdkrepository/"),
+	)
 }
 
 func TestMirrorDisplayName_NoTrailingSlash(t *testing.T) {

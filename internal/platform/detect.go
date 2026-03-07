@@ -16,12 +16,12 @@ func Current() Platform {
 	}
 }
 
-// GOOS returns the current operating system name (mirrors runtime.GOOS).
+// GOOS returns the current operating system name (mirrors [runtime.GOOS]).
 func GOOS() string {
 	return runtime.GOOS
 }
 
-// GOARCH returns the current architecture (mirrors runtime.GOARCH).
+// GOARCH returns the current architecture (mirrors [runtime.GOARCH]).
 func GOARCH() string {
 	return runtime.GOARCH
 }

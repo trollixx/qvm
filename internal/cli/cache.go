@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/trollixx/qvm/internal/install"
 	"github.com/trollixx/qvm/internal/repository"
-	"github.com/urfave/cli/v3"
 )
 
 func newCacheCommand() *cli.Command {

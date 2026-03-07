@@ -9,8 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/trollixx/qvm/internal/config"
 	"github.com/urfave/cli/v3"
+
+	"github.com/trollixx/qvm/internal/config"
 )
 
 func newConfigCommand() *cli.Command {

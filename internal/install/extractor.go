@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/trollixx/qvm/pkg/archive"
 	"github.com/ulikunitz/xz"
+
+	"github.com/trollixx/qvm/pkg/archive"
 )
 
 // ExtractionEvent is emitted during archive extraction.

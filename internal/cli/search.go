@@ -7,8 +7,9 @@ import (
 	"os"
 
 	"github.com/sahilm/fuzzy"
-	"github.com/trollixx/qvm/internal/config"
 	"github.com/urfave/cli/v3"
+
+	"github.com/trollixx/qvm/internal/config"
 )
 
 // searchResult is the exported form of searchItem for JSON serialization.
@@ -41,7 +42,9 @@ type searchItem struct {
 func runSearch(ctx context.Context, cmd *cli.Command) error {
 	query := cmd.Args().Get(0)
 	if query == "" {
-		return fmt.Errorf("missing argument\n\nUsage:\n  qvm search <query>       Search for Qt modules or tools\n\nExample:\n  qvm search charts")
+		return fmt.Errorf(
+			"missing argument\n\nUsage:\n  qvm search <query>       Search for Qt modules or tools\n\nExample:\n  qvm search charts",
+		)
 	}
 
 	format := cmd.String("format")

@@ -213,7 +213,10 @@ func TestResolveArchives_DebugInfoScopedToModules(t *testing.T) {
 	vi.PackageArchives[debugPkg] = []ArchiveRef{
 		{URL: "http://x/qtbase-dbg.7z", Filename: "6.10.2-0-202503010000qtbase-Windows-debug-symbols.7z"},
 		{URL: "http://x/qtcharts-dbg.7z", Filename: "6.10.2-0-202503010000qtcharts-Windows-debug-symbols.7z"},
-		{URL: "http://x/qtimageformats-dbg.7z", Filename: "6.10.2-0-202503010000qtimageformats-Windows-debug-symbols.7z"},
+		{
+			URL:      "http://x/qtimageformats-dbg.7z",
+			Filename: "6.10.2-0-202503010000qtimageformats-Windows-debug-symbols.7z",
+		},
 		{URL: "http://x/qt3d-dbg.7z", Filename: "6.10.2-0-202503010000qt3d-Windows-debug-symbols.7z"},
 		{URL: "http://x/qtdeclarative-dbg.7z", Filename: "6.10.2-0-202503010000qtdeclarative-Windows-debug-symbols.7z"},
 	}

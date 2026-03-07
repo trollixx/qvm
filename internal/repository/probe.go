@@ -30,7 +30,7 @@ func ProbeURLs(ctx context.Context, urls []string, timeoutSeconds int, host stri
 	var wg sync.WaitGroup
 	for i, base := range urls {
 		wg.Add(1)
-		i, base := i, base
+
 		go func() {
 			defer wg.Done()
 			results[i] = probeOne(ctx, client, base, host)
@@ -60,7 +60,7 @@ func probeOne(ctx context.Context, client *http.Client, base, host string) Probe
 		return ProbeResult{URL: base}
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body) //nolint:errcheck
+	io.Copy(io.Discard, resp.Body)
 	if resp.StatusCode >= 400 {
 		return ProbeResult{URL: base}
 	}

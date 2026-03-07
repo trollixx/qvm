@@ -7,10 +7,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/trollixx/qvm/internal/storage"
 )
 
-// captureStdout runs fn while capturing os.Stdout and returns the output.
+// captureStdout runs fn while capturing [os.Stdout] and returns the output.
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()

@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/trollixx/qvm/internal/repository"
 	"github.com/urfave/cli/v3"
+
+	"github.com/trollixx/qvm/internal/repository"
 )
 
 // showHelpOnNotFound is a CommandNotFound handler that shows the command's help
@@ -76,8 +77,11 @@ var dryRunFlag = &cli.BoolFlag{
 }
 
 var hostFlag = &cli.StringFlag{
-	Name:      "host",
-	Usage:     "host platform override; valid values: " + strings.Join(repository.ValidHosts, ", ") + " (default: auto-detect)",
+	Name: "host",
+	Usage: "host platform override; valid values: " + strings.Join(
+		repository.ValidHosts,
+		", ",
+	) + " (default: auto-detect)",
 	Validator: validateHost,
 }
 

@@ -316,7 +316,12 @@ func (f *MetadataFetcher) fetchExtensions(ctx context.Context, vi *QtVersionInfo
 // processExtensionXML parses an extension Updates.xml and stores archives
 // in vi.PackageArchives using the standard addon key format so the resolver
 // works unchanged.
-func (f *MetadataFetcher) processExtensionXML(body []byte, baseURL string, vi *QtVersionInfo, moduleName, arch, prefix string) {
+func (f *MetadataFetcher) processExtensionXML(
+	body []byte,
+	baseURL string,
+	vi *QtVersionInfo,
+	moduleName, arch, prefix string,
+) {
 	var upd updatesXML
 	if err := xml.Unmarshal(body, &upd); err != nil {
 		return
@@ -729,16 +734,6 @@ func processToolPackage(pkg packageXML, toolMap map[string]*ToolInfo, baseURL st
 		Archives:    buildArchiveRefs(pkg, baseURL),
 	}
 	tool.Versions = append(tool.Versions, tv)
-}
-
-func parseMasterList(body []byte) ([]QtVersionInfo, error) {
-	// The master list is also an Updates.xml with virtual packages listing versions.
-	// baseURL is not needed here since we only use this for version discovery.
-	idx, err := parseRepoIndex(body, "")
-	if err != nil {
-		return nil, err
-	}
-	return idx.QtVersions, nil
 }
 
 func parseToolIndex(body []byte, toolName, baseURL string) (*ToolInfo, error) {

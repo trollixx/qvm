@@ -7,8 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/trollixx/qvm/internal/storage"
 	"github.com/urfave/cli/v3"
+
+	"github.com/trollixx/qvm/internal/storage"
 )
 
 func newInfoCommand() *cli.Command {
@@ -31,7 +32,9 @@ func runInfo(ctx context.Context, cmd *cli.Command) error {
 
 	arg := cmd.Args().Get(0)
 	if arg == "" {
-		return fmt.Errorf("missing argument\n\nUsage:\n  qvm info qt@<version>            Show Qt version details\n  qvm info <tool>[@<version>]      Show tool details\n\nExample:\n  qvm info qt@6.8.3")
+		return fmt.Errorf(
+			"missing argument\n\nUsage:\n  qvm info qt@<version>            Show Qt version details\n  qvm info <tool>[@<version>]      Show tool details\n\nExample:\n  qvm info qt@6.8.3",
+		)
 	}
 
 	format := cmd.String("format")
@@ -62,7 +65,13 @@ func runInfoQt(reg *storage.Registry, version, arch, format string) error {
 
 	if len(matches) == 0 {
 		if arch != "" {
-			return fmt.Errorf("Qt %s (arch: %s) is not installed\n\nTo install it: qvm install qt@%s --arch %s", version, arch, version, arch)
+			return fmt.Errorf(
+				"Qt %s (arch: %s) is not installed\n\nTo install it: qvm install qt@%s --arch %s",
+				version,
+				arch,
+				version,
+				arch,
+			)
 		}
 		return fmt.Errorf("Qt %s is not installed\n\nTo install it: qvm install qt@%s", version, version)
 	}
@@ -100,7 +109,13 @@ func runInfoTool(reg *storage.Registry, arg, format string) error {
 
 	if len(matches) == 0 {
 		if toolVersion != "" {
-			return fmt.Errorf("tool %s@%s is not installed\n\nTo install it: qvm install %s@%s", toolName, toolVersion, toolName, toolVersion)
+			return fmt.Errorf(
+				"tool %s@%s is not installed\n\nTo install it: qvm install %s@%s",
+				toolName,
+				toolVersion,
+				toolName,
+				toolVersion,
+			)
 		}
 		return fmt.Errorf("tool %s is not installed\n\nRun 'qvm list tools --all' to see available tools.", toolName)
 	}
