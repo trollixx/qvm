@@ -43,8 +43,7 @@ func runPath(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("loading registry: %w", err)
 	}
 
-	if strings.HasPrefix(arg, "qt@") {
-		version := strings.TrimPrefix(arg, "qt@")
+	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
 		arch := cmd.String("arch")
 		return pathQt(reg, version, arch)
 	}

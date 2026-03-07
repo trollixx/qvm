@@ -49,8 +49,8 @@ func runInfo(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("loading registry: %w", err)
 	}
 
-	if strings.HasPrefix(arg, "qt@") {
-		return runInfoQt(reg, strings.TrimPrefix(arg, "qt@"), cmd.String("arch"), format)
+	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
+		return runInfoQt(reg, version, cmd.String("arch"), format)
 	}
 	return runInfoTool(reg, arg, format)
 }

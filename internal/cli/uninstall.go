@@ -50,8 +50,7 @@ func runUninstall(ctx context.Context, cmd *cli.Command) error {
 
 	autoYes := cmd.Bool("yes")
 
-	if strings.HasPrefix(arg, "qt@") {
-		version := strings.TrimPrefix(arg, "qt@")
+	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
 		return runUninstallQt(ctx, cmd, cfg, registry, version, autoYes)
 	}
 	return runUninstallTool(ctx, cmd, cfg, registry, arg, autoYes)
@@ -127,16 +126,13 @@ func runUninstallTool(
 	_ = ctx
 	_ = cmd
 
-	at := strings.Index(arg, "@")
-	if at < 0 {
+	toolName, toolVersion, ok := strings.Cut(arg, "@")
+	if !ok {
 		return fmt.Errorf(
 			"missing version\n\nUsage:\n  qvm uninstall <tool>@<version>\n\nExample:\n  qvm uninstall %s@<version>",
 			arg,
 		)
 	}
-
-	toolName := arg[:at]
-	toolVersion := arg[at+1:]
 
 	reg, err := registry.Load()
 	if err != nil {

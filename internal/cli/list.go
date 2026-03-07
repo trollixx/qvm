@@ -43,8 +43,7 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 	host := cmd.String("host")
 
 	// qt@<version> detail or filtered view - always fetches remote metadata.
-	if strings.HasPrefix(arg, "qt@") {
-		version := strings.TrimPrefix(arg, "qt@")
+	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("loading config: %w", err)
@@ -542,7 +541,7 @@ func newestLTSPatch(vers []repository.QtVersionInfo) string {
 	return ""
 }
 
-func printJSON(v interface{}) error {
+func printJSON(v any) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)

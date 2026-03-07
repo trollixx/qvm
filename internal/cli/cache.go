@@ -83,8 +83,8 @@ func runCacheList(_ context.Context, _ *cli.Command) error {
 		}
 		name := e.Name()
 		status := "complete"
-		if strings.HasSuffix(name, ".part") {
-			name = strings.TrimSuffix(name, ".part")
+		if rest, ok := strings.CutSuffix(name, ".part"); ok {
+			name = rest
 			status = "partial"
 		}
 		totalBytes += info.Size()

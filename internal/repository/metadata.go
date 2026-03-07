@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -683,14 +684,7 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 			}
 			if dashIdx := strings.IndexByte(archive, '-'); dashIdx > 0 {
 				modName := archive[:dashIdx]
-				alreadyHave := false
-				for _, em := range archEntry.EssentialModules {
-					if em == modName {
-						alreadyHave = true
-						break
-					}
-				}
-				if !alreadyHave {
+				if !slices.Contains(archEntry.EssentialModules, modName) {
 					archEntry.EssentialModules = append(archEntry.EssentialModules, modName)
 				}
 			}

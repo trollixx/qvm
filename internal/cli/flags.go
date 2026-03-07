@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -90,10 +91,8 @@ func validateHost(host string) error {
 	if host == "" {
 		return nil
 	}
-	for _, h := range repository.ValidHosts {
-		if host == h {
-			return nil
-		}
+	if slices.Contains(repository.ValidHosts, host) {
+		return nil
 	}
 	return fmt.Errorf("unknown host %q: valid hosts are %s", host, strings.Join(repository.ValidHosts, ", "))
 }

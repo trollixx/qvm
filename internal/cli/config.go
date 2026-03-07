@@ -123,7 +123,7 @@ var configKeyMap = map[string][]string{
 	"download.timeout_seconds": {"Download", "TimeoutSeconds"},
 }
 
-func configGet(cfg *config.Config, key string) (interface{}, error) {
+func configGet(cfg *config.Config, key string) (any, error) {
 	fields, ok := configKeyMap[normalizeConfigKey(key)]
 	if !ok {
 		return nil, fmt.Errorf("unknown config key %q; valid keys: %s", key, validKeys())
@@ -200,7 +200,7 @@ func configList(cfg *config.Config) [][2]string {
 		rv := reflect.ValueOf(val)
 		if rv.Kind() == reflect.Slice {
 			strs := make([]string, rv.Len())
-			for i := 0; i < rv.Len(); i++ {
+			for i := range rv.Len() {
 				strs[i] = fmt.Sprintf("%v", rv.Index(i).Interface())
 			}
 			valStr = strings.Join(strs, ", ")

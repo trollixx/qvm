@@ -74,8 +74,8 @@ func runInstall(ctx context.Context, cmd *cli.Command) error {
 	if arg == "qt" {
 		return runInstallQtPickVersion(ctx, cmd)
 	}
-	if strings.HasPrefix(arg, "qt@") {
-		return runInstallQt(ctx, cmd, strings.TrimPrefix(arg, "qt@"))
+	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
+		return runInstallQt(ctx, cmd, version)
 	}
 	return runInstallTool(ctx, cmd, arg)
 }
