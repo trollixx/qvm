@@ -39,7 +39,7 @@ type QtVersionInfo struct {
 	HasExamples  bool      `json:"has_examples,omitempty"`
 	HasSources   bool      `json:"has_sources,omitempty"`
 	HasDebugInfo bool      `json:"has_debug_info,omitempty"`
-	// PackageArchives maps Qt package name → archive list (internal; not exposed in JSON output).
+	// PackageArchives maps Qt package name -> archive list (internal; not exposed in JSON output).
 	// Keys follow the Updates.xml package naming convention, e.g.:
 	//   "qt.qt6.6101.win64_msvc2022_64"             (essential bundle)
 	//   "qt.qt6.6101.addons.qtcharts.win64_msvc2022_64" (addon module)

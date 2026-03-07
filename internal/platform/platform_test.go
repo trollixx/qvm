@@ -17,7 +17,7 @@ func TestDefaultArchForHost(t *testing.T) {
 		{"qt5_windows_x86", "windows_x86", "5.15.2", "win64_msvc2019_64"},
 		{"qt5_windows_x86_old", "windows_x86", "5.9.0", "win64_msvc2019_64"},
 
-		// Qt 6.0–6.5 gets msvc2019.
+		// Qt 6.0-6.5 gets msvc2019.
 		{"qt6.2_windows_x86", "windows_x86", "6.2.0", "win64_msvc2019_64"},
 		{"qt6.5_windows_x86", "windows_x86", "6.5.3", "win64_msvc2019_64"},
 

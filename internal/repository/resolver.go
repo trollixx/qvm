@@ -13,7 +13,7 @@ type ResolveOptions struct {
 	Version        string
 	Arch           string   // e.g. "win64_msvc2022_64"
 	TargetPlatform string   // e.g. "desktop", "android", "wasm"; defaults to "desktop"
-	Modules        []string // add-on module names to install (delta — only new ones)
+	Modules        []string // add-on module names to install (delta - only new ones)
 	AllModules     []string // all module names (existing + new) for scoping docs/examples
 	Docs           bool
 	Examples       bool
@@ -148,7 +148,7 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 				continue
 			}
 		}
-		// Module is already part of the essential bundle — skip silently.
+		// Module is already part of the essential bundle - skip silently.
 		if essentialSet[mod] || essentialSet[qtMod] {
 			continue
 		}
@@ -173,12 +173,12 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 		allModules = append(allModules, opts.Modules...)
 	}
 
-	// Documentation — scoped to all installed modules.
+	// Documentation - scoped to all installed modules.
 	if opts.Docs {
 		archives = append(archives, resolveDocArchives(vi, prefix, allModules)...)
 	}
 
-	// Examples — scoped to all installed modules.
+	// Examples - scoped to all installed modules.
 	if opts.Examples {
 		archives = append(archives, resolveExamplesArchives(vi, prefix, allModules)...)
 	}
@@ -188,7 +188,7 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 		archives = append(archives, resolveSourcesArchives(vi, prefix)...)
 	}
 
-	// Debug info — scoped to all installed modules.
+	// Debug info - scoped to all installed modules.
 	if opts.DebugInfo {
 		archives = append(archives, resolveDebugInfoArchives(vi, prefix, opts.Arch, allModules)...)
 	}
@@ -270,8 +270,8 @@ func resolveDebugInfoArchives(vi *QtVersionInfo, prefix, arch string, modules []
 
 // archiveModuleName extracts the Qt module name from an archive filename.
 // Filenames follow the pattern: "{version_prefix}{module}-{OS}-...-debug-symbols.7z"
-// e.g. "6.10.2-0-202601261212qtbase-Windows-...-debug-symbols.7z" → "qtbase"
-// or simply "qtbase-Windows-msvc.7z" → "qtbase" (no version prefix).
+// e.g. "6.10.2-0-202601261212qtbase-Windows-...-debug-symbols.7z" -> "qtbase"
+// or simply "qtbase-Windows-msvc.7z" -> "qtbase" (no version prefix).
 func archiveModuleName(filename string) string {
 	if filename == "" {
 		return ""

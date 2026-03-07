@@ -21,7 +21,7 @@ func assertErrContains(t *testing.T, err error, substr string) {
 	assert.ErrorContains(t, err, substr)
 }
 
-// ── install ───────────────────────────────────────────────────────────────────
+// -- install -------------------------------------------------------------------
 
 func TestInstall_NoArg(t *testing.T) {
 	assertErrContains(t, run(t, "install"), "missing argument")
@@ -52,7 +52,7 @@ func TestInstall_QtRouting_NotTreatedAsTool(t *testing.T) {
 	assert.NotContains(t, err.Error(), "Updates.xml")
 }
 
-// ── list ──────────────────────────────────────────────────────────────────────
+// -- list ----------------------------------------------------------------------
 
 func TestList_NoArg(t *testing.T) {
 	// Bare `qvm list` now shows installed versions (no error).
@@ -66,7 +66,7 @@ func TestList_UnknownTarget(t *testing.T) {
 	assertErrContains(t, err, "notavalidthing")
 }
 
-// ── uninstall ─────────────────────────────────────────────────────────────────
+// -- uninstall -----------------------------------------------------------------
 
 func TestUninstall_NoArg(t *testing.T) {
 	assertErrContains(t, run(t, "uninstall"), "missing argument")
@@ -79,7 +79,7 @@ func TestUninstall_Tool_NoVersion(t *testing.T) {
 	assertErrContains(t, err, "version")
 }
 
-// ── info ──────────────────────────────────────────────────────────────────────
+// -- info ----------------------------------------------------------------------
 
 func TestInfo_NoArg(t *testing.T) {
 	assertErrContains(t, run(t, "info"), "missing argument")
@@ -95,13 +95,13 @@ func TestInfo_QueueOnly(t *testing.T) {
 	assertErrContains(t, run(t, "info", "qt"), "not installed")
 }
 
-// ── search ────────────────────────────────────────────────────────────────────
+// -- search --------------------------------------------------------------------
 
 func TestSearch_NoArg(t *testing.T) {
 	assertErrContains(t, run(t, "search"), "missing argument")
 }
 
-// ── config ────────────────────────────────────────────────────────────────────
+// -- config --------------------------------------------------------------------
 
 func TestConfigGet_NoKey(t *testing.T) {
 	assertErrContains(t, run(t, "config", "get"), "argument required")

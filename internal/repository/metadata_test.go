@@ -105,13 +105,13 @@ func TestExtractTarget(t *testing.T) {
 // Qt 6.8.3 structure:
 //
 //	4-part non-virtual: essential target packages (have archives)
-//	5-part non-virtual: addon module meta-packages (no archives) ← key case
+//	5-part non-virtual: addon module meta-packages (no archives) <- key case
 //	6-part virtual:     addon target packages (have archives, but are virtual)
 func TestParseRepoIndex_Qt683Modules(t *testing.T) {
 	xml := packagesXML([]struct{ name, virtual, archives string }{
 		{"qt.qt6.683.win64_msvc2022_64", "false", "qtbase-Windows-msvc.7z"},
 		{"qt.qt6.683.win64_mingw", "false", "qtbase-Windows-mingw.7z"},
-		// 5-part non-virtual module meta-packages — module discovery depends on these.
+		// 5-part non-virtual module meta-packages - module discovery depends on these.
 		{"qt.qt6.683.addons.qtcharts", "false", ""},
 		{"qt.qt6.683.addons.qt3d", "false", ""},
 		{"qt.qt6.683.addons.qtwebengine", "false", ""},
@@ -164,7 +164,7 @@ func TestParseRepoIndex_Qt65ModulesNonVirtual(t *testing.T) {
 func TestParseRepoIndex_VirtualSkipped(t *testing.T) {
 	xml := packagesXML([]struct{ name, virtual, archives string }{
 		{"qt.qt6.683.win64_msvc2022_64", "false", "qtbase-Windows-msvc.7z"},
-		// Virtual addon package only — no 5-part module meta-package present.
+		// Virtual addon package only - no 5-part module meta-package present.
 		{"qt.qt6.683.addons.qtcharts.win64_msvc2022_64", "true", "qtcharts-Windows-msvc.7z"},
 	})
 
@@ -319,10 +319,10 @@ func TestParseRepoIndex_EssentialModulesPerTarget(t *testing.T) {
 
 	vi := idx.QtVersions[0]
 
-	// vi.Modules must contain no essentials — they live on each Target.
+	// vi.Modules must contain no essentials - they live on each Target.
 	assert.Empty(t, essentialModuleNames(vi.Modules))
 
-	// MSVC target sees only its own archives — no mingw1310_64 leak.
+	// MSVC target sees only its own archives - no mingw1310_64 leak.
 	assert.ElementsMatch(t,
 		[]string{"qtbase", "qtdeclarative"},
 		essentialModuleNamesForArch(vi.Archs, "win64_msvc2022_64"),
@@ -341,7 +341,7 @@ func TestParseRepoIndex_ModuleDisplayName(t *testing.T) {
 		{"qt.qt6.683.win64_msvc2022_64", "Qt 6.8.3 MSVC 2022", "false", "qtbase.7z"},
 		{"qt.qt6.683.addons.qtcharts", "Qt Charts", "false", ""},
 		{"qt.qt6.683.addons.qtwebengine", "Qt WebEngine", "false", ""},
-		// Virtual addon+target package — should not overwrite already-registered DisplayName.
+		// Virtual addon+target package - should not overwrite already-registered DisplayName.
 		{"qt.qt6.683.addons.qtcharts.win64_msvc2022_64", "Qt Charts MSVC", "true", "qtcharts.7z"},
 	})
 
@@ -396,7 +396,7 @@ func TestParseRepoIndex_DocArchivesStored(t *testing.T) {
 	base := "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/"
 	xml := packagesXML([]struct{ name, virtual, archives string }{
 		{"qt.qt6.683.win64_msvc2022_64", "false", "qtbase-Windows-msvc.7z"},
-		// Doc package — no arch, has archives.
+		// Doc package - no arch, has archives.
 		{"qt.qt6.683.doc.qtcharts", "false", "qtcharts-doc.7z"},
 		{"qt.qt6.683.doc.qtbase", "false", "qtbase-doc.7z"},
 		// Examples package.

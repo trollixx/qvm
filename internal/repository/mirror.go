@@ -138,7 +138,7 @@ func (m *MirrorList) DirectoryURLs() []string {
 }
 
 // versionToRepoStr converts a version string to the compact form used in Qt repo folder names.
-// e.g. "6.10.0" → "6100", "5.15.18" → "51518", "5.9.0" → "59" (patch omitted for 5.9.0).
+// e.g. "6.10.0" -> "6100", "5.15.18" -> "51518", "5.9.0" -> "59" (patch omitted for 5.9.0).
 func versionToRepoStr(version string, major int) string {
 	parts := strings.SplitN(version, ".", 3)
 	if len(parts) < 3 {
@@ -151,7 +151,7 @@ func versionToRepoStr(version string, major int) string {
 	if major == 5 && minor == "9" && patch == "0" {
 		return major_minor(major, minor)
 	}
-	// Qt 5 with patch 0: patch omitted (e.g. 5.12.0 → "5120", but 5.12.3 → "5123").
+	// Qt 5 with patch 0: patch omitted (e.g. 5.12.0 -> "5120", but 5.12.3 -> "5123").
 	// aqtinstall omits patch only for prerelease; for stable releases patch is always included
 	// except for the Qt 5.9.0 special case above.
 	return fmt.Sprintf("%d%s%s", major, minor, patch)
@@ -189,7 +189,7 @@ func (m *MirrorList) ExtensionURLsFor(moduleName, version string, major int, arc
 }
 
 // extensionArchSubdir maps a Qt arch name to the subdirectory name used in extension repos.
-// e.g. "win64_msvc2022_64" → "msvc2022_64", "linux_x64_gcc" → "gcc".
+// e.g. "win64_msvc2022_64" -> "msvc2022_64", "linux_x64_gcc" -> "gcc".
 func extensionArchSubdir(arch string) string {
 	// Strip well-known platform prefixes.
 	prefixes := []string{

@@ -22,7 +22,7 @@ func PatchQtConf(installDir string) error {
 	prefix := filepath.ToSlash(installDir)
 
 	// If file already exists, replace the Prefix line in-place so any other
-	// settings (Translations, Plugins, …) are preserved.
+	// settings (Translations, Plugins, ...) are preserved.
 	if len(data) > 0 {
 		lines := strings.Split(string(data), "\n")
 		found := false
@@ -34,7 +34,7 @@ func PatchQtConf(installDir string) error {
 			}
 		}
 		if !found {
-			// Existing file has no Prefix line — insert one after [Paths].
+			// Existing file has no Prefix line - insert one after [Paths].
 			inserted := false
 			for i, line := range lines {
 				if strings.TrimSpace(line) == "[Paths]" {
@@ -55,7 +55,7 @@ func PatchQtConf(installDir string) error {
 		return nil
 	}
 
-	// No existing file — create a minimal one.
+	// No existing file - create a minimal one.
 	if err := os.MkdirAll(filepath.Dir(qtConfPath), 0o755); err != nil {
 		return fmt.Errorf("creating bin dir for qt.conf: %w", err)
 	}

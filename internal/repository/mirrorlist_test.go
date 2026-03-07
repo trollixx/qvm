@@ -9,7 +9,7 @@ import (
 	"github.com/trollixx/qvm/internal/repository"
 )
 
-// ── parseMirrorListHTML ───────────────────────────────────────────────────────
+// -- parseMirrorListHTML -------------------------------------------------------
 
 var mirrorListFixtureHTML = []byte(`<!DOCTYPE html>
 <html><head><title>Qt Mirror List</title></head><body>
@@ -31,12 +31,12 @@ var mirrorListFixtureHTML = []byte(`<!DOCTYPE html>
   </tr>
   <tr>
     <td>Europe</td>
-    <!-- URL without trailing slash — should be normalized -->
+    <!-- URL without trailing slash - should be normalized -->
     <td><a href="https://mirrors.ukfast.co.uk/sites/qt.io">mirrors.ukfast.co.uk</a></td>
   </tr>
   <tr>
     <td>Asia</td>
-    <!-- Duplicate — should appear only once -->
+    <!-- Duplicate - should appear only once -->
     <td><a href="https://ftp.fau.de/qtproject/">ftp.fau.de (dup)</a></td>
   </tr>
   <tr>
@@ -93,7 +93,7 @@ func TestParseMirrorListHTML_Empty(t *testing.T) {
 	assert.Empty(t, mirrors)
 }
 
-// ── MirrorListCache ───────────────────────────────────────────────────────────
+// -- MirrorListCache -----------------------------------------------------------
 
 func TestMirrorListCache_NotExistsBeforeSave(t *testing.T) {
 	c := repository.NewMirrorListCacheAt(filepath.Join(t.TempDir(), "mirrors.json"))

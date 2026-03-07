@@ -68,7 +68,7 @@ func pathQt(reg *storage.Registry, version, arch string) error {
 		fmt.Fprintln(os.Stdout, matches[0].InstallDir)
 		return nil
 	default:
-		// Multiple archs installed — prefer the local machine's default.
+		// Multiple archs installed - prefer the local machine's default.
 		defaultArch := platform.Current().DefaultArch(version)
 		for _, m := range matches {
 			if m.Arch == defaultArch {
@@ -76,7 +76,7 @@ func pathQt(reg *storage.Registry, version, arch string) error {
 				return nil
 			}
 		}
-		// No default match — ask the user to specify.
+		// No default match - ask the user to specify.
 		archs := make([]string, len(matches))
 		for i, m := range matches {
 			archs[i] = m.Arch

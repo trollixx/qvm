@@ -41,7 +41,7 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 	format := cmd.String("format")
 	host := cmd.String("host")
 
-	// qt@<version> detail or filtered view — always fetches remote metadata.
+	// qt@<version> detail or filtered view - always fetches remote metadata.
 	if strings.HasPrefix(arg, "qt@") {
 		version := strings.TrimPrefix(arg, "qt@")
 		cfg, err := config.Load()
@@ -58,8 +58,8 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 			return fmt.Errorf("invalid version %q: %w", version, err)
 		}
 
-		// Full version (e.g. "6.8.3") → detail view.
-		// Partial version (e.g. "6" or "6.9") → filtered list view.
+		// Full version (e.g. "6.8.3") -> detail view.
+		// Partial version (e.g. "6" or "6.9") -> filtered list view.
 		if vf.IsFullVersion() {
 			return runListQtVersion(ctx, fetcher, version, format)
 		}

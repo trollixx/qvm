@@ -20,7 +20,7 @@ func defaultCfg() *config.Config {
 	return cfg
 }
 
-// ── configGet ─────────────────────────────────────────────────────────────────
+// -- configGet -----------------------------------------------------------------
 
 func TestConfigGet_KnownStringKey(t *testing.T) {
 	cfg := defaultCfg()
@@ -67,7 +67,7 @@ func TestConfigGet_TimeoutSeconds(t *testing.T) {
 	assert.Equal(t, 300, val)
 }
 
-// ── configSet ─────────────────────────────────────────────────────────────────
+// -- configSet -----------------------------------------------------------------
 
 func TestConfigSet_String(t *testing.T) {
 	cfg := defaultCfg()
@@ -114,7 +114,7 @@ func TestConfigSet_RoundTrip(t *testing.T) {
 	assert.Equal(t, int64(120), int64(val.(int)))
 }
 
-// ── configList ────────────────────────────────────────────────────────────────
+// -- configList ----------------------------------------------------------------
 
 func TestConfigList_ReturnsAllKeys(t *testing.T) {
 	pairs := configList(defaultCfg())

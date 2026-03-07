@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// ── dedupURLs ─────────────────────────────────────────────────────────────────
+// -- dedupURLs -----------------------------------------------------------------
 
 func TestDedupURLs_NoDuplicates(t *testing.T) {
 	result := dedupURLs("https://a.example/", []string{"https://b.example/", "https://c.example/"})
@@ -28,7 +28,7 @@ func TestDedupURLs_EmptyFallbacks(t *testing.T) {
 	assert.Equal(t, []string{"https://a.example/"}, result)
 }
 
-// ── mirrorDisplayName ─────────────────────────────────────────────────────────
+// -- mirrorDisplayName ---------------------------------------------------------
 
 func TestMirrorDisplayName_StripHTTPS(t *testing.T) {
 	assert.Equal(t, "download.qt.io/online/qtsdkrepository", mirrorDisplayName("https://download.qt.io/online/qtsdkrepository/"))
@@ -42,7 +42,7 @@ func TestMirrorDisplayName_NoTrailingSlash(t *testing.T) {
 	assert.Equal(t, "download.qt.io/path", mirrorDisplayName("https://download.qt.io/path"))
 }
 
-// ── filterBlacklist ───────────────────────────────────────────────────────────
+// -- filterBlacklist -----------------------------------------------------------
 
 func TestFilterBlacklist_RemovesBlacklisted(t *testing.T) {
 	mirrors := []string{"https://a.example/", "https://b.example/", "https://c.example/"}
@@ -69,7 +69,7 @@ func TestFilterBlacklist_AllBlacklisted(t *testing.T) {
 	assert.Empty(t, result)
 }
 
-// ── isBlacklisted ─────────────────────────────────────────────────────────────
+// -- isBlacklisted -------------------------------------------------------------
 
 func TestIsBlacklisted_True(t *testing.T) {
 	assert.True(t, isBlacklisted("https://bad.example/", []string{"https://bad.example/"}))
@@ -84,7 +84,7 @@ func TestIsBlacklisted_NormalizesBothSides(t *testing.T) {
 	assert.True(t, isBlacklisted("https://bad.example", []string{"https://bad.example/"}))
 }
 
-// ── normalizeURL ──────────────────────────────────────────────────────────────
+// -- normalizeURL --------------------------------------------------------------
 
 func TestNormalizeURL_AddsSlash(t *testing.T) {
 	assert.Equal(t, "https://a.example/", normalizeURL("https://a.example"))
@@ -94,7 +94,7 @@ func TestNormalizeURL_PreservesExistingSlash(t *testing.T) {
 	assert.Equal(t, "https://a.example/", normalizeURL("https://a.example/"))
 }
 
-// ── mirror command routing ────────────────────────────────────────────────────
+// -- mirror command routing ----------------------------------------------------
 
 func TestMirrorSelect_NoArgs(t *testing.T) {
 	assertErrContains(t, run(t, "mirror", "select"), "usage:")

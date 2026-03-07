@@ -77,7 +77,7 @@ func runInstall(ctx context.Context, cmd *cli.Command) error {
 	return runInstallTool(ctx, cmd, arg)
 }
 
-// runInstallQtPickVersion handles "qvm install qt" — no version specified.
+// runInstallQtPickVersion handles "qvm install qt" - no version specified.
 func runInstallQtPickVersion(_ context.Context, _ *cli.Command) error {
 	return fmt.Errorf("specify a version: qvm install qt@<version>\n\nExample: qvm install qt@6.8.3")
 }
@@ -237,8 +237,8 @@ func runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
 
 func printDryRun(ev install.ProgressEvent) {
 	if ev.Archive == "" {
-		// Header event — emitted once with ArchiveTotal set.
-		fmt.Fprintf(os.Stdout, "Dry run — would download %d archive(s):\n", ev.ArchiveTotal)
+		// Header event - emitted once with ArchiveTotal set.
+		fmt.Fprintf(os.Stdout, "Dry run - would download %d archive(s):\n", ev.ArchiveTotal)
 		return
 	}
 	size := ""
@@ -250,7 +250,7 @@ func printDryRun(ev install.ProgressEvent) {
 
 // progressTracker keeps state for multi-line download progress on a TTY.
 type progressTracker struct {
-	lines map[string]int // archive name → line index (0-based from first download line)
+	lines map[string]int // archive name -> line index (0-based from first download line)
 	total int            // number of lines printed so far
 }
 
@@ -280,13 +280,13 @@ func printProgress(ev install.ProgressEvent) {
 		line := formatDownloadLine(ev)
 		idx, exists := dlTracker.lines[ev.Archive]
 		if !exists {
-			// New file — append a new line.
+			// New file - append a new line.
 			idx = dlTracker.total
 			dlTracker.lines[ev.Archive] = idx
 			dlTracker.total++
 			fmt.Fprintf(os.Stderr, "%s\n", line)
 		} else {
-			// Existing file — move cursor up, overwrite, move back down.
+			// Existing file - move cursor up, overwrite, move back down.
 			up := dlTracker.total - idx
 			fmt.Fprintf(os.Stderr, "\033[%dA\r\033[K%s\033[%dB\r", up, line, up)
 		}

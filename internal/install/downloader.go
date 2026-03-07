@@ -95,13 +95,13 @@ func (d *Downloader) downloadOne(ctx context.Context, arch repository.ArchiveRef
 	dest := filepath.Join(d.destDir, arch.Filename)
 	part := dest + ".part"
 
-	// Already fully downloaded from a previous run — verify and skip.
+	// Already fully downloaded from a previous run - verify and skip.
 	if _, err := os.Stat(dest); err == nil {
 		if err := VerifyFile(dest, arch.SHA1); err == nil {
 			sendEvent(eventCh, DownloadEvent{Filename: arch.Filename, Done: true})
 			return dest, nil
 		}
-		// Cached file is corrupt — re-download.
+		// Cached file is corrupt - re-download.
 		os.Remove(dest)
 	}
 
@@ -109,7 +109,7 @@ func (d *Downloader) downloadOne(ctx context.Context, arch repository.ArchiveRef
 	var rangeStart int64
 	if fi, err := os.Stat(part); err == nil {
 		partSize := fi.Size()
-		// If the part file is larger than expected, it's corrupt — start fresh.
+		// If the part file is larger than expected, it's corrupt - start fresh.
 		if arch.Size > 0 && partSize > arch.Size {
 			os.Remove(part)
 		} else {
@@ -133,7 +133,7 @@ func (d *Downloader) downloadOne(ctx context.Context, arch repository.ArchiveRef
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusRequestedRangeNotSatisfiable {
-		// .part file is already complete — just promote it.
+		// .part file is already complete - just promote it.
 		if err := os.Rename(part, dest); err != nil {
 			return "", err
 		}
@@ -189,7 +189,7 @@ func (d *Downloader) downloadOne(ctx context.Context, arch repository.ArchiveRef
 		}
 	}
 
-	// Close before rename — required on Windows.
+	// Close before rename - required on Windows.
 	if cerr := f.Close(); cerr != nil && writeErr == nil {
 		writeErr = cerr
 	}

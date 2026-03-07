@@ -27,7 +27,7 @@ func randSuffix() string {
 type ProgressEvent struct {
 	Phase        string  // "resolving", "downloading", "extracting", "patching", "registering"
 	Archive      string  // current archive name
-	Percent      float64 // 0–100 overall progress
+	Percent      float64 // 0-100 overall progress
 	BytesDone    int64
 	BytesTotal   int64
 	Speed        float64 // bytes/sec (download phase only)
@@ -60,7 +60,7 @@ type ToolOptions struct {
 	Timeout     int
 }
 
-// Installer orchestrates the download → verify → extract → patch → register pipeline.
+// Installer orchestrates the download -> verify -> extract -> patch -> register pipeline.
 type Installer struct {
 	resolver *repository.Resolver
 	registry *storage.RegistryManager
@@ -148,7 +148,7 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		return fmt.Errorf("download cache dir: %w", err)
 	}
 
-	// Separate temp dir only for extraction — always starts fresh.
+	// Separate temp dir only for extraction - always starts fresh.
 	extractTmp := storage.TempDir(installDir) + "-" + randSuffix()
 	defer os.RemoveAll(extractTmp)
 
@@ -271,7 +271,7 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		totalSize += a.Ref.Size
 	}
 
-	// Register — merge with existing entry when doing a delta install.
+	// Register - merge with existing entry when doing a delta install.
 	sendProgress(progressCh, ProgressEvent{Phase: "registering"})
 	entry := storage.InstalledQt{
 		Version:     opts.Version,

@@ -101,7 +101,7 @@ func TestResolveArchives_MultipleUnknown_FailsOnFirst(t *testing.T) {
 }
 
 func TestResolveArchives_NoPrefixForAlreadyPrefixed(t *testing.T) {
-	// "qtcharts" is already prefixed — should not try "qtqtcharts".
+	// "qtcharts" is already prefixed - should not try "qtqtcharts".
 	vi := testVersionInfo("win64_msvc2022_64", "qtcharts")
 	archives, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
@@ -165,7 +165,7 @@ func TestResolveArchives_Qt5_AutoPrefixQt(t *testing.T) {
 }
 
 func TestResolveArchives_EssentialModuleSkipped(t *testing.T) {
-	// "qtimageformats" is an essential module — requesting it should not error.
+	// "qtimageformats" is an essential module - requesting it should not error.
 	vi := testVersionInfoQt5("win64_msvc2019_64", "qtcharts")
 	vi.Archs[0].EssentialModules = []string{"qtbase", "qtimageformats", "qtwebchannel"}
 
@@ -182,7 +182,7 @@ func TestResolveArchives_EssentialModuleSkipped(t *testing.T) {
 	}
 	// qtcharts should be resolved as an addon.
 	assert.Contains(t, names, "qt.qt5.5152.qtcharts.win64_msvc2019_64")
-	// imageformats and webchannel are essentials — skipped, no error.
+	// imageformats and webchannel are essentials - skipped, no error.
 	assert.NotContains(t, names, "qtimageformats")
 	assert.NotContains(t, names, "qtwebchannel")
 }

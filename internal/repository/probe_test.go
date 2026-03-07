@@ -55,7 +55,7 @@ func TestProbeURLs_ReachableBeforeUnreachable(t *testing.T) {
 	good := httptest.NewServer(http.HandlerFunc(okHandler))
 	defer good.Close()
 
-	// Closed server → connection refused.
+	// Closed server -> connection refused.
 	bad := httptest.NewServer(http.HandlerFunc(okHandler))
 	badURL := bad.URL + "/"
 	bad.Close()

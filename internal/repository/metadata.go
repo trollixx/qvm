@@ -144,7 +144,7 @@ func (f *MetadataFetcher) isPreviewVersion(ctx context.Context, version string, 
 
 	status, err := f.client.Head(ctx, probeURL)
 	if err != nil {
-		// Network error — assume not preview (conservative).
+		// Network error - assume not preview (conservative).
 		return false
 	}
 	return status == http.StatusNotFound
@@ -275,7 +275,7 @@ func (f *MetadataFetcher) fetchExtensions(ctx context.Context, vi *QtVersionInfo
 			}
 			body, successURL, err := f.fetchRaw(ctx, urls)
 			if err != nil {
-				// Extension not available for this arch — skip silently.
+				// Extension not available for this arch - skip silently.
 				continue
 			}
 			f.processExtensionXML(body, dirURL(successURL), vi, moduleName, arch.Name, prefix)
@@ -427,7 +427,7 @@ func (f *MetadataFetcher) fetchRaw(ctx context.Context, urls []string) (body []b
 			continue
 		}
 		if body == nil {
-			// 304 Not Modified — serve from cache.
+			// 304 Not Modified - serve from cache.
 			cached, cacheErr := f.cache.Load(cacheKey)
 			if cacheErr == nil && cached != nil {
 				return cached, url, nil
@@ -438,7 +438,7 @@ func (f *MetadataFetcher) fetchRaw(ctx context.Context, urls []string) (body []b
 		}
 	}
 
-	// All mirrors failed — try stale cache.
+	// All mirrors failed - try stale cache.
 	stale, cacheErr := f.cache.LoadStale(cacheKey)
 	if cacheErr == nil && stale != nil {
 		fmt.Fprintf(os.Stderr, "warning: serving stale cached metadata (network unavailable)\n")
@@ -463,7 +463,7 @@ func cacheKeyFromURL(rawURL string) string {
 }
 
 // dirURL returns the directory portion of a URL (strips the last path component).
-// e.g. "https://host/path/Updates.xml" → "https://host/path/"
+// e.g. "https://host/path/Updates.xml" -> "https://host/path/"
 func dirURL(u string) string {
 	if idx := strings.LastIndex(u, "/"); idx >= 0 {
 		return u[:idx+1]
@@ -499,7 +499,7 @@ func parseRepoIndex(body []byte, baseURL string) (*RepoIndex, error) {
 
 		switch classifyPackage(pkg.Name) {
 		case pkgClassQt:
-			// Process all Qt packages — virtual and non-virtual.
+			// Process all Qt packages - virtual and non-virtual.
 			// Virtual packages are skipped for module/arch registration but their
 			// archive refs are still collected (needed for Qt 6.8+ addon packages).
 			processQtPackage(pkg, versionMap, baseURL, virtual)
@@ -548,7 +548,7 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 	if len(parts) < 3 {
 		return
 	}
-	// Extract version from parts[1]: "qt6" → 6, parts[2]: "6100" → "6.10.0"
+	// Extract version from parts[1]: "qt6" -> 6, parts[2]: "6100" -> "6.10.0"
 	var major int
 	if strings.HasPrefix(parts[1], "qt6") {
 		major = 6
@@ -667,7 +667,7 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 
 	// For essential (non-addon) arch packages, derive essential module names from
 	// the DownloadableArchives field. Archive names follow the pattern:
-	//   "qtbase-Windows-...-X86_64.7z" → module name = prefix before first "-".
+	//   "qtbase-Windows-...-X86_64.7z" -> module name = prefix before first "-".
 	// Essential modules are stored per-arch so that MinGW/LLVM archives do not
 	// appear as essentials when an MSVC target is selected.
 	if len(parts) < 5 || parts[3] != "addons" {
@@ -813,7 +813,7 @@ func buildArchiveRefs(pkg packageXML, baseURL string) []ArchiveRef {
 	return refs
 }
 
-// repoSuffixToVersion converts "6100" → "6.10.0", "51518" → "5.15.18".
+// repoSuffixToVersion converts "6100" -> "6.10.0", "51518" -> "5.15.18".
 func repoSuffixToVersion(suffix string, major int) string {
 	// suffix is compact version with no dots: e.g. "6100" for 6.10.0, "51518" for 5.15.18
 	majorStr := strconv.Itoa(major)
@@ -825,8 +825,8 @@ func repoSuffixToVersion(suffix string, major int) string {
 		return ""
 	}
 	// Try to parse as minor + patch.
-	// For Qt 6: "6100" → major=6, rest="100" → minor=10, patch=0
-	// For Qt 5: "51518" → major=5, rest="1518" → minor=15, patch=18
+	// For Qt 6: "6100" -> major=6, rest="100" -> minor=10, patch=0
+	// For Qt 5: "51518" -> major=5, rest="1518" -> minor=15, patch=18
 	// Heuristic: split rest into (minor_digits, patch_digits).
 	// We try 2-digit minor first, then 1-digit.
 	for minorLen := 2; minorLen >= 1; minorLen-- {
@@ -847,7 +847,7 @@ func repoSuffixToVersion(suffix string, major int) string {
 				continue
 			}
 		} else if len(rest) != 1 {
-			// Empty patch is only valid when rest is a single digit (Qt 5.9.0 → "qt5_59").
+			// Empty patch is only valid when rest is a single digit (Qt 5.9.0 -> "qt5_59").
 			// For longer rest strings like "83", prefer the next minorLen iteration.
 			continue
 		}
