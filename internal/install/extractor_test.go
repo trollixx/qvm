@@ -162,7 +162,7 @@ func TestExtractTar_PathTraversalBlocked(t *testing.T) {
 		require.NoError(t, err)
 		// File should exist inside destDir, not outside.
 		_, err = os.Stat(filepath.Join(destDir, "evil.txt"))
-		assert.NoError(t, err, "file should be safely extracted inside destDir")
+		require.NoError(t, err, "file should be safely extracted inside destDir")
 		_, err = os.Stat(filepath.Join(dir, "evil.txt"))
 		assert.True(t, os.IsNotExist(err), "file should not exist outside destDir")
 	} else {

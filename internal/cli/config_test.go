@@ -56,8 +56,8 @@ func TestConfigGet_CaseInsensitive(t *testing.T) {
 func TestConfigGet_UnknownKey(t *testing.T) {
 	_, err := configGet(defaultCfg(), "no.such.key")
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "unknown config key")
-	assert.ErrorContains(t, err, "no.such.key")
+	require.ErrorContains(t, err, "unknown config key")
+	require.ErrorContains(t, err, "no.such.key")
 }
 
 func TestConfigGet_TimeoutSeconds(t *testing.T) {
@@ -97,14 +97,14 @@ func TestConfigSet_Slice_Single(t *testing.T) {
 func TestConfigSet_UnknownKey(t *testing.T) {
 	err := configSet(defaultCfg(), "bad.key", "value")
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "unknown config key")
+	require.ErrorContains(t, err, "unknown config key")
 }
 
 func TestConfigSet_InvalidInt(t *testing.T) {
 	err := configSet(defaultCfg(), "download.concurrency", "abc")
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "invalid integer value")
-	assert.ErrorContains(t, err, "abc")
+	require.ErrorContains(t, err, "invalid integer value")
+	require.ErrorContains(t, err, "abc")
 }
 
 func TestConfigSet_RoundTrip(t *testing.T) {

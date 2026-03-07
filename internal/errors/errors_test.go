@@ -1,7 +1,6 @@
 package errors
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -64,7 +63,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, CodeNetworkError, err.Code)
 	assert.Equal(t, "connection refused", err.Message)
 	assert.Nil(t, err.Suggestions)
-	assert.Nil(t, err.Cause)
+	assert.NoError(t, err.Cause)
 }
 
 func TestNewf(t *testing.T) {
@@ -87,12 +86,12 @@ func TestQvmError_Unwrap(t *testing.T) {
 		err := Wrap(CodeNetworkError, cause, "wrapper")
 		assert.Equal(t, cause, err.Unwrap())
 		// Also works with errors.Is / errors.Unwrap
-		assert.True(t, errors.Is(err, cause))
+		assert.ErrorIs(t, err, cause)
 	})
 
 	t.Run("without cause", func(t *testing.T) {
 		err := New(CodeUnknownTool, "no cause")
-		assert.Nil(t, err.Unwrap())
+		assert.NoError(t, err.Unwrap())
 	})
 }
 

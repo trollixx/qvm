@@ -141,7 +141,7 @@ func TestMirrorList_URLsFor_TwoMirrors(t *testing.T) {
 
 	require.Len(t, urls, 2, "expected primary + 1 fallback")
 	for _, u := range urls {
-		assert.True(t, strings.Contains(u, "qt6_683/qt6_683/Updates.xml"),
+		assert.Contains(t, u, "qt6_683/qt6_683/Updates.xml",
 			"URL %q should use two-level structure for Qt 6.8.3", u)
 	}
 	assert.Contains(t, urls[0], "primary.example.com")

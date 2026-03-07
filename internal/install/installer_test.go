@@ -199,6 +199,6 @@ func TestSendProgress(t *testing.T) {
 
 		received := <-ch
 		assert.Equal(t, "downloading", received.Phase)
-		assert.Equal(t, float64(50), received.Percent)
+		assert.InEpsilon(t, float64(50), received.Percent, 1e-9)
 	})
 }

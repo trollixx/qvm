@@ -18,7 +18,7 @@ func run(t *testing.T, args ...string) error {
 func assertErrContains(t *testing.T, err error, substr string) {
 	t.Helper()
 	require.Error(t, err)
-	assert.ErrorContains(t, err, substr)
+	require.ErrorContains(t, err, substr)
 }
 
 // -- install -------------------------------------------------------------------
