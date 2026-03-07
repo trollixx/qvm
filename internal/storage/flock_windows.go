@@ -12,7 +12,8 @@ import (
 // Returns an unlock function that must be called to release the lock.
 func lockFile(path string) (func(), error) {
 	lockPath := filepath.Clean(path) + ".lock"
-	if err := os.MkdirAll(filepath.Dir(lockPath), 0o750); err != nil {
+	err := os.MkdirAll(filepath.Dir(lockPath), 0o750)
+	if err != nil {
 		return nil, fmt.Errorf("creating lock dir: %w", err)
 	}
 

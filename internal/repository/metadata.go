@@ -239,7 +239,8 @@ func (f *MetadataFetcher) FetchAllTools(ctx context.Context) ([]ToolInfo, error)
 	toolNames := []string{"qtcreator", "cmake", "ifw", "mingw", "llvm_mingw", "ninja", "openssl", "vcredist"}
 	var tools []ToolInfo
 	for _, name := range toolNames {
-		if err := ctx.Err(); err != nil {
+		err := ctx.Err()
+		if err != nil {
 			return tools, err
 		}
 		tool, err := f.FetchTool(ctx, name)
@@ -321,7 +322,8 @@ func (f *MetadataFetcher) processExtensionXML(
 	moduleName, arch, prefix string,
 ) {
 	var upd updatesXML
-	if err := xml.Unmarshal(body, &upd); err != nil {
+	err := xml.Unmarshal(body, &upd)
+	if err != nil {
 		return
 	}
 
@@ -489,7 +491,8 @@ func urlList(urls []string) string {
 // Pass "" if archive URLs are not needed (e.g. in tests or version-listing paths).
 func parseRepoIndex(body []byte, baseURL string) (*RepoIndex, error) {
 	var upd updatesXML
-	if err := xml.Unmarshal(body, &upd); err != nil {
+	err := xml.Unmarshal(body, &upd)
+	if err != nil {
 		return nil, fmt.Errorf("parsing Updates.xml: %w", err)
 	}
 
@@ -760,7 +763,8 @@ func buildArchiveRefs(pkg packageXML, baseURL string) []ArchiveRef {
 	sizeByFile := make(map[string]int64)
 	for _, uf := range pkg.UpdateFiles {
 		sha1ByFile[uf.FileName] = uf.SHA1
-		if sz, err := strconv.ParseInt(uf.CompressedSize, 10, 64); err == nil {
+		sz, parseErr := strconv.ParseInt(uf.CompressedSize, 10, 64)
+		if parseErr == nil {
 			sizeByFile[uf.FileName] = sz
 		}
 	}

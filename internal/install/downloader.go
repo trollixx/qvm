@@ -105,8 +105,9 @@ func (d *Downloader) downloadOne(
 	part := dest + ".part"
 
 	// Already fully downloaded from a previous run - verify and skip.
-	if _, err := os.Stat(dest); err == nil {
-		if err := VerifyFile(dest, arch.SHA1); err == nil {
+	_, statErr := os.Stat(dest)
+	if statErr == nil {
+		if VerifyFile(dest, arch.SHA1) == nil {
 			sendEvent(eventCh, DownloadEvent{Filename: arch.Filename, Done: true})
 			return dest, nil
 		}
@@ -116,7 +117,8 @@ func (d *Downloader) downloadOne(
 
 	// Check for a partial download to resume.
 	var rangeStart int64
-	if fi, err := os.Stat(part); err == nil {
+	fi, statErr2 := os.Stat(part)
+	if statErr2 == nil {
 		partSize := fi.Size()
 		// If the part file is larger than expected, it's corrupt - start fresh.
 		if arch.Size > 0 && partSize > arch.Size {
@@ -175,7 +177,8 @@ func (d *Downloader) downloadOne(
 	for {
 		n, readErr := resp.Body.Read(buf)
 		if n > 0 {
-			if _, werr := f.Write(buf[:n]); werr != nil {
+			_, werr := f.Write(buf[:n])
+			if werr != nil {
 				writeErr = werr
 				break
 			}
@@ -199,7 +202,8 @@ func (d *Downloader) downloadOne(
 	}
 
 	// Close before rename - required on Windows.
-	if cerr := f.Close(); cerr != nil && writeErr == nil {
+	cerr := f.Close()
+	if cerr != nil && writeErr == nil {
 		writeErr = cerr
 	}
 	if writeErr != nil {

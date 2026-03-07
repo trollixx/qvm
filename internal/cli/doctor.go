@@ -64,13 +64,13 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 	registry, regErr := storage.NewRegistryManager()
 	if regErr != nil {
 		printCheck(checkFail, "registry", "could not open registry: "+regErr.Error())
-		return nil
+		return regErr
 	}
 
 	reg, loadErr := registry.Load()
 	if loadErr != nil {
 		printCheck(checkFail, "registry", "could not load registry: "+loadErr.Error())
-		return nil
+		return loadErr
 	}
 
 	if len(reg.Qt) == 0 {
@@ -190,7 +190,8 @@ func checkQtInstallation(q storage.InstalledQt) {
 	label := fmt.Sprintf("Qt %s  %s", q.Version, q.Arch)
 
 	// Check directory exists.
-	if _, err := os.Stat(q.InstallDir); os.IsNotExist(err) {
+	_, err := os.Stat(q.InstallDir)
+	if os.IsNotExist(err) {
 		fmt.Fprintf(os.Stdout, "  %s  %s\n", checkFail, label)
 		fmt.Fprintf(os.Stdout, "       directory missing: %s\n", q.InstallDir)
 		return
@@ -238,7 +239,8 @@ func checkQtInstallation(q storage.InstalledQt) {
 func checkToolInstallation(t storage.InstalledTool) {
 	label := fmt.Sprintf("%s  %s", t.Name, t.Version)
 
-	if _, err := os.Stat(t.InstallDir); os.IsNotExist(err) {
+	_, err := os.Stat(t.InstallDir)
+	if os.IsNotExist(err) {
 		fmt.Fprintf(os.Stdout, "  %s  %s\n", checkFail, label)
 		fmt.Fprintf(os.Stdout, "       directory missing: %s\n", t.InstallDir)
 		return
@@ -253,7 +255,8 @@ func findQmakeInDir(installDir string) string {
 		filepath.Join(installDir, "bin", "qmake"),
 	}
 	for _, c := range candidates {
-		if _, err := os.Stat(c); err == nil {
+		_, err := os.Stat(c)
+		if err == nil {
 			return c
 		}
 	}

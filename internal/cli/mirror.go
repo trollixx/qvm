@@ -204,7 +204,8 @@ func mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL string) err
 	if !strings.HasSuffix(rawURL, "/") {
 		rawURL += "/"
 	}
-	if _, err := url.ParseRequestURI(rawURL); err != nil {
+	_, err := url.ParseRequestURI(rawURL)
+	if err != nil {
 		return fmt.Errorf("invalid URL %q: %w", rawURL, err)
 	}
 	if isBlacklisted(rawURL, cfg.Repository.Blacklist) {
@@ -222,7 +223,8 @@ func mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL string) err
 	fmt.Fprintf(os.Stdout, "Latency: %d ms\n\n", results[0].Latency.Milliseconds())
 
 	cfg.Repository.URL = rawURL
-	if err := config.Save(cfg); err != nil {
+	err = config.Save(cfg)
+	if err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
 	fmt.Fprintf(os.Stdout, "%s  Primary mirror set to: %s\n", checkOK, rawURL)

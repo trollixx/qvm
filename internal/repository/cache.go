@@ -60,13 +60,16 @@ func (c *Cache) Store(key string, body []byte, etag string) error {
 	// Write gzip-compressed.
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
-	if _, err := gz.Write(body); err != nil {
+	_, err := gz.Write(body)
+	if err != nil {
 		return err
 	}
-	if err := gz.Close(); err != nil {
+	err = gz.Close()
+	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(fn, buf.Bytes(), 0o600); err != nil {
+	err = os.WriteFile(fn, buf.Bytes(), 0o600)
+	if err != nil {
 		return err
 	}
 	if etag != "" {

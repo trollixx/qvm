@@ -75,7 +75,8 @@ func extractFile(f *sevenzip.File, destDir string, onBytes func(n int)) error {
 		return os.MkdirAll(target, 0o755) //nolint:gosec // 0755 for Qt SDK
 	}
 
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
+	err := os.MkdirAll(filepath.Dir(target), 0o755) //nolint:gosec // 0755 for Qt SDK
+	if err != nil {
 		return fmt.Errorf("creating directory for %s: %w", target, err)
 	}
 

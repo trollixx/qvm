@@ -212,7 +212,8 @@ func runCacheClean(_ context.Context, cmd *cli.Command) error {
 	var dlRemoved int
 	var dlFreed int64
 	for _, c := range dlCandidates {
-		if err := os.Remove(c.path); err != nil {
+		err := os.Remove(c.path)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: removing %s: %v\n", filepath.Base(c.path), err)
 			continue
 		}
@@ -224,7 +225,8 @@ func runCacheClean(_ context.Context, cmd *cli.Command) error {
 	var metaRemoved int
 	var metaFreed int64
 	for _, c := range metaCandidates {
-		if err := os.Remove(c.path); err != nil {
+		err := os.Remove(c.path)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: removing %s: %v\n", filepath.Base(c.path), err)
 			continue
 		}

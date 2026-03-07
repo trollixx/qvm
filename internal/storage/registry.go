@@ -39,7 +39,8 @@ func (q *InstalledQt) UnmarshalJSON(data []byte) error {
 
 		Target string `json:"target"` // legacy field name
 	}
-	if err := json.Unmarshal(data, &v); err != nil {
+	err := json.Unmarshal(data, &v)
+	if err != nil {
 		return err
 	}
 	*q = InstalledQt(v.Alias)

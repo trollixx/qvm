@@ -22,7 +22,8 @@ var ErrUpToDate = errors.New("already up to date")
 
 func randSuffix() string {
 	var b [4]byte
-	if _, err := rand.Read(b[:]); err != nil {
+	_, err := rand.Read(b[:])
+	if err != nil {
 		panic("crypto/rand.Read failed: " + err.Error())
 	}
 	return hex.EncodeToString(b[:])
@@ -83,7 +84,8 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	// Check for an existing installation and compute the delta unless --force.
 	var existingQt *storage.InstalledQt
 	if !opts.Force {
-		if reg, err := inst.registry.Load(); err == nil {
+		reg, err := inst.registry.Load()
+		if err == nil {
 			for i := range reg.Qt {
 				if reg.Qt[i].Version == opts.Version && reg.Qt[i].Arch == opts.Arch {
 					existingQt = &reg.Qt[i]
@@ -252,7 +254,8 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	if _, err := os.Stat(installDir); os.IsNotExist(err) {
 		if err := os.Rename(extractDir, installDir); err != nil {
 			// Rename across drives may fail; fall back to copy.
-			if err2 := copyDir(extractDir, installDir); err2 != nil {
+			err2 := copyDir(extractDir, installDir)
+			if err2 != nil {
 				return fmt.Errorf("moving to install dir: %w", err2)
 			}
 		}

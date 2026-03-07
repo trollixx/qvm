@@ -73,7 +73,8 @@ func (c *MirrorListCache) Load() ([]string, error) {
 
 // Save writes mirrors to the cache file, overwriting any previous contents.
 func (c *MirrorListCache) Save(mirrors []string) error {
-	if err := os.MkdirAll(filepath.Dir(c.path), 0o750); err != nil {
+	err := os.MkdirAll(filepath.Dir(c.path), 0o750)
+	if err != nil {
 		return err
 	}
 	d := mirrorListData{Mirrors: mirrors, FetchedAt: time.Now().UTC()}

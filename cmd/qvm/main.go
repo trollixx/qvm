@@ -10,7 +10,8 @@ import (
 
 func main() {
 	app := cli.NewApp()
-	if err := app.Run(context.Background(), os.Args); err != nil {
+	err := app.Run(context.Background(), os.Args)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

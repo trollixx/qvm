@@ -27,7 +27,8 @@ type ExtractionEvent struct {
 // ExtractAll extracts all downloaded archives into destDir.
 func ExtractAll(archivePaths []string, destDir string, eventCh chan<- ExtractionEvent) error {
 	for _, path := range archivePaths {
-		if err := extractOne(path, destDir, eventCh); err != nil {
+		err := extractOne(path, destDir, eventCh)
+		if err != nil {
 			return err
 		}
 	}
@@ -49,7 +50,8 @@ func extractOne(archivePath, destDir string, eventCh chan<- ExtractionEvent) err
 }
 
 func extract7z(src, destDir, name string, eventCh chan<- ExtractionEvent) error {
-	if err := os.MkdirAll(destDir, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
+	err := os.MkdirAll(destDir, 0o755) //nolint:gosec // 0755 for Qt SDK
+	if err != nil {
 		return err
 	}
 	progress := func(done, total int64) {
@@ -65,7 +67,8 @@ func extract7z(src, destDir, name string, eventCh chan<- ExtractionEvent) error 
 }
 
 func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error {
-	if err := os.MkdirAll(destDir, 0o755); err != nil { //nolint:gosec // 0755 for Qt SDK
+	err := os.MkdirAll(destDir, 0o755) //nolint:gosec // 0755 for Qt SDK
+	if err != nil {
 		return err
 	}
 
