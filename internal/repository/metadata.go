@@ -86,10 +86,7 @@ func (f *MetadataFetcher) FetchAllQtVersions(ctx context.Context) ([]QtVersionIn
 	if err != nil {
 		return nil, fmt.Errorf("fetching Qt version directory: %w", err)
 	}
-	versions, err := parseDirectoryListing(body)
-	if err != nil {
-		return nil, err
-	}
+	versions := parseDirectoryListing(body)
 
 	f.probePreviewVersions(ctx, versions)
 	return versions, nil
@@ -153,7 +150,7 @@ func (f *MetadataFetcher) isPreviewVersion(ctx context.Context, version string, 
 
 // parseDirectoryListing parses an HTML directory page from the Qt repository
 // and returns QtVersionInfo stubs for each Qt SDK folder found.
-func parseDirectoryListing(body []byte) ([]QtVersionInfo, error) {
+func parseDirectoryListing(body []byte) []QtVersionInfo {
 	html := string(body)
 	var versions []QtVersionInfo
 
@@ -165,7 +162,7 @@ func parseDirectoryListing(body []byte) ([]QtVersionInfo, error) {
 			versions = append(versions, vi)
 		}
 	}
-	return versions, nil
+	return versions
 }
 
 // extractFolderNames extracts href folder names from a plain HTML directory listing.
@@ -415,7 +412,7 @@ func (f *MetadataFetcher) fetchFromURLs(ctx context.Context, urls []string) (*Re
 	return parseRepoIndex(body, dirURL(successURL))
 }
 
-func (f *MetadataFetcher) fetchRaw(ctx context.Context, urls []string) (body []byte, successURL string, err error) {
+func (f *MetadataFetcher) fetchRaw(ctx context.Context, urls []string) ([]byte, string, error) {
 	if len(urls) == 0 {
 		return nil, "", fmt.Errorf("no URLs provided")
 	}

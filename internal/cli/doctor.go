@@ -41,9 +41,9 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 	// Load config once for all checks.
 	cfg, cfgErr := config.Load()
 	if cfgErr != nil {
-		printCheck(checkFail, "Config file", "error: "+cfgErr.Error(), "")
+		printCheck(checkFail, "Config file", "error: "+cfgErr.Error())
 	} else {
-		printCheck(checkOK, "Config file", "readable", "")
+		printCheck(checkOK, "Config file", "readable")
 	}
 
 	// 2. Metadata cache age.
@@ -63,13 +63,13 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 	fmt.Fprintln(os.Stdout, "Installations")
 	registry, regErr := storage.NewRegistryManager()
 	if regErr != nil {
-		printCheck(checkFail, "registry", "could not open registry: "+regErr.Error(), "")
+		printCheck(checkFail, "registry", "could not open registry: "+regErr.Error())
 		return nil
 	}
 
 	reg, loadErr := registry.Load()
 	if loadErr != nil {
-		printCheck(checkFail, "registry", "could not load registry: "+loadErr.Error(), "")
+		printCheck(checkFail, "registry", "could not load registry: "+loadErr.Error())
 		return nil
 	}
 
@@ -98,14 +98,14 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 func checkMetadataCache() {
 	cache, err := repository.NewCache()
 	if err != nil {
-		printCheck(checkWarn, "Metadata cache", "could not open cache: "+err.Error(), "")
+		printCheck(checkWarn, "Metadata cache", "could not open cache: "+err.Error())
 		return
 	}
 
 	cacheDir := cache.Dir()
 	entries, err := os.ReadDir(cacheDir)
 	if err != nil || len(entries) == 0 {
-		printCheck(checkWarn, "Metadata cache", "empty (run 'qvm list qt' to populate)", "")
+		printCheck(checkWarn, "Metadata cache", "empty (run 'qvm list qt' to populate)")
 		return
 	}
 
@@ -125,7 +125,7 @@ func checkMetadataCache() {
 	}
 
 	if newest.IsZero() {
-		printCheck(checkWarn, "Metadata cache", "no cache files found", "")
+		printCheck(checkWarn, "Metadata cache", "no cache files found")
 		return
 	}
 
@@ -133,15 +133,15 @@ func checkMetadataCache() {
 	ageStr := formatAge(age)
 
 	if age > 7*24*time.Hour {
-		printCheck(checkWarn, "Metadata cache", fmt.Sprintf("stale (updated %s ago)", ageStr), "")
+		printCheck(checkWarn, "Metadata cache", fmt.Sprintf("stale (updated %s ago)", ageStr))
 	} else {
-		printCheck(checkOK, "Metadata cache", fmt.Sprintf("OK  (updated %s ago)", ageStr), "")
+		printCheck(checkOK, "Metadata cache", fmt.Sprintf("OK  (updated %s ago)", ageStr))
 	}
 }
 
 func checkDiskSpace(cfg *config.Config) {
 	if cfg == nil {
-		printCheck(checkWarn, "Disk space", "could not determine install dir", "")
+		printCheck(checkWarn, "Disk space", "could not determine install dir")
 		return
 	}
 
@@ -152,16 +152,16 @@ func checkDiskSpace(cfg *config.Config) {
 
 	free, _, spaceErr := diskSpace(dir)
 	if spaceErr != nil {
-		printCheck(checkWarn, "Disk space", fmt.Sprintf("could not check: %v", spaceErr), "")
+		printCheck(checkWarn, "Disk space", fmt.Sprintf("could not check: %v", spaceErr))
 		return
 	}
 
 	freeGB := float64(free) / (1024 * 1024 * 1024)
 
 	if freeGB < 5 {
-		printCheck(checkWarn, "Disk space", fmt.Sprintf("low (%.0f GB free on %s)", freeGB, dir), "")
+		printCheck(checkWarn, "Disk space", fmt.Sprintf("low (%.0f GB free on %s)", freeGB, dir))
 	} else {
-		printCheck(checkOK, "Disk space", fmt.Sprintf("OK  (%.0f GB free on %s)", freeGB, dir), "")
+		printCheck(checkOK, "Disk space", fmt.Sprintf("OK  (%.0f GB free on %s)", freeGB, dir))
 	}
 }
 
@@ -173,17 +173,17 @@ func checkInstallDir(cfg *config.Config) {
 	info, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			printCheck(checkWarn, "Qt install dir", "does not exist yet: "+dir, "")
+			printCheck(checkWarn, "Qt install dir", "does not exist yet: "+dir)
 		} else {
-			printCheck(checkFail, "Qt install dir", "error: "+err.Error(), "")
+			printCheck(checkFail, "Qt install dir", "error: "+err.Error())
 		}
 		return
 	}
 	if !info.IsDir() {
-		printCheck(checkFail, "Qt install dir", "not a directory: "+dir, "")
+		printCheck(checkFail, "Qt install dir", "not a directory: "+dir)
 		return
 	}
-	printCheck(checkOK, "Qt install dir", "OK  "+dir, "")
+	printCheck(checkOK, "Qt install dir", "OK  "+dir)
 }
 
 func checkQtInstallation(q storage.InstalledQt) {
@@ -205,7 +205,7 @@ func checkQtInstallation(q storage.InstalledQt) {
 	}
 
 	// Run qmake -version.
-	out, err := exec.Command(qmakeExe, "-version").Output()
+	out, err := exec.CommandContext(context.Background(), qmakeExe, "-version").Output()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "  %s  %s\n", checkWarn, label)
 		fmt.Fprintf(os.Stdout, "       qmake: %s\n", qmakeExe)
@@ -260,18 +260,14 @@ func findQmakeInDir(installDir string) string {
 	return ""
 }
 
-func printCheck(mark, label, status, detail string) {
+func printCheck(mark, label, status string) {
 	// Pad label to ~26 chars with dots.
 	padded := label
 	targetLen := 26
 	if len(padded) < targetLen {
 		padded = padded + " " + strings.Repeat(".", targetLen-len(padded)-1)
 	}
-	if detail != "" {
-		fmt.Fprintf(os.Stdout, "%s  %s %s  %s\n", mark, padded, status, detail)
-	} else {
-		fmt.Fprintf(os.Stdout, "%s  %s %s\n", mark, padded, status)
-	}
+	fmt.Fprintf(os.Stdout, "%s  %s %s\n", mark, padded, status)
 }
 
 func formatAge(d time.Duration) string {

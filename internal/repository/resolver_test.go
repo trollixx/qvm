@@ -8,7 +8,8 @@ import (
 )
 
 // testVersionInfo builds a QtVersionInfo with the given addon packages registered.
-func testVersionInfo(arch string, addonModules ...string) *QtVersionInfo {
+func testVersionInfo(addonModules ...string) *QtVersionInfo {
+	const arch = "win64_msvc2022_64"
 	vi := &QtVersionInfo{
 		Version: "6.10.2",
 		Major:   6,
@@ -26,7 +27,7 @@ func testVersionInfo(arch string, addonModules ...string) *QtVersionInfo {
 }
 
 func TestResolveArchives_ExactModuleName(t *testing.T) {
-	vi := testVersionInfo("win64_msvc2022_64", "qtcharts", "qtwebengine")
+	vi := testVersionInfo("qtcharts", "qtwebengine")
 	archives, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
@@ -42,7 +43,7 @@ func TestResolveArchives_ExactModuleName(t *testing.T) {
 }
 
 func TestResolveArchives_AutoPrefixQt(t *testing.T) {
-	vi := testVersionInfo("win64_msvc2022_64", "qtcharts", "qtwebengine", "qtimageformats")
+	vi := testVersionInfo("qtcharts", "qtwebengine", "qtimageformats")
 	archives, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
@@ -60,7 +61,7 @@ func TestResolveArchives_AutoPrefixQt(t *testing.T) {
 }
 
 func TestResolveArchives_MixedPrefixed(t *testing.T) {
-	vi := testVersionInfo("win64_msvc2022_64", "qtcharts", "qthttpserver")
+	vi := testVersionInfo("qtcharts", "qthttpserver")
 	archives, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
@@ -77,7 +78,7 @@ func TestResolveArchives_MixedPrefixed(t *testing.T) {
 }
 
 func TestResolveArchives_UnknownModule_Error(t *testing.T) {
-	vi := testVersionInfo("win64_msvc2022_64", "qtcharts")
+	vi := testVersionInfo("qtcharts")
 	_, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
@@ -89,7 +90,7 @@ func TestResolveArchives_UnknownModule_Error(t *testing.T) {
 }
 
 func TestResolveArchives_MultipleUnknown_FailsOnFirst(t *testing.T) {
-	vi := testVersionInfo("win64_msvc2022_64", "qtcharts")
+	vi := testVersionInfo("qtcharts")
 	_, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
@@ -102,7 +103,7 @@ func TestResolveArchives_MultipleUnknown_FailsOnFirst(t *testing.T) {
 
 func TestResolveArchives_NoPrefixForAlreadyPrefixed(t *testing.T) {
 	// "qtcharts" is already prefixed - should not try "qtqtcharts".
-	vi := testVersionInfo("win64_msvc2022_64", "qtcharts")
+	vi := testVersionInfo("qtcharts")
 	archives, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
@@ -249,7 +250,7 @@ func TestResolveArchives_DebugInfoScopedToModules(t *testing.T) {
 }
 
 func TestResolveArchives_SkipEssentials(t *testing.T) {
-	vi := testVersionInfo("win64_msvc2022_64", "qtcharts")
+	vi := testVersionInfo("qtcharts")
 	archives, err := resolveArchives(vi, ResolveOptions{
 		Version:        "6.10.2",
 		Arch:           "win64_msvc2022_64",

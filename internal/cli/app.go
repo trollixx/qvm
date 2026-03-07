@@ -80,10 +80,10 @@ func buildFetcher(cfg *config.Config, host string) (*repository.MetadataFetcher,
 func buildDeps(
 	cfg *config.Config,
 	host string,
-) (*repository.Resolver, *install.Installer, *storage.RegistryManager, error) {
+) (*install.Installer, error) {
 	cache, err := repository.NewCache()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	mirrors := repository.NewMirrorList(cfg.Repository.URL, cfg.Repository.Mirrors, resolveHost(host))
@@ -93,11 +93,11 @@ func buildDeps(
 
 	registry, err := storage.NewRegistryManager()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	installer := install.NewInstaller(resolver, registry)
-	return resolver, installer, registry, nil
+	return installer, nil
 }
 
 // formatSize converts bytes to a human-readable string.

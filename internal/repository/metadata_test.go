@@ -15,16 +15,16 @@ import (
 
 // packagesXML builds a minimal Updates.xml body from a slice of package descriptors.
 func packagesXML(pkgs []struct{ name, virtual, archives string }) []byte {
-	return packagesXMLFull(func() (out []struct {
+	return packagesXMLFull(func() []struct {
 		name, displayName, virtual, archives string
-	},
-	) {
+	} {
+		var result []struct{ name, displayName, virtual, archives string }
 		for _, p := range pkgs {
-			out = append(out, struct{ name, displayName, virtual, archives string }{
+			result = append(result, struct{ name, displayName, virtual, archives string }{
 				p.name, "", p.virtual, p.archives,
 			})
 		}
-		return out
+		return result
 	}())
 }
 
@@ -441,8 +441,7 @@ func TestParseDirectoryListing_IsPreviewNotSet(t *testing.T) {
 		<a href="qt5_51518/">qt5_51518/</a>
 	</body></html>`
 
-	versions, err := parseDirectoryListing([]byte(html))
-	require.NoError(t, err)
+	versions := parseDirectoryListing([]byte(html))
 
 	byVersion := map[string]bool{}
 	for _, vi := range versions {

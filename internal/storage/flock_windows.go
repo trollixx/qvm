@@ -18,7 +18,7 @@ const lockfileExclusiveLock = 0x00000002
 
 // lockFile acquires an exclusive advisory lock on a .lock file next to path.
 // Returns an unlock function that must be called to release the lock.
-func lockFile(path string) (unlock func(), err error) {
+func lockFile(path string) (func(), error) {
 	lockPath := filepath.Clean(path) + ".lock"
 	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
 		return nil, fmt.Errorf("creating lock dir: %w", err)
@@ -32,7 +32,7 @@ func lockFile(path string) (unlock func(), err error) {
 	ol := new(syscall.Overlapped)
 	r1, _, e1 := syscall.SyscallN(
 		procLockFileEx.Addr(),
-		uintptr(f.Fd()),
+		f.Fd(),
 		uintptr(lockfileExclusiveLock),
 		0,
 		1, 0,
@@ -47,7 +47,7 @@ func lockFile(path string) (unlock func(), err error) {
 		ol2 := new(syscall.Overlapped)
 		syscall.SyscallN(
 			procUnlockFileEx.Addr(),
-			uintptr(f.Fd()),
+			f.Fd(),
 			0,
 			1, 0,
 			uintptr(unsafe.Pointer(ol2)),

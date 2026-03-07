@@ -98,7 +98,7 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	_, installer, _, err := buildDeps(cfg, host)
+	installer, err := buildDeps(cfg, host)
 	if err != nil {
 		return fmt.Errorf("initializing dependencies: %w", err)
 	}
@@ -195,7 +195,7 @@ func runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	_, installer, _, err := buildDeps(cfg, cmd.String("host"))
+	installer, err := buildDeps(cfg, cmd.String("host"))
 	if err != nil {
 		return fmt.Errorf("initializing dependencies: %w", err)
 	}

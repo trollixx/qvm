@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
@@ -28,7 +29,7 @@ func (l *Linux) CheckCompilerPresent(arch string) (bool, string) {
 		return false, "GCC not found in PATH; install via your package manager (e.g. apt install g++)"
 	}
 	// Get version.
-	out, err := exec.Command(path, "--version").Output()
+	out, err := exec.CommandContext(context.Background(), path, "--version").Output()
 	if err != nil {
 		return true, ""
 	}

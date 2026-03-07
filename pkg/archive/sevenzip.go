@@ -26,7 +26,7 @@ func Extract(src, destDir string, progress ProgressFunc) error {
 	// Calculate total uncompressed size.
 	var total int64
 	for _, f := range r.File {
-		total += int64(f.FileInfo().Size())
+		total += f.FileInfo().Size()
 	}
 
 	var done atomic.Int64
@@ -42,7 +42,7 @@ func Extract(src, destDir string, progress ProgressFunc) error {
 		}
 		// Ensure done is at least the file size even if cb was nil.
 		if progress == nil {
-			done.Add(int64(f.FileInfo().Size()))
+			done.Add(f.FileInfo().Size())
 		}
 	}
 	return nil

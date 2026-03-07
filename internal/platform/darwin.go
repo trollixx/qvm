@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
@@ -27,7 +28,7 @@ func (d *Darwin) CheckCompilerPresent(arch string) (bool, string) {
 	if err != nil {
 		return false, "clang++ not found; install Xcode Command Line Tools: xcode-select --install"
 	}
-	out, err := exec.Command(path, "--version").Output()
+	out, err := exec.CommandContext(context.Background(), path, "--version").Output()
 	if err != nil {
 		return true, ""
 	}
