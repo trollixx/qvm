@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -417,7 +418,7 @@ func (f *MetadataFetcher) fetchFromURLs(ctx context.Context, urls []string) (*Re
 
 func (f *MetadataFetcher) fetchRaw(ctx context.Context, urls []string) ([]byte, string, error) {
 	if len(urls) == 0 {
-		return nil, "", fmt.Errorf("no URLs provided")
+		return nil, "", errors.New("no URLs provided")
 	}
 
 	// Use a mirror-independent cache key so all mirrors share one cache entry.

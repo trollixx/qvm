@@ -141,7 +141,7 @@ func (a *app) runMirrorSelect(ctx context.Context, cmd *cli.Command) error {
 		return errors.New("specify --auto or a URL\n\nUsage: qvm mirror select --auto | qvm mirror select <url>")
 	}
 	if auto && urlArg != "" {
-		return fmt.Errorf("cannot combine --auto with a URL argument")
+		return errors.New("cannot combine --auto with a URL argument")
 	}
 
 	cfg, err := config.Load()
@@ -165,7 +165,7 @@ func (a *app) mirrorSelectAuto(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("loading mirror list: %w", err)
 	}
 	if len(cached) == 0 {
-		return fmt.Errorf("no mirror list cached; run 'qvm mirror refresh' first")
+		return errors.New("no mirror list cached; run 'qvm mirror refresh' first")
 	}
 
 	filtered := filterBlacklist(cached, cfg.Repository.Blacklist)
@@ -199,7 +199,7 @@ func (a *app) mirrorSelectAuto(ctx context.Context, cfg *config.Config) error {
 		fmt.Fprintf(a.streams.Out, "%s  Primary mirror set to: %s\n", checkOK, r.URL)
 		return nil
 	}
-	return fmt.Errorf("no reachable mirrors found")
+	return errors.New("no reachable mirrors found")
 }
 
 func (a *app) mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL string) error {

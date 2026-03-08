@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -73,7 +74,7 @@ func TestNewf(t *testing.T) {
 }
 
 func TestWrap(t *testing.T) {
-	cause := fmt.Errorf("underlying IO error")
+	cause := errors.New("underlying IO error")
 	err := Wrap(CodeIOError, cause, "failed to read file")
 	assert.Equal(t, CodeIOError, err.Code)
 	assert.Equal(t, "failed to read file", err.Message)
@@ -82,7 +83,7 @@ func TestWrap(t *testing.T) {
 
 func TestQvmError_Unwrap(t *testing.T) {
 	t.Run("with cause", func(t *testing.T) {
-		cause := fmt.Errorf("root cause")
+		cause := errors.New("root cause")
 		err := Wrap(CodeNetworkError, cause, "wrapper")
 		assert.Equal(t, cause, err.Unwrap())
 		// Also works with errors.Is / errors.Unwrap
@@ -124,7 +125,7 @@ func TestWithSuggestions(t *testing.T) {
 	})
 
 	t.Run("preserves other fields", func(t *testing.T) {
-		cause := fmt.Errorf("cause")
+		cause := errors.New("cause")
 		original := Wrap(CodeIOError, cause, "msg")
 		derived := original.WithSuggestions("hint")
 		assert.Equal(t, CodeIOError, derived.Code)
@@ -146,12 +147,12 @@ func TestIsQvmError(t *testing.T) {
 		},
 		{
 			name: "QvmError from Wrap",
-			err:  Wrap(CodeIOError, fmt.Errorf("io"), "msg"),
+			err:  Wrap(CodeIOError, errors.New("io"), "msg"),
 			want: true,
 		},
 		{
 			name: "plain error",
-			err:  fmt.Errorf("not a qvm error"),
+			err:  errors.New("not a qvm error"),
 			want: false,
 		},
 		{
