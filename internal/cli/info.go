@@ -3,8 +3,8 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -12,7 +12,7 @@ import (
 	"github.com/trollixx/qvm/internal/storage"
 )
 
-func newInfoCommand() *cli.Command {
+func (a *app) newInfoCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "info",
 		Aliases:         []string{"show"},
@@ -23,18 +23,21 @@ func newInfoCommand() *cli.Command {
 			newArchFlag(),
 			newFormatFlag(),
 		},
-		Action: runInfo,
+		Action: a.runInfo,
 	}
 }
 
-func runInfo(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runInfo(ctx context.Context, cmd *cli.Command) error {
 	_ = ctx
 
 	arg := cmd.Args().Get(0)
 	if arg == "" {
-		return fmt.Errorf(
-			"missing argument\n\nUsage:\n  qvm info qt@<version>            Show Qt version details\n  qvm info <tool>[@<version>]      Show tool details\n\nExample:\n  qvm info qt@6.8.3",
-		)
+		return errors.New("missing argument\n\n" +
+			"Usage:\n" +
+			"  qvm info qt@<version>            Show Qt version details\n" +
+			"  qvm info <tool>[@<version>]      Show tool details\n\n" +
+			"Example:\n" +
+			"  qvm info qt@6.8.3")
 	}
 
 	format := cmd.String("format")
@@ -50,12 +53,12 @@ func runInfo(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
-		return runInfoQt(reg, version, cmd.String("arch"), format)
+		return a.runInfoQt(reg, version, cmd.String("arch"), format)
 	}
-	return runInfoTool(reg, arg, format)
+	return a.runInfoTool(reg, arg, format)
 }
 
-func runInfoQt(reg *storage.Registry, version, arch, format string) error {
+func (a *app) runInfoQt(reg *storage.Registry, version, arch, format string) error {
 	var matches []storage.InstalledQt
 	for _, q := range reg.Qt {
 		if q.Version == version && (arch == "" || q.Arch == arch) {
@@ -77,7 +80,7 @@ func runInfoQt(reg *storage.Registry, version, arch, format string) error {
 	}
 
 	if format == "json" {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(a.streams.Out)
 		enc.SetIndent("", "  ")
 		if len(matches) == 1 {
 			return enc.Encode(matches[0])
@@ -86,13 +89,13 @@ func runInfoQt(reg *storage.Registry, version, arch, format string) error {
 	}
 
 	for _, q := range matches {
-		printQtInfo(q)
-		fmt.Fprintln(os.Stdout)
+		a.printQtInfo(q)
+		fmt.Fprintln(a.streams.Out)
 	}
 	return nil
 }
 
-func runInfoTool(reg *storage.Registry, arg, format string) error {
+func (a *app) runInfoTool(reg *storage.Registry, arg, format string) error {
 	toolName := arg
 	toolVersion := ""
 	if idx := strings.Index(arg, "@"); idx >= 0 {
@@ -121,7 +124,7 @@ func runInfoTool(reg *storage.Registry, arg, format string) error {
 	}
 
 	if format == "json" {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(a.streams.Out)
 		enc.SetIndent("", "  ")
 		if len(matches) == 1 {
 			return enc.Encode(matches[0])
@@ -130,51 +133,51 @@ func runInfoTool(reg *storage.Registry, arg, format string) error {
 	}
 
 	for _, t := range matches {
-		printToolInfo(t)
-		fmt.Fprintln(os.Stdout)
+		a.printToolInfo(t)
+		fmt.Fprintln(a.streams.Out)
 	}
 	return nil
 }
 
-func printToolInfo(t storage.InstalledTool) {
-	fmt.Fprintf(os.Stdout, "%s  %s\n", t.Name, t.Version)
-	fmt.Fprintf(os.Stdout, "  Install dir:  %s\n", t.InstallDir)
-	fmt.Fprintf(os.Stdout, "  Installed at: %s\n", t.InstalledAt.Format("2006-01-02 15:04:05"))
+func (a *app) printToolInfo(t storage.InstalledTool) {
+	fmt.Fprintf(a.streams.Out, "%s  %s\n", t.Name, t.Version)
+	fmt.Fprintf(a.streams.Out, "  Install dir:  %s\n", t.InstallDir)
+	fmt.Fprintf(a.streams.Out, "  Installed at: %s\n", t.InstalledAt.Format("2006-01-02 15:04:05"))
 	if t.SizeBytes > 0 {
-		fmt.Fprintf(os.Stdout, "  Size:         %s\n", formatSize(t.SizeBytes))
+		fmt.Fprintf(a.streams.Out, "  Size:         %s\n", formatSize(t.SizeBytes))
 	}
 }
 
-func printQtInfo(q storage.InstalledQt) {
-	fmt.Fprintf(os.Stdout, "Qt %s  %s\n", q.Version, q.Arch)
-	fmt.Fprintf(os.Stdout, "  Install dir:  %s\n", q.InstallDir)
-	fmt.Fprintf(os.Stdout, "  Installed at: %s\n", q.InstalledAt.Format("2006-01-02 15:04:05"))
+func (a *app) printQtInfo(q storage.InstalledQt) {
+	fmt.Fprintf(a.streams.Out, "Qt %s  %s\n", q.Version, q.Arch)
+	fmt.Fprintf(a.streams.Out, "  Install dir:  %s\n", q.InstallDir)
+	fmt.Fprintf(a.streams.Out, "  Installed at: %s\n", q.InstalledAt.Format("2006-01-02 15:04:05"))
 	if q.SizeBytes > 0 {
-		fmt.Fprintf(os.Stdout, "  Size:         %s\n", formatSize(q.SizeBytes))
+		fmt.Fprintf(a.streams.Out, "  Size:         %s\n", formatSize(q.SizeBytes))
 	}
 
 	if len(q.Modules) > 0 {
-		fmt.Fprintf(os.Stdout, "  Modules:      %s\n", strings.Join(q.Modules, ", "))
+		fmt.Fprintf(a.streams.Out, "  Modules:      %s\n", strings.Join(q.Modules, ", "))
 	} else {
-		fmt.Fprintf(os.Stdout, "  Modules:      (essentials only)\n")
+		fmt.Fprintf(a.streams.Out, "  Modules:      (essentials only)\n")
 	}
 
 	if q.Extras.Docs {
-		fmt.Fprintf(os.Stdout, "  Docs:         yes\n")
+		fmt.Fprintf(a.streams.Out, "  Docs:         yes\n")
 	}
 	if q.Extras.Examples {
-		fmt.Fprintf(os.Stdout, "  Examples:     yes\n")
+		fmt.Fprintf(a.streams.Out, "  Examples:     yes\n")
 	}
 	if q.Extras.Sources {
-		fmt.Fprintf(os.Stdout, "  Sources:      yes\n")
+		fmt.Fprintf(a.streams.Out, "  Sources:      yes\n")
 	}
 	if q.Extras.DebugInfo {
-		fmt.Fprintf(os.Stdout, "  Debug symbols: yes\n")
+		fmt.Fprintf(a.streams.Out, "  Debug symbols: yes\n")
 	}
 
 	// Show qmake path.
 	qmakePath := findQmakeInDir(q.InstallDir)
 	if qmakePath != "" {
-		fmt.Fprintf(os.Stdout, "  qmake:        %s\n", qmakePath)
+		fmt.Fprintf(a.streams.Out, "  qmake:        %s\n", qmakePath)
 	}
 }

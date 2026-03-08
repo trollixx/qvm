@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -9,9 +10,17 @@ import (
 )
 
 // run is a helper that invokes the app with the given args and returns the error.
+// All output is captured in-memory; nothing leaks to real stdout/stderr.
 func run(t *testing.T, args ...string) error {
 	t.Helper()
-	return NewApp().Run(context.Background(), append([]string{"qvm"}, args...))
+	streams, _, _ := NewTestIOStreams()
+	return newRootCommand(streams).Run(context.Background(), append([]string{"qvm"}, args...))
+}
+
+// newTestApp creates an app backed by in-memory buffers for use in unit tests.
+func newTestApp() (*app, *bytes.Buffer) {
+	streams, out, _ := NewTestIOStreams()
+	return &app{streams: streams}, out
 }
 
 // assertErrContains is a convenience that requires an error and checks its message.

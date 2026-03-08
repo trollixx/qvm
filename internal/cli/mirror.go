@@ -2,9 +2,9 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -15,21 +15,21 @@ import (
 
 const probeTimeoutSeconds = 8
 
-func newMirrorCommand() *cli.Command {
+func (a *app) newMirrorCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "mirror",
 		Usage:  "Probe and manage Qt repository mirrors",
-		Action: runMirrorList,
+		Action: a.runMirrorList,
 		Commands: []*cli.Command{
 			{
 				Name:   "list",
 				Usage:  "Probe cached mirrors and display latency",
-				Action: runMirrorList,
+				Action: a.runMirrorList,
 			},
 			{
 				Name:   "refresh",
 				Usage:  "Fetch the latest mirror list from Qt and update the local cache",
-				Action: runMirrorRefresh,
+				Action: a.runMirrorRefresh,
 			},
 			{
 				Name:      "select",
@@ -41,19 +41,19 @@ func newMirrorCommand() *cli.Command {
 						Usage: "Probe all cached mirrors and select the fastest",
 					},
 				},
-				Action: runMirrorSelect,
+				Action: a.runMirrorSelect,
 			},
 		},
 	}
 }
 
-func runMirrorRefresh(ctx context.Context, _ *cli.Command) error {
+func (a *app) runMirrorRefresh(ctx context.Context, _ *cli.Command) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	fmt.Fprintf(os.Stdout, "Fetching mirror list from %s...\n", repository.MirrorListURL)
+	fmt.Fprintf(a.streams.Out, "Fetching mirror list from %s...\n", repository.MirrorListURL)
 	mirrors, err := repository.FetchMirrorList(ctx, cfg.Download.TimeoutSeconds)
 	if err != nil {
 		return fmt.Errorf("fetching mirror list: %w", err)
@@ -68,11 +68,11 @@ func runMirrorRefresh(ctx context.Context, _ *cli.Command) error {
 		return fmt.Errorf("saving mirror list: %w", err)
 	}
 
-	fmt.Fprintf(os.Stdout, "%s  Cached %d mirrors to %s\n", checkOK, len(mirrors), mlc.Path())
+	fmt.Fprintf(a.streams.Out, "%s  Cached %d mirrors to %s\n", checkOK, len(mirrors), mlc.Path())
 	return nil
 }
 
-func runMirrorList(ctx context.Context, _ *cli.Command) error {
+func (a *app) runMirrorList(ctx context.Context, _ *cli.Command) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -88,16 +88,16 @@ func runMirrorList(ctx context.Context, _ *cli.Command) error {
 		return fmt.Errorf("loading mirror list cache: %w", err)
 	}
 	if len(cached) == 0 {
-		fmt.Fprintf(os.Stdout, "No mirror list cached.\n")
-		fmt.Fprintf(os.Stdout, "Run 'qvm mirror refresh' to fetch the list from %s\n\n", repository.MirrorListURL)
-		fmt.Fprintf(os.Stdout, "Current primary: %s\n", cfg.Repository.URL)
+		fmt.Fprintf(a.streams.Out, "No mirror list cached.\n")
+		fmt.Fprintf(a.streams.Out, "Run 'qvm mirror refresh' to fetch the list from %s\n\n", repository.MirrorListURL)
+		fmt.Fprintf(a.streams.Out, "Current primary: %s\n", cfg.Repository.URL)
 		return nil
 	}
 
 	filtered := filterBlacklist(cached, cfg.Repository.Blacklist)
 	urls := dedupURLs(cfg.Repository.URL, filtered)
 
-	fmt.Fprintf(os.Stdout, "Probing %d mirrors...\n\n", len(urls))
+	fmt.Fprintf(a.streams.Out, "Probing %d mirrors...\n\n", len(urls))
 	results := repository.ProbeURLs(ctx, urls, probeTimeoutSeconds, repository.PlatformHost())
 
 	primary := cfg.Repository.URL
@@ -122,23 +122,23 @@ func runMirrorList(ctx context.Context, _ *cli.Command) error {
 		if r.Reachable {
 			latency = fmt.Sprintf("%d ms", r.Latency.Milliseconds())
 		}
-		fmt.Fprintf(os.Stdout, "  %s%-52s %s%s\n", marker, mirrorDisplayName(r.URL), latency, suffix)
+		fmt.Fprintf(a.streams.Out, "  %s%-52s %s%s\n", marker, mirrorDisplayName(r.URL), latency, suffix)
 	}
 
-	fmt.Fprintln(os.Stdout)
-	fmt.Fprintln(os.Stdout, "* current primary")
+	fmt.Fprintln(a.streams.Out)
+	fmt.Fprintln(a.streams.Out, "* current primary")
 	if fastestURL != "" && fastestURL != primary {
-		fmt.Fprintln(os.Stdout, "Run 'qvm mirror select --auto' to switch to the fastest mirror.")
+		fmt.Fprintln(a.streams.Out, "Run 'qvm mirror select --auto' to switch to the fastest mirror.")
 	}
 	return nil
 }
 
-func runMirrorSelect(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runMirrorSelect(ctx context.Context, cmd *cli.Command) error {
 	auto := cmd.Bool("auto")
 	urlArg := cmd.Args().Get(0)
 
 	if !auto && urlArg == "" {
-		return fmt.Errorf("usage: qvm mirror select --auto | qvm mirror select <url>")
+		return errors.New("specify --auto or a URL\n\nUsage: qvm mirror select --auto | qvm mirror select <url>")
 	}
 	if auto && urlArg != "" {
 		return fmt.Errorf("cannot combine --auto with a URL argument")
@@ -150,12 +150,12 @@ func runMirrorSelect(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if auto {
-		return mirrorSelectAuto(ctx, cfg)
+		return a.mirrorSelectAuto(ctx, cfg)
 	}
-	return mirrorSelectURL(ctx, cfg, urlArg)
+	return a.mirrorSelectURL(ctx, cfg, urlArg)
 }
 
-func mirrorSelectAuto(ctx context.Context, cfg *config.Config) error {
+func (a *app) mirrorSelectAuto(ctx context.Context, cfg *config.Config) error {
 	mlc, err := repository.NewMirrorListCache()
 	if err != nil {
 		return fmt.Errorf("opening mirror list cache: %w", err)
@@ -171,24 +171,24 @@ func mirrorSelectAuto(ctx context.Context, cfg *config.Config) error {
 	filtered := filterBlacklist(cached, cfg.Repository.Blacklist)
 	urls := dedupURLs(cfg.Repository.URL, filtered)
 
-	fmt.Fprintf(os.Stdout, "Probing %d mirrors...\n\n", len(urls))
+	fmt.Fprintf(a.streams.Out, "Probing %d mirrors...\n\n", len(urls))
 	results := repository.ProbeURLs(ctx, urls, probeTimeoutSeconds, repository.PlatformHost())
 
 	for _, r := range results {
 		if r.Reachable {
-			fmt.Fprintf(os.Stdout, "  %-52s %d ms\n", mirrorDisplayName(r.URL), r.Latency.Milliseconds())
+			fmt.Fprintf(a.streams.Out, "  %-52s %d ms\n", mirrorDisplayName(r.URL), r.Latency.Milliseconds())
 		} else {
-			fmt.Fprintf(os.Stdout, "  %-52s timeout\n", mirrorDisplayName(r.URL))
+			fmt.Fprintf(a.streams.Out, "  %-52s timeout\n", mirrorDisplayName(r.URL))
 		}
 	}
-	fmt.Fprintln(os.Stdout)
+	fmt.Fprintln(a.streams.Out)
 
 	for _, r := range results {
 		if !r.Reachable {
 			continue
 		}
 		if r.URL == cfg.Repository.URL {
-			fmt.Fprintf(os.Stdout, "%s  Already using the fastest mirror: %s\n", checkOK, mirrorDisplayName(r.URL))
+			fmt.Fprintf(a.streams.Out, "%s  Already using the fastest mirror: %s\n", checkOK, mirrorDisplayName(r.URL))
 			return nil
 		}
 		cfg.Repository.URL = r.URL
@@ -196,13 +196,13 @@ func mirrorSelectAuto(ctx context.Context, cfg *config.Config) error {
 		if err != nil {
 			return fmt.Errorf("saving config: %w", err)
 		}
-		fmt.Fprintf(os.Stdout, "%s  Primary mirror set to: %s\n", checkOK, r.URL)
+		fmt.Fprintf(a.streams.Out, "%s  Primary mirror set to: %s\n", checkOK, r.URL)
 		return nil
 	}
 	return fmt.Errorf("no reachable mirrors found")
 }
 
-func mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL string) error {
+func (a *app) mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL string) error {
 	if !strings.HasSuffix(rawURL, "/") {
 		rawURL += "/"
 	}
@@ -217,19 +217,19 @@ func mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL string) err
 		)
 	}
 
-	fmt.Fprintf(os.Stdout, "Probing %s...\n", mirrorDisplayName(rawURL))
+	fmt.Fprintf(a.streams.Out, "Probing %s...\n", mirrorDisplayName(rawURL))
 	results := repository.ProbeURLs(ctx, []string{rawURL}, probeTimeoutSeconds, repository.PlatformHost())
 	if len(results) == 0 || !results[0].Reachable {
 		return fmt.Errorf("mirror %s is not reachable (timeout or HTTP error)", mirrorDisplayName(rawURL))
 	}
-	fmt.Fprintf(os.Stdout, "Latency: %d ms\n\n", results[0].Latency.Milliseconds())
+	fmt.Fprintf(a.streams.Out, "Latency: %d ms\n\n", results[0].Latency.Milliseconds())
 
 	cfg.Repository.URL = rawURL
 	err = config.Save(cfg)
 	if err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, "%s  Primary mirror set to: %s\n", checkOK, rawURL)
+	fmt.Fprintf(a.streams.Out, "%s  Primary mirror set to: %s\n", checkOK, rawURL)
 	return nil
 }
 

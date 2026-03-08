@@ -4,10 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
-	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v3"
 
 	"github.com/trollixx/qvm/internal/config"
@@ -15,7 +14,7 @@ import (
 	"github.com/trollixx/qvm/internal/platform"
 )
 
-func newInstallCommand() *cli.Command {
+func (a *app) newInstallCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "install",
 		Aliases:         []string{"i"},
@@ -57,33 +56,37 @@ func newInstallCommand() *cli.Command {
 			newQuietFlag(),
 			newDirFlag(),
 		},
-		Action: runInstall,
+		Action: a.runInstall,
 	}
 }
 
-func runInstall(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runInstall(ctx context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
 	if arg == "" {
-		return fmt.Errorf(
-			"missing argument\n\nUsage:\n  qvm install qt@<version>         Install a Qt SDK\n  qvm install <tool>@<version>     Install a tool\n\nExamples:\n  qvm install qt@6.8.3\n  qvm install qtcreator@15.0.0",
-		)
+		return errors.New("missing argument\n\n" +
+			"Usage:\n" +
+			"  qvm install qt@<version>         Install a Qt SDK\n" +
+			"  qvm install <tool>@<version>     Install a tool\n\n" +
+			"Examples:\n" +
+			"  qvm install qt@6.8.3\n" +
+			"  qvm install qtcreator@15.0.0")
 	}
 
 	if arg == "qt" {
-		return runInstallQtPickVersion(ctx, cmd)
+		return a.runInstallQtPickVersion(ctx, cmd)
 	}
 	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
-		return runInstallQt(ctx, cmd, version)
+		return a.runInstallQt(ctx, cmd, version)
 	}
-	return runInstallTool(ctx, cmd, arg)
+	return a.runInstallTool(ctx, cmd, arg)
 }
 
 // runInstallQtPickVersion handles "qvm install qt" - no version specified.
-func runInstallQtPickVersion(_ context.Context, _ *cli.Command) error {
-	return fmt.Errorf("specify a version: qvm install qt@<version>\n\nExample: qvm install qt@6.8.3")
+func (a *app) runInstallQtPickVersion(_ context.Context, _ *cli.Command) error {
+	return errors.New("specify a version: qvm install qt@<version>\n\nExample: qvm install qt@6.8.3")
 }
 
-func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
+func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 	force := cmd.Bool("force")
 	host := cmd.String("host")
 
@@ -137,12 +140,12 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 	doneCh := make(chan struct{})
 
 	dryRun := cmd.Bool("dry-run")
-	printer := newProgressPrinter()
+	printer := a.streams.NewProgressPrinter()
 	go func() {
 		defer close(doneCh)
 		for ev := range progressCh {
 			if ev.Phase == "dryrun" {
-				printDryRun(ev)
+				a.printDryRun(ev)
 			} else if !quiet {
 				printer.print(ev)
 			}
@@ -158,25 +161,25 @@ func runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 	}
 
 	if errors.Is(installErr, install.ErrUpToDate) {
-		fmt.Fprintf(os.Stdout, "Qt %s (%s) is already installed. Use --force to reinstall.\n", version, arch)
+		fmt.Fprintf(a.streams.Out, "Qt %s (%s) is already installed. Use --force to reinstall.\n", version, arch)
 		return nil
 	}
 	if installErr != nil {
 		return fmt.Errorf("installation failed: %w\n\nRun 'qvm doctor' to diagnose issues.", installErr)
 	}
 
-	fmt.Fprintf(os.Stdout, "\nQt %s (%s) installed successfully.\n", version, arch)
+	fmt.Fprintf(a.streams.Out, "\nQt %s (%s) installed successfully.\n", version, arch)
 
 	if !quiet && len(modules) == 0 {
-		fmt.Fprintf(os.Stdout, "\nTip: Add-on modules are available (charts, webengine, multimedia, ...).\n")
-		fmt.Fprintf(os.Stdout, "  Run 'qvm list qt@%s' to see them, or reinstall with:\n", version)
-		fmt.Fprintf(os.Stdout, "  qvm install qt@%s -m <module1>,<module2>\n", version)
+		fmt.Fprintf(a.streams.Out, "\nTip: Add-on modules are available (charts, webengine, multimedia, ...).\n")
+		fmt.Fprintf(a.streams.Out, "  Run 'qvm list qt@%s' to see them, or reinstall with:\n", version)
+		fmt.Fprintf(a.streams.Out, "  qvm install qt@%s -m <module1>,<module2>\n", version)
 	}
 
 	return nil
 }
 
-func runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
+func (a *app) runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
 	toolName := arg
 	toolVersion := ""
 
@@ -216,7 +219,7 @@ func runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
 	progressCh := make(chan install.ProgressEvent, 256)
 	doneCh := make(chan struct{})
 
-	printer := newProgressPrinter()
+	printer := a.streams.NewProgressPrinter()
 	go func() {
 		defer close(doneCh)
 		for ev := range progressCh {
@@ -234,41 +237,36 @@ func runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
 		return fmt.Errorf("tool installation failed: %w\n\nRun 'qvm doctor' to diagnose issues.", installErr)
 	}
 
-	fmt.Fprintf(os.Stdout, "\nTool %s@%s installed successfully.\n", toolName, toolVersion)
+	fmt.Fprintf(a.streams.Out, "\nTool %s@%s installed successfully.\n", toolName, toolVersion)
 	return nil
 }
 
-func printDryRun(ev install.ProgressEvent) {
+func (a *app) printDryRun(ev install.ProgressEvent) {
 	if ev.Archive == "" {
 		// Header event - emitted once with ArchiveTotal set.
-		fmt.Fprintf(os.Stdout, "Dry run - would download %d archive(s):\n", ev.ArchiveTotal)
+		fmt.Fprintf(a.streams.Out, "Dry run - would download %d archive(s):\n", ev.ArchiveTotal)
 		return
 	}
 	size := ""
 	if ev.BytesTotal > 0 {
 		size = "  " + formatSize(ev.BytesTotal)
 	}
-	fmt.Fprintf(os.Stdout, "  %s%s\n", ev.Archive, size)
+	fmt.Fprintf(a.streams.Out, "  %s%s\n", ev.Archive, size)
 }
 
 // progressPrinter renders install progress events to stderr.
 // isTTY controls whether cursor-movement escape sequences are used.
 type progressPrinter struct {
 	isTTY bool
+	w     io.Writer
 	lines map[string]int // archive name -> line index (0-based from first download line)
 	total int            // number of lines printed so far
-}
-
-func newProgressPrinter() *progressPrinter {
-	return &progressPrinter{
-		isTTY: isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()),
-	}
 }
 
 func (p *progressPrinter) print(ev install.ProgressEvent) {
 	switch ev.Phase {
 	case "resolving":
-		fmt.Fprintf(os.Stderr, "Resolving archives...\n")
+		fmt.Fprintf(p.w, "Resolving archives...\n")
 	case "downloading":
 		if ev.Archive == "" {
 			// Reset tracker for each install.
@@ -281,7 +279,7 @@ func (p *progressPrinter) print(ev install.ProgressEvent) {
 			if ev.BytesTotal > 0 && ev.BytesDone == ev.BytesTotal {
 				if _, reported := p.lines[ev.Archive]; !reported {
 					p.lines[ev.Archive] = 0
-					fmt.Fprintf(os.Stderr, "  Downloaded %s\n", ev.Archive)
+					fmt.Fprintf(p.w, "  Downloaded %s\n", ev.Archive)
 				}
 			}
 			return
@@ -294,14 +292,14 @@ func (p *progressPrinter) print(ev install.ProgressEvent) {
 			idx = p.total
 			p.lines[ev.Archive] = idx
 			p.total++
-			fmt.Fprintf(os.Stderr, "%s\n", line)
+			fmt.Fprintf(p.w, "%s\n", line)
 		} else {
 			// Existing file - move cursor up, overwrite, move back down.
 			up := p.total - idx
-			fmt.Fprintf(os.Stderr, "\033[%dA\r\033[K%s\033[%dB\r", up, line, up)
+			fmt.Fprintf(p.w, "\033[%dA\r\033[K%s\033[%dB\r", up, line, up)
 		}
 	case "verifying":
-		fmt.Fprintf(os.Stderr, "Verifying %s...\n", ev.Archive)
+		fmt.Fprintf(p.w, "Verifying %s...\n", ev.Archive)
 	case "extracting":
 		if ev.Archive != "" {
 			if p.isTTY {
@@ -309,24 +307,24 @@ func (p *progressPrinter) print(ev install.ProgressEvent) {
 				if ev.BytesTotal > 0 {
 					pct = fmt.Sprintf(" %.0f%%", float64(ev.BytesDone)/float64(ev.BytesTotal)*100)
 				}
-				fmt.Fprintf(os.Stderr, "\r\033[KExtracting %s%s", ev.Archive, pct)
+				fmt.Fprintf(p.w, "\r\033[KExtracting %s%s", ev.Archive, pct)
 			}
 			// Non-TTY: skip per-file extraction updates entirely.
 		} else {
-			fmt.Fprintf(os.Stderr, "Extracting archives...\n")
+			fmt.Fprintf(p.w, "Extracting archives...\n")
 		}
 	case "patching":
 		if p.isTTY {
-			fmt.Fprintf(os.Stderr, "\r\033[K")
+			fmt.Fprintf(p.w, "\r\033[K")
 		}
-		fmt.Fprintf(os.Stderr, "Patching qt.conf...\n")
+		fmt.Fprintf(p.w, "Patching qt.conf...\n")
 	case "registering":
-		fmt.Fprintf(os.Stderr, "Registering installation...\n")
+		fmt.Fprintf(p.w, "Registering installation...\n")
 	case "done":
 		if p.isTTY {
-			fmt.Fprintf(os.Stderr, "\r\033[K")
+			fmt.Fprintf(p.w, "\r\033[K")
 		}
-		fmt.Fprintf(os.Stderr, "Done.\n")
+		fmt.Fprintf(p.w, "Done.\n")
 	}
 }
 

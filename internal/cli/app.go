@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/urfave/cli/v3"
@@ -18,42 +17,58 @@ import (
 // Override at build time: go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=1.2.3".
 var Version = "dev" //nolint:gochecknoglobals // set by build ldflags
 
+// app holds shared dependencies for all CLI commands.
+type app struct {
+	streams *IOStreams
+}
+
 // NewApp creates and configures the qvm CLI application.
 func NewApp() *cli.Command {
-	app := &cli.Command{
+	return newRootCommand(NewIOStreams())
+}
+
+func newRootCommand(streams *IOStreams) *cli.Command {
+	a := &app{streams: streams}
+	return &cli.Command{
 		Name:                  "qvm",
 		Usage:                 "Qt Version Manager",
 		Version:               Version,
 		EnableShellCompletion: true,
-		Action:                runDefault,
+		Writer:                a.streams.Out,
+		ErrWriter:             a.streams.ErrOut,
+		ExitErrHandler: func(_ context.Context, _ *cli.Command, err error) {
+			if err != nil && err.Error() != "" {
+				fmt.Fprintln(a.streams.ErrOut, err.Error())
+			}
+		},
+		Action: a.runDefault,
 		Commands: []*cli.Command{
-			newInstallCommand(),
-			newListCommand(),
-			newUninstallCommand(),
-			newPathCommand(),
-			newInfoCommand(),
-			newSearchCommand(),
-			newDoctorCommand(),
-			newConfigCommand(),
-			newMirrorCommand(),
-			newCacheCommand(),
+			a.newInstallCommand(),
+			a.newListCommand(),
+			a.newUninstallCommand(),
+			a.newPathCommand(),
+			a.newInfoCommand(),
+			a.newSearchCommand(),
+			a.newDoctorCommand(),
+			a.newConfigCommand(),
+			a.newMirrorCommand(),
+			a.newCacheCommand(),
 		},
 	}
-	return app
 }
 
 // runDefault handles bare "qvm" with no arguments by printing a quick-start guide.
-func runDefault(_ context.Context, _ *cli.Command) error {
-	fmt.Fprintf(os.Stdout, "qvm - Qt Version Manager (v%s)\n", Version)
-	fmt.Fprintln(os.Stdout)
-	fmt.Fprintln(os.Stdout, "Quick start:")
-	fmt.Fprintln(os.Stdout, "  qvm list --all           List available Qt versions")
-	fmt.Fprintln(os.Stdout, "  qvm install qt@6.8.3     Install a Qt version")
-	fmt.Fprintln(os.Stdout, "  qvm path qt@6.8.3        Print install directory")
-	fmt.Fprintln(os.Stdout, "  qvm list                 Show what's installed")
-	fmt.Fprintln(os.Stdout, "  qvm doctor               Check environment health")
-	fmt.Fprintln(os.Stdout)
-	fmt.Fprintln(os.Stdout, "Run 'qvm --help' for all commands and options.")
+func (a *app) runDefault(_ context.Context, _ *cli.Command) error {
+	fmt.Fprintf(a.streams.Out, "qvm - Qt Version Manager (v%s)\n", Version)
+	fmt.Fprintln(a.streams.Out)
+	fmt.Fprintln(a.streams.Out, "Quick start:")
+	fmt.Fprintln(a.streams.Out, "  qvm list --all           List available Qt versions")
+	fmt.Fprintln(a.streams.Out, "  qvm install qt@6.8.3     Install a Qt version")
+	fmt.Fprintln(a.streams.Out, "  qvm path qt@6.8.3        Print install directory")
+	fmt.Fprintln(a.streams.Out, "  qvm list                 Show what's installed")
+	fmt.Fprintln(a.streams.Out, "  qvm doctor               Check environment health")
+	fmt.Fprintln(a.streams.Out)
+	fmt.Fprintln(a.streams.Out, "Run 'qvm --help' for all commands and options.")
 	return nil
 }
 

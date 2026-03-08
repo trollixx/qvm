@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/trollixx/qvm/pkg/qtmeta"
 )
 
-func newListCommand() *cli.Command {
+func (a *app) newListCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "list",
 		Aliases:         []string{"ls"},
@@ -32,11 +31,11 @@ func newListCommand() *cli.Command {
 			newFormatFlag(),
 			newHostFlag(),
 		},
-		Action: runList,
+		Action: a.runList,
 	}
 }
 
-func runList(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runList(ctx context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
 	showAll := cmd.Bool("all")
 	format := cmd.String("format")
@@ -61,7 +60,7 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 		// Full version (e.g. "6.8.3") -> detail view.
 		// Partial version (e.g. "6" or "6.9") -> filtered list view.
 		if vf.IsFullVersion() {
-			return runListQtVersion(ctx, fetcher, version, format)
+			return a.runListQtVersion(ctx, fetcher, version, format)
 		}
 
 		registry, err := storage.NewRegistryManager()
@@ -72,25 +71,28 @@ func runList(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return fmt.Errorf("loading registry: %w", err)
 		}
-		return runListQtFiltered(ctx, fetcher, reg, vf, format)
+		return a.runListQtFiltered(ctx, fetcher, reg, vf, format)
 	}
 
 	if arg != "" && arg != "qt" && arg != "tools" {
-		return fmt.Errorf(
-			"unknown list target %q\n\nUsage:\n  qvm list                 Show installed versions\n  qvm list --all           Show all available versions\n  qvm list qt@6            Show all Qt 6.x versions\n  qvm list qt@6.8          Show all Qt 6.8.x versions\n  qvm list qt@6.8.3        Show version details (archs, modules)",
-			arg,
-		)
+		return fmt.Errorf("unknown list target %q\n\n"+
+			"Usage:\n"+
+			"  qvm list                 Show installed versions\n"+
+			"  qvm list --all           Show all available versions\n"+
+			"  qvm list qt@6            Show all Qt 6.x versions\n"+
+			"  qvm list qt@6.8          Show all Qt 6.8.x versions\n"+
+			"  qvm list qt@6.8.3        Show version details (archs, modules)", arg)
 	}
 
 	if showAll {
-		return runListAll(ctx, arg, format, host)
+		return a.runListAll(ctx, arg, format, host)
 	}
-	return runListInstalled(arg, format)
+	return a.runListInstalled(arg, format)
 }
 
 // --- Installed-only views (default) ---
 
-func runListInstalled(arg, format string) error {
+func (a *app) runListInstalled(arg, format string) error {
 	registry, err := storage.NewRegistryManager()
 	if err != nil {
 		return fmt.Errorf("opening registry: %w", err)
@@ -103,35 +105,35 @@ func runListInstalled(arg, format string) error {
 	if format == "json" {
 		switch arg {
 		case "qt":
-			return printJSON(reg.Qt)
+			return a.printJSON(reg.Qt)
 		case "tools":
-			return printJSON(reg.Tools)
+			return a.printJSON(reg.Tools)
 		default:
-			return printJSON(reg)
+			return a.printJSON(reg)
 		}
 	}
 
 	switch arg {
 	case "qt":
-		printInstalledQt(reg)
+		a.printInstalledQt(reg)
 	case "tools":
-		printInstalledTools(reg)
+		a.printInstalledTools(reg)
 	default:
-		printInstalledQt(reg)
-		fmt.Fprintln(os.Stdout)
-		printInstalledTools(reg)
+		a.printInstalledQt(reg)
+		fmt.Fprintln(a.streams.Out)
+		a.printInstalledTools(reg)
 	}
 	return nil
 }
 
-func printInstalledQt(reg *storage.Registry) {
-	fmt.Fprintln(os.Stdout, "Installed Qt versions")
+func (a *app) printInstalledQt(reg *storage.Registry) {
+	fmt.Fprintln(a.streams.Out, "Installed Qt versions")
 
 	if len(reg.Qt) == 0 {
-		fmt.Fprintln(os.Stdout, "  (none)")
-		fmt.Fprintln(os.Stdout)
-		fmt.Fprintln(os.Stdout, "  Install one with: qvm install qt@<version>")
-		fmt.Fprintln(os.Stdout, "  Run 'qvm list --all' to see available versions.")
+		fmt.Fprintln(a.streams.Out, "  (none)")
+		fmt.Fprintln(a.streams.Out)
+		fmt.Fprintln(a.streams.Out, "  Install one with: qvm install qt@<version>")
+		fmt.Fprintln(a.streams.Out, "  Run 'qvm list --all' to see available versions.")
 		return
 	}
 
@@ -141,27 +143,27 @@ func printInstalledQt(reg *storage.Registry) {
 			size = formatSize(q.SizeBytes)
 		}
 
-		fmt.Fprintf(os.Stdout, "  %-8s %-30s %-40s %s\n",
+		fmt.Fprintf(a.streams.Out, "  %-8s %-30s %-40s %s\n",
 			q.Version, q.Arch, q.InstallDir, size)
 
 		if len(q.Modules) > 0 {
-			fmt.Fprintf(os.Stdout, "          modules: %s\n", strings.Join(q.Modules, ", "))
+			fmt.Fprintf(a.streams.Out, "          modules: %s\n", strings.Join(q.Modules, ", "))
 		}
 
 		extras := buildExtrasLine(q.Extras)
 		if extras != "" {
-			fmt.Fprintf(os.Stdout, "          extras:  %s\n", extras)
+			fmt.Fprintf(a.streams.Out, "          extras:  %s\n", extras)
 		}
 	}
 }
 
-func printInstalledTools(reg *storage.Registry) {
-	fmt.Fprintln(os.Stdout, "Installed tools")
+func (a *app) printInstalledTools(reg *storage.Registry) {
+	fmt.Fprintln(a.streams.Out, "Installed tools")
 
 	if len(reg.Tools) == 0 {
-		fmt.Fprintln(os.Stdout, "  (none)")
-		fmt.Fprintln(os.Stdout)
-		fmt.Fprintln(os.Stdout, "  Run 'qvm list tools --all' to see available tools.")
+		fmt.Fprintln(a.streams.Out, "  (none)")
+		fmt.Fprintln(a.streams.Out)
+		fmt.Fprintln(a.streams.Out, "  Run 'qvm list tools --all' to see available tools.")
 		return
 	}
 
@@ -170,7 +172,7 @@ func printInstalledTools(reg *storage.Registry) {
 		if t.SizeBytes > 0 {
 			size = formatSize(t.SizeBytes)
 		}
-		fmt.Fprintf(os.Stdout, "  %-16s %-12s %-40s %s\n",
+		fmt.Fprintf(a.streams.Out, "  %-16s %-12s %-40s %s\n",
 			t.Name, t.Version, t.InstallDir, size)
 	}
 }
@@ -194,7 +196,7 @@ func buildExtrasLine(extras storage.InstalledExtras) string {
 
 // --- All-available views (with installed markers) ---
 
-func runListAll(ctx context.Context, arg, format, host string) error {
+func (a *app) runListAll(ctx context.Context, arg, format, host string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -216,20 +218,20 @@ func runListAll(ctx context.Context, arg, format, host string) error {
 
 	switch arg {
 	case "qt":
-		return runListAllQt(ctx, fetcher, reg, format)
+		return a.runListAllQt(ctx, fetcher, reg, format)
 	case "tools":
-		return runListAllTools(ctx, fetcher, reg, format)
+		return a.runListAllTools(ctx, fetcher, reg, format)
 	default:
-		err = runListAllQt(ctx, fetcher, reg, format)
+		err = a.runListAllQt(ctx, fetcher, reg, format)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stdout)
-		return runListAllTools(ctx, fetcher, reg, format)
+		fmt.Fprintln(a.streams.Out)
+		return a.runListAllTools(ctx, fetcher, reg, format)
 	}
 }
 
-func runListAllQt(
+func (a *app) runListAllQt(
 	ctx context.Context,
 	fetcher *repository.MetadataFetcher,
 	reg *storage.Registry,
@@ -241,7 +243,7 @@ func runListAllQt(
 	}
 
 	if format == "json" {
-		return printJSON(versions)
+		return a.printJSON(versions)
 	}
 
 	// Build installed version lookup: version -> []arch.
@@ -262,13 +264,13 @@ func runListAllQt(
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(majors)))
 
-	fmt.Fprintln(os.Stdout, "Qt versions")
+	fmt.Fprintln(a.streams.Out, "Qt versions")
 
 	for _, major := range majors {
 		vers := byMajor[major]
 		sortVersionsDesc(vers)
 
-		fmt.Fprintf(os.Stdout, "\nQt %d\n", major)
+		fmt.Fprintf(a.streams.Out, "\nQt %d\n", major)
 
 		recommendedVersion := newestLTSPatch(vers)
 
@@ -282,15 +284,15 @@ func runListAllQt(
 				label = "Latest"
 			}
 
-			printVersionRow(v, label, installedVersions, recommendedVersion)
+			a.printVersionRow(v, label, installedVersions, recommendedVersion)
 		}
 	}
 
-	fmt.Fprintln(os.Stdout, "\nRun 'qvm list qt@<version>' to see available targets and modules.")
+	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list qt@<version>' to see available targets and modules.")
 	return nil
 }
 
-func runListQtFiltered(
+func (a *app) runListQtFiltered(
 	ctx context.Context,
 	fetcher *repository.MetadataFetcher,
 	reg *storage.Registry,
@@ -317,7 +319,7 @@ func runListQtFiltered(
 	}
 
 	if format == "json" {
-		return printJSON(filtered)
+		return a.printJSON(filtered)
 	}
 
 	sortVersionsDesc(filtered)
@@ -329,7 +331,7 @@ func runListQtFiltered(
 
 	recommendedVersion := newestLTSPatch(filtered)
 
-	fmt.Fprintf(os.Stdout, "Qt versions matching %s\n\n", vf.String())
+	fmt.Fprintf(a.streams.Out, "Qt versions matching %s\n\n", vf.String())
 
 	for _, v := range filtered {
 		label := ""
@@ -339,14 +341,14 @@ func runListQtFiltered(
 			label = "LTS"
 		}
 
-		printVersionRow(v, label, installedVersions, recommendedVersion)
+		a.printVersionRow(v, label, installedVersions, recommendedVersion)
 	}
 
-	fmt.Fprintln(os.Stdout, "\nRun 'qvm list qt@<version>' to see available targets and modules.")
+	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list qt@<version>' to see available targets and modules.")
 	return nil
 }
 
-func runListAllTools(
+func (a *app) runListAllTools(
 	ctx context.Context,
 	fetcher *repository.MetadataFetcher,
 	reg *storage.Registry,
@@ -358,7 +360,7 @@ func runListAllTools(
 	}
 
 	if format == "json" {
-		return printJSON(tools)
+		return a.printJSON(tools)
 	}
 
 	// Build installed lookup: tool name -> version -> true.
@@ -370,15 +372,15 @@ func runListAllTools(
 		installedTools[t.Name][t.Version] = true
 	}
 
-	fmt.Fprintln(os.Stdout, "Available tools")
-	fmt.Fprintln(os.Stdout)
+	fmt.Fprintln(a.streams.Out, "Available tools")
+	fmt.Fprintln(a.streams.Out)
 
 	for _, t := range tools {
 		display := t.Display
 		if display == "" {
 			display = t.Name
 		}
-		fmt.Fprintf(os.Stdout, "  %s  (%s)\n", display, t.Name)
+		fmt.Fprintf(a.streams.Out, "  %s  (%s)\n", display, t.Name)
 		for _, v := range t.Versions {
 			date := ""
 			if !v.ReleaseDate.IsZero() {
@@ -388,7 +390,7 @@ func runListAllTools(
 			if installedTools[t.Name][v.Version] {
 				marker = "  \u2713 installed"
 			}
-			fmt.Fprintf(os.Stdout, "      %-20s %s%s\n", v.Version, date, marker)
+			fmt.Fprintf(a.streams.Out, "      %-20s %s%s\n", v.Version, date, marker)
 		}
 	}
 
@@ -397,7 +399,7 @@ func runListAllTools(
 
 // --- Version detail view ---
 
-func runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, version, format string) error {
+func (a *app) runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, version, format string) error {
 	idx, err := fetcher.FetchQtVersion(ctx, version)
 	if err != nil {
 		return fmt.Errorf("fetching metadata for Qt %s: %w", version, err)
@@ -420,22 +422,22 @@ func runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, 
 	vi.SetDefaultArch(platform.Current().DefaultArch(version))
 
 	if format == "json" {
-		return printJSON(vi)
+		return a.printJSON(vi)
 	}
 
-	fmt.Fprintf(os.Stdout, "Qt %s\n", version)
+	fmt.Fprintf(a.streams.Out, "Qt %s\n", version)
 
-	fmt.Fprintf(os.Stdout, "\nArchitectures\n")
-	for _, a := range vi.Archs {
+	fmt.Fprintf(a.streams.Out, "\nArchitectures\n")
+	for _, ar := range vi.Archs {
 		def := ""
-		if a.IsDefault {
+		if ar.IsDefault {
 			def = " (default)"
 		}
-		display := a.DisplayName
-		if display == a.Name {
+		display := ar.DisplayName
+		if display == ar.Name {
 			display = ""
 		}
-		fmt.Fprintf(os.Stdout, "  %-30s %s%s\n", a.Name, display, def)
+		fmt.Fprintf(a.streams.Out, "  %-30s %s%s\n", ar.Name, display, def)
 	}
 
 	var addons []repository.Module
@@ -445,9 +447,9 @@ func runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, 
 		}
 	}
 	if len(addons) > 0 {
-		fmt.Fprintf(os.Stdout, "\nAdd-on modules\n")
+		fmt.Fprintf(a.streams.Out, "\nAdd-on modules\n")
 		for _, m := range addons {
-			fmt.Fprintf(os.Stdout, "  %-20s %s\n", m.Name, m.DisplayName)
+			fmt.Fprintf(a.streams.Out, "  %-20s %s\n", m.Name, m.DisplayName)
 		}
 	}
 
@@ -467,8 +469,8 @@ func runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, 
 	}
 
 	if len(supp) > 0 {
-		fmt.Fprintf(os.Stdout, "\nSupplementary (available for all modules above)\n")
-		fmt.Fprintf(os.Stdout, "  %s\n", strings.Join(supp, ", "))
+		fmt.Fprintf(a.streams.Out, "\nSupplementary (available for all modules above)\n")
+		fmt.Fprintf(a.streams.Out, "  %s\n", strings.Join(supp, ", "))
 	}
 
 	return nil
@@ -485,7 +487,12 @@ func sortVersionsDesc(vers []repository.QtVersionInfo) {
 	})
 }
 
-func printVersionRow(v repository.QtVersionInfo, label string, installed map[string][]string, recommended string) {
+func (a *app) printVersionRow(
+	v repository.QtVersionInfo,
+	label string,
+	installed map[string][]string,
+	recommended string,
+) {
 	date := ""
 	if !v.ReleaseDate.IsZero() {
 		date = v.ReleaseDate.Format("2006-01-02")
@@ -502,7 +509,7 @@ func printVersionRow(v repository.QtVersionInfo, label string, installed map[str
 		suffix = "   \u2190 recommended"
 	}
 
-	fmt.Fprintf(os.Stdout, "  %-10s %-16s %s%s\n", v.Version, label, date, suffix)
+	fmt.Fprintf(a.streams.Out, "  %-10s %-16s %s%s\n", v.Version, label, date, suffix)
 }
 
 // newestLTSPatch returns the version string of the newest patch release within
@@ -542,8 +549,8 @@ func newestLTSPatch(vers []repository.QtVersionInfo) string {
 	return ""
 }
 
-func printJSON(v any) error {
-	enc := json.NewEncoder(os.Stdout)
+func (a *app) printJSON(v any) error {
+	enc := json.NewEncoder(a.streams.Out)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
 }

@@ -105,7 +105,7 @@ func TestNormalizeURL_PreservesExistingSlash(t *testing.T) {
 // -- mirror command routing ----------------------------------------------------
 
 func TestMirrorSelect_NoArgs(t *testing.T) {
-	assertErrContains(t, run(t, "mirror", "select"), "usage:")
+	assertErrContains(t, run(t, "mirror", "select"), "Usage:")
 }
 
 func TestMirrorSelect_AutoAndURL(t *testing.T) {

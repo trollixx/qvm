@@ -3,8 +3,8 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
 
 	"github.com/sahilm/fuzzy"
 	"github.com/urfave/cli/v3"
@@ -19,7 +19,7 @@ type searchResult struct {
 	Display string `json:"display,omitempty"`
 }
 
-func newSearchCommand() *cli.Command {
+func (a *app) newSearchCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "search",
 		Aliases:   []string{"s"},
@@ -29,7 +29,7 @@ func newSearchCommand() *cli.Command {
 			newFormatFlag(),
 			newHostFlag(),
 		},
-		Action: runSearch,
+		Action: a.runSearch,
 	}
 }
 
@@ -39,12 +39,14 @@ type searchItem struct {
 	display string
 }
 
-func runSearch(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 	query := cmd.Args().Get(0)
 	if query == "" {
-		return fmt.Errorf(
-			"missing argument\n\nUsage:\n  qvm search <query>       Search for Qt modules or tools\n\nExample:\n  qvm search charts",
-		)
+		return errors.New("missing argument\n\n" +
+			"Usage:\n" +
+			"  qvm search <query>       Search for Qt modules or tools\n\n" +
+			"Example:\n" +
+			"  qvm search charts")
 	}
 
 	format := cmd.String("format")
@@ -64,7 +66,7 @@ func runSearch(ctx context.Context, cmd *cli.Command) error {
 	// Fetch Qt versions for modules.
 	versions, err := fetcher.FetchAllQtVersions(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not fetch Qt version index: %v\n", err)
+		fmt.Fprintf(a.streams.ErrOut, "warning: could not fetch Qt version index: %v\n", err)
 	} else {
 		// Collect unique module names across all versions.
 		seenModules := map[string]bool{}
@@ -88,7 +90,7 @@ func runSearch(ctx context.Context, cmd *cli.Command) error {
 	// Fetch tools.
 	tools, err := fetcher.FetchAllTools(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not fetch tools index: %v\n", err)
+		fmt.Fprintf(a.streams.ErrOut, "warning: could not fetch tools index: %v\n", err)
 	} else {
 		for _, t := range tools {
 			item := searchItem{
@@ -103,13 +105,13 @@ func runSearch(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if len(names) == 0 {
-		fmt.Fprintln(os.Stdout, "No items available to search.")
+		fmt.Fprintln(a.streams.Out, "No items available to search.")
 		return nil
 	}
 
 	results := fuzzy.Find(query, names)
 	if len(results) == 0 {
-		fmt.Fprintf(os.Stdout, "No results found for %q.\n", query)
+		fmt.Fprintf(a.streams.Out, "No results found for %q.\n", query)
 		return nil
 	}
 
@@ -134,18 +136,18 @@ func runSearch(ctx context.Context, cmd *cli.Command) error {
 		for i, m := range matched {
 			jsonResults[i] = searchResult{Kind: m.kind, Name: m.name, Display: m.display}
 		}
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(a.streams.Out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(jsonResults)
 	}
 
-	fmt.Fprintf(os.Stdout, "Search results for %q:\n\n", query)
+	fmt.Fprintf(a.streams.Out, "Search results for %q:\n\n", query)
 	for _, item := range matched {
 		display := item.display
 		if display == "" {
 			display = item.name
 		}
-		fmt.Fprintf(os.Stdout, "  [%-6s] %-24s %s\n", item.kind, item.name, display)
+		fmt.Fprintf(a.streams.Out, "  [%-6s] %-24s %s\n", item.kind, item.name, display)
 	}
 
 	return nil

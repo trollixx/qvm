@@ -3,8 +3,8 @@ package cli
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -13,7 +13,7 @@ import (
 	"github.com/trollixx/qvm/internal/storage"
 )
 
-func newUninstallCommand() *cli.Command {
+func (a *app) newUninstallCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "uninstall",
 		Aliases:         []string{"remove"},
@@ -24,18 +24,22 @@ func newUninstallCommand() *cli.Command {
 			newArchFlag(),
 			newYesFlag(),
 		},
-		Action: runUninstall,
+		Action: a.runUninstall,
 	}
 }
 
-func runUninstall(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runUninstall(ctx context.Context, cmd *cli.Command) error {
 	_ = ctx
 
 	arg := cmd.Args().Get(0)
 	if arg == "" {
-		return fmt.Errorf(
-			"missing argument\n\nUsage:\n  qvm uninstall qt@<version>       Uninstall a Qt version\n  qvm uninstall <tool>@<version>   Uninstall a tool\n\nExamples:\n  qvm uninstall qt@6.8.3\n  qvm uninstall qtcreator@15.0.0",
-		)
+		return errors.New("missing argument\n\n" +
+			"Usage:\n" +
+			"  qvm uninstall qt@<version>       Uninstall a Qt version\n" +
+			"  qvm uninstall <tool>@<version>   Uninstall a tool\n\n" +
+			"Examples:\n" +
+			"  qvm uninstall qt@6.8.3\n" +
+			"  qvm uninstall qtcreator@15.0.0")
 	}
 
 	cfg, err := config.Load()
@@ -51,12 +55,12 @@ func runUninstall(ctx context.Context, cmd *cli.Command) error {
 	autoYes := cmd.Bool("yes")
 
 	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
-		return runUninstallQt(ctx, cmd, cfg, registry, version, autoYes)
+		return a.runUninstallQt(ctx, cmd, cfg, registry, version, autoYes)
 	}
-	return runUninstallTool(ctx, cmd, cfg, registry, arg, autoYes)
+	return a.runUninstallTool(ctx, cmd, cfg, registry, arg, autoYes)
 }
 
-func runUninstallQt(
+func (a *app) runUninstallQt(
 	ctx context.Context,
 	cmd *cli.Command,
 	cfg *config.Config,
@@ -93,16 +97,16 @@ func runUninstallQt(
 	}
 
 	if !autoYes {
-		fmt.Fprintf(os.Stdout, "The following installations will be removed:\n")
+		fmt.Fprintf(a.streams.Out, "The following installations will be removed:\n")
 		for _, q := range matches {
 			size := ""
 			if q.SizeBytes > 0 {
 				size = "  (" + formatSize(q.SizeBytes) + ")"
 			}
-			fmt.Fprintf(os.Stdout, "  Qt %s  %s  %s%s\n", q.Version, q.Arch, q.InstallDir, size)
+			fmt.Fprintf(a.streams.Out, "  Qt %s  %s  %s%s\n", q.Version, q.Arch, q.InstallDir, size)
 		}
-		if !confirm("Proceed?") {
-			fmt.Fprintln(os.Stdout, "Aborted.")
+		if !a.confirm("Proceed?") {
+			fmt.Fprintln(a.streams.Out, "Aborted.")
 			return nil
 		}
 	}
@@ -112,11 +116,11 @@ func runUninstallQt(
 		return fmt.Errorf("uninstall failed: %w", err)
 	}
 
-	fmt.Fprintf(os.Stdout, "Qt %s uninstalled successfully.\n", version)
+	fmt.Fprintf(a.streams.Out, "Qt %s uninstalled successfully.\n", version)
 	return nil
 }
 
-func runUninstallTool(
+func (a *app) runUninstallTool(
 	ctx context.Context,
 	cmd *cli.Command,
 	cfg *config.Config,
@@ -156,16 +160,16 @@ func runUninstallTool(
 	}
 
 	if !autoYes {
-		fmt.Fprintf(os.Stdout, "The following tools will be removed:\n")
+		fmt.Fprintf(a.streams.Out, "The following tools will be removed:\n")
 		for _, t := range matches {
 			size := ""
 			if t.SizeBytes > 0 {
 				size = "  (" + formatSize(t.SizeBytes) + ")"
 			}
-			fmt.Fprintf(os.Stdout, "  %s@%s  %s%s\n", t.Name, t.Version, t.InstallDir, size)
+			fmt.Fprintf(a.streams.Out, "  %s@%s  %s%s\n", t.Name, t.Version, t.InstallDir, size)
 		}
-		if !confirm("Proceed?") {
-			fmt.Fprintln(os.Stdout, "Aborted.")
+		if !a.confirm("Proceed?") {
+			fmt.Fprintln(a.streams.Out, "Aborted.")
 			return nil
 		}
 	}
@@ -175,13 +179,13 @@ func runUninstallTool(
 		return fmt.Errorf("uninstall failed: %w", err)
 	}
 
-	fmt.Fprintf(os.Stdout, "Tool %s@%s uninstalled successfully.\n", toolName, toolVersion)
+	fmt.Fprintf(a.streams.Out, "Tool %s@%s uninstalled successfully.\n", toolName, toolVersion)
 	return nil
 }
 
-func confirm(prompt string) bool {
-	fmt.Fprintf(os.Stdout, "%s [y/N] ", prompt)
-	scanner := bufio.NewScanner(os.Stdin)
+func (a *app) confirm(prompt string) bool {
+	fmt.Fprintf(a.streams.Out, "%s [y/N] ", prompt)
+	scanner := bufio.NewScanner(a.streams.In)
 	if !scanner.Scan() {
 		return false
 	}

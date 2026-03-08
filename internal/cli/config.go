@@ -2,8 +2,8 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -14,7 +14,7 @@ import (
 	"github.com/trollixx/qvm/internal/config"
 )
 
-func newConfigCommand() *cli.Command {
+func (a *app) newConfigCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "config",
 		Usage: "Get or set qvm configuration values",
@@ -23,36 +23,36 @@ func newConfigCommand() *cli.Command {
 				Name:      "get",
 				Usage:     "Get a configuration value",
 				ArgsUsage: "<key>",
-				Action:    runConfigGet,
+				Action:    a.runConfigGet,
 			},
 			{
 				Name:      "set",
 				Usage:     "Set a configuration value",
 				ArgsUsage: "<key> <value>",
-				Action:    runConfigSet,
+				Action:    a.runConfigSet,
 			},
 			{
 				Name:   "list",
 				Usage:  "List all configuration values",
-				Action: runConfigList,
+				Action: a.runConfigList,
 			},
 			{
 				Name:   "path",
 				Usage:  "Print the path to the config file",
-				Action: runConfigPath,
+				Action: a.runConfigPath,
 			},
 		},
 		// If no sub-command, show list.
-		Action: runConfigList,
+		Action: a.runConfigList,
 	}
 }
 
-func runConfigGet(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runConfigGet(ctx context.Context, cmd *cli.Command) error {
 	_ = ctx
 
 	key := cmd.Args().Get(0)
 	if key == "" {
-		return fmt.Errorf("argument required; run 'qvm config get --help' for usage")
+		return errors.New("argument required\n\nRun 'qvm config get --help' for usage.")
 	}
 
 	cfg, err := config.Load()
@@ -65,17 +65,17 @@ func runConfigGet(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	fmt.Fprintf(os.Stdout, "%v\n", val)
+	fmt.Fprintf(a.streams.Out, "%v\n", val)
 	return nil
 }
 
-func runConfigSet(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runConfigSet(ctx context.Context, cmd *cli.Command) error {
 	_ = ctx
 
 	key := cmd.Args().Get(0)
 	value := cmd.Args().Get(1)
 	if key == "" || value == "" {
-		return fmt.Errorf("key and value required; run 'qvm config set --help' for usage")
+		return errors.New("key and value required\n\nRun 'qvm config set --help' for usage.")
 	}
 
 	cfg, err := config.Load()
@@ -93,11 +93,11 @@ func runConfigSet(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
-	fmt.Fprintf(os.Stdout, "Set %s = %s\n", key, value)
+	fmt.Fprintf(a.streams.Out, "Set %s = %s\n", key, value)
 	return nil
 }
 
-func runConfigList(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runConfigList(ctx context.Context, cmd *cli.Command) error {
 	_ = ctx
 	_ = cmd
 
@@ -108,7 +108,7 @@ func runConfigList(ctx context.Context, cmd *cli.Command) error {
 
 	pairs := configList(cfg)
 	for _, kv := range pairs {
-		fmt.Fprintf(os.Stdout, "%-40s = %v\n", kv[0], kv[1])
+		fmt.Fprintf(a.streams.Out, "%-40s = %v\n", kv[0], kv[1])
 	}
 	return nil
 }
@@ -214,7 +214,7 @@ func configList(cfg *config.Config) [][2]string {
 	return pairs
 }
 
-func runConfigPath(ctx context.Context, cmd *cli.Command) error {
+func (a *app) runConfigPath(ctx context.Context, cmd *cli.Command) error {
 	_ = ctx
 	_ = cmd
 
@@ -222,7 +222,7 @@ func runConfigPath(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("determining config path: %w", err)
 	}
-	fmt.Fprintln(os.Stdout, p)
+	fmt.Fprintln(a.streams.Out, p)
 	return nil
 }
 

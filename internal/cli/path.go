@@ -2,8 +2,8 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -12,7 +12,7 @@ import (
 	"github.com/trollixx/qvm/internal/storage"
 )
 
-func newPathCommand() *cli.Command {
+func (a *app) newPathCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "path",
 		Usage:           "Print the install directory of a Qt version or tool",
@@ -21,16 +21,20 @@ func newPathCommand() *cli.Command {
 		Flags: []cli.Flag{
 			newArchFlag(),
 		},
-		Action: runPath,
+		Action: a.runPath,
 	}
 }
 
-func runPath(_ context.Context, cmd *cli.Command) error {
+func (a *app) runPath(_ context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
 	if arg == "" {
-		return fmt.Errorf(
-			"missing argument\n\nUsage:\n  qvm path qt@<version>         Print Qt install directory\n  qvm path <tool>[@<version>]   Print tool install directory\n\nExamples:\n  qvm path qt@6.8.3\n  cmake -DCMAKE_PREFIX_PATH=$(qvm path qt@6.8.3) ..",
-		)
+		return errors.New("missing argument\n\n" +
+			"Usage:\n" +
+			"  qvm path qt@<version>         Print Qt install directory\n" +
+			"  qvm path <tool>[@<version>]   Print tool install directory\n\n" +
+			"Examples:\n" +
+			"  qvm path qt@6.8.3\n" +
+			"  cmake -DCMAKE_PREFIX_PATH=$(qvm path qt@6.8.3) ..")
 	}
 
 	registry, err := storage.NewRegistryManager()
@@ -45,12 +49,12 @@ func runPath(_ context.Context, cmd *cli.Command) error {
 
 	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
 		arch := cmd.String("arch")
-		return pathQt(reg, version, arch)
+		return a.pathQt(reg, version, arch)
 	}
-	return pathTool(reg, arg)
+	return a.pathTool(reg, arg)
 }
 
-func pathQt(reg *storage.Registry, version, arch string) error {
+func (a *app) pathQt(reg *storage.Registry, version, arch string) error {
 	// Collect all matching installs.
 	var matches []storage.InstalledQt
 	for i := range reg.Qt {
@@ -73,14 +77,14 @@ func pathQt(reg *storage.Registry, version, arch string) error {
 		}
 		return fmt.Errorf("Qt %s is not installed\n\nTo install it: qvm install qt@%s", version, version)
 	case 1:
-		fmt.Fprintln(os.Stdout, matches[0].InstallDir)
+		fmt.Fprintln(a.streams.Out, matches[0].InstallDir)
 		return nil
 	default:
 		// Multiple archs installed - prefer the local machine's default.
 		defaultArch := platform.Current().DefaultArch(version)
 		for _, m := range matches {
 			if m.Arch == defaultArch {
-				fmt.Fprintln(os.Stdout, m.InstallDir)
+				fmt.Fprintln(a.streams.Out, m.InstallDir)
 				return nil
 			}
 		}
@@ -99,7 +103,7 @@ func pathQt(reg *storage.Registry, version, arch string) error {
 	}
 }
 
-func pathTool(reg *storage.Registry, arg string) error {
+func (a *app) pathTool(reg *storage.Registry, arg string) error {
 	toolName := arg
 	toolVersion := ""
 	if idx := strings.Index(arg, "@"); idx >= 0 {
@@ -110,7 +114,7 @@ func pathTool(reg *storage.Registry, arg string) error {
 	for i := range reg.Tools {
 		t := &reg.Tools[i]
 		if t.Name == toolName && (toolVersion == "" || t.Version == toolVersion) {
-			fmt.Fprintln(os.Stdout, t.InstallDir)
+			fmt.Fprintln(a.streams.Out, t.InstallDir)
 			return nil
 		}
 	}

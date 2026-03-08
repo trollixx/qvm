@@ -13,16 +13,16 @@ import (
 	"github.com/trollixx/qvm/internal/repository"
 )
 
-func newCacheCommand() *cli.Command {
+func (a *app) newCacheCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "cache",
 		Usage:  "Manage the download cache",
-		Action: runCacheList,
+		Action: a.runCacheList,
 		Commands: []*cli.Command{
 			{
 				Name:   "list",
 				Usage:  "List cached download files",
-				Action: runCacheList,
+				Action: a.runCacheList,
 			},
 			{
 				Name:  "clean",
@@ -42,13 +42,13 @@ func newCacheCommand() *cli.Command {
 					},
 					newYesFlag(),
 				},
-				Action: runCacheClean,
+				Action: a.runCacheClean,
 			},
 		},
 	}
 }
 
-func runCacheList(_ context.Context, _ *cli.Command) error {
+func (a *app) runCacheList(_ context.Context, _ *cli.Command) error {
 	dir, err := install.DownloadCacheDir()
 	if err != nil {
 		return err
@@ -68,10 +68,10 @@ func runCacheList(_ context.Context, _ *cli.Command) error {
 		files = append(files, e)
 	}
 
-	fmt.Fprintf(os.Stdout, "Download cache: %s\n", dir)
+	fmt.Fprintf(a.streams.Out, "Download cache: %s\n", dir)
 
 	if len(files) == 0 {
-		fmt.Fprintln(os.Stdout, "  (empty)")
+		fmt.Fprintln(a.streams.Out, "  (empty)")
 		return nil
 	}
 
@@ -88,14 +88,14 @@ func runCacheList(_ context.Context, _ *cli.Command) error {
 			status = "partial"
 		}
 		totalBytes += info.Size()
-		fmt.Fprintf(os.Stdout, "  %-60s  %8s  %s\n", name, formatSize(info.Size()), status)
+		fmt.Fprintf(a.streams.Out, "  %-60s  %8s  %s\n", name, formatSize(info.Size()), status)
 	}
 
-	fmt.Fprintf(os.Stdout, "\nTotal: %s\n", formatSize(totalBytes))
+	fmt.Fprintf(a.streams.Out, "\nTotal: %s\n", formatSize(totalBytes))
 	return nil
 }
 
-func runCacheClean(_ context.Context, cmd *cli.Command) error {
+func (a *app) runCacheClean(_ context.Context, cmd *cli.Command) error {
 	metadataFlag := cmd.Bool("metadata")
 	incompleteFlag := cmd.Bool("incomplete")
 	allFlag := cmd.Bool("all")
@@ -173,12 +173,12 @@ func runCacheClean(_ context.Context, cmd *cli.Command) error {
 	}
 
 	if len(dlCandidates) == 0 && dlSkipped == 0 && len(metaCandidates) == 0 {
-		fmt.Fprintln(os.Stdout, "Nothing to remove.")
+		fmt.Fprintln(a.streams.Out, "Nothing to remove.")
 		return nil
 	}
 
 	if len(dlCandidates) == 0 && dlSkipped > 0 && len(metaCandidates) == 0 {
-		fmt.Fprintln(os.Stdout, "No partial files to remove.")
+		fmt.Fprintln(a.streams.Out, "No partial files to remove.")
 		return nil
 	}
 
@@ -193,17 +193,17 @@ func runCacheClean(_ context.Context, cmd *cli.Command) error {
 			if incompleteOnly {
 				label = "partial download file(s)"
 			}
-			fmt.Fprintf(os.Stdout, "  %d %s (%s)\n", len(dlCandidates), label, formatSize(dlBytes))
+			fmt.Fprintf(a.streams.Out, "  %d %s (%s)\n", len(dlCandidates), label, formatSize(dlBytes))
 		}
 		if len(metaCandidates) > 0 {
 			var metaBytes int64
 			for _, c := range metaCandidates {
 				metaBytes += c.size
 			}
-			fmt.Fprintf(os.Stdout, "  %d metadata file(s) (%s)\n", len(metaCandidates), formatSize(metaBytes))
+			fmt.Fprintf(a.streams.Out, "  %d metadata file(s) (%s)\n", len(metaCandidates), formatSize(metaBytes))
 		}
-		if !confirm("Remove the above?") {
-			fmt.Fprintln(os.Stdout, "Aborted.")
+		if !a.confirm("Remove the above?") {
+			fmt.Fprintln(a.streams.Out, "Aborted.")
 			return nil
 		}
 	}
@@ -214,7 +214,7 @@ func runCacheClean(_ context.Context, cmd *cli.Command) error {
 	for _, c := range dlCandidates {
 		err := os.Remove(c.path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: removing %s: %v\n", filepath.Base(c.path), err)
+			fmt.Fprintf(a.streams.ErrOut, "warning: removing %s: %v\n", filepath.Base(c.path), err)
 			continue
 		}
 		dlRemoved++
@@ -227,7 +227,7 @@ func runCacheClean(_ context.Context, cmd *cli.Command) error {
 	for _, c := range metaCandidates {
 		err := os.Remove(c.path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: removing %s: %v\n", filepath.Base(c.path), err)
+			fmt.Fprintf(a.streams.ErrOut, "warning: removing %s: %v\n", filepath.Base(c.path), err)
 			continue
 		}
 		metaRemoved++
@@ -240,13 +240,17 @@ func runCacheClean(_ context.Context, cmd *cli.Command) error {
 		if incompleteOnly {
 			label = "partial file(s)"
 		}
-		fmt.Fprintf(os.Stdout, "Removed %d download %s, freed %s.\n", dlRemoved, label, formatSize(dlFreed))
+		fmt.Fprintf(a.streams.Out, "Removed %d download %s, freed %s.\n", dlRemoved, label, formatSize(dlFreed))
 		if dlSkipped > 0 {
-			fmt.Fprintf(os.Stdout, "Kept %d complete archive(s) (use without --incomplete to remove all).\n", dlSkipped)
+			fmt.Fprintf(
+				a.streams.Out,
+				"Kept %d complete archive(s) (use without --incomplete to remove all).\n",
+				dlSkipped,
+			)
 		}
 	}
 	if metaRemoved > 0 {
-		fmt.Fprintf(os.Stdout, "Removed %d metadata file(s), freed %s.\n", metaRemoved, formatSize(metaFreed))
+		fmt.Fprintf(a.streams.Out, "Removed %d metadata file(s), freed %s.\n", metaRemoved, formatSize(metaFreed))
 	}
 
 	return nil
