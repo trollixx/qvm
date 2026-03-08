@@ -87,13 +87,15 @@ func (a *app) runUninstallQt(
 
 	if len(matches) == 0 {
 		if arch != "" {
-			return fmt.Errorf(
-				"Qt %s (arch: %s) is not installed\n\nRun 'qvm list' to see installed versions.",
-				version,
-				arch,
+			return withHint(
+				fmt.Errorf("Qt %s (arch: %s) is not installed", version, arch),
+				"Run 'qvm list' to see installed versions.",
 			)
 		}
-		return fmt.Errorf("Qt %s is not installed\n\nRun 'qvm list' to see installed versions.", version)
+		return withHint(
+			fmt.Errorf("Qt %s is not installed", version),
+			"Run 'qvm list' to see installed versions.",
+		)
 	}
 
 	if !autoYes {
@@ -133,9 +135,9 @@ func (a *app) runUninstallTool(
 
 	toolName, toolVersion, ok := strings.Cut(arg, "@")
 	if !ok {
-		return fmt.Errorf(
-			"missing version\n\nUsage:\n  qvm uninstall <tool>@<version>\n\nExample:\n  qvm uninstall %s@<version>",
-			arg,
+		return newHintError(
+			"missing version",
+			fmt.Sprintf("Usage:\n  qvm uninstall <tool>@<version>\n\nExample:\n  qvm uninstall %s@<version>", arg),
 		)
 	}
 
@@ -152,10 +154,9 @@ func (a *app) runUninstallTool(
 	}
 
 	if len(matches) == 0 {
-		return fmt.Errorf(
-			"tool %s@%s is not installed\n\nRun 'qvm list' to see installed versions.",
-			toolName,
-			toolVersion,
+		return withHint(
+			fmt.Errorf("tool %s@%s is not installed", toolName, toolVersion),
+			"Run 'qvm list' to see installed versions.",
 		)
 	}
 

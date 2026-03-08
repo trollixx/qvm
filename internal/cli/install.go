@@ -63,13 +63,13 @@ func (a *app) newInstallCommand() *cli.Command {
 func (a *app) runInstall(ctx context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
 	if arg == "" {
-		return errors.New("missing argument\n\n" +
-			"Usage:\n" +
-			"  qvm install qt@<version>         Install a Qt SDK\n" +
-			"  qvm install <tool>@<version>     Install a tool\n\n" +
-			"Examples:\n" +
-			"  qvm install qt@6.8.3\n" +
-			"  qvm install qtcreator@15.0.0")
+		return newHintError("missing argument",
+			"Usage:\n"+
+				"  qvm install qt@<version>         Install a Qt SDK\n"+
+				"  qvm install <tool>@<version>     Install a tool\n\n"+
+				"Examples:\n"+
+				"  qvm install qt@6.8.3\n"+
+				"  qvm install qtcreator@15.0.0")
 	}
 
 	if arg == "qt" {
@@ -83,7 +83,7 @@ func (a *app) runInstall(ctx context.Context, cmd *cli.Command) error {
 
 // runInstallQtPickVersion handles "qvm install qt" - no version specified.
 func (a *app) runInstallQtPickVersion(_ context.Context, _ *cli.Command) error {
-	return errors.New("specify a version: qvm install qt@<version>\n\nExample: qvm install qt@6.8.3")
+	return newHintError("specify a version: qvm install qt@<version>", "Example: qvm install qt@6.8.3")
 }
 
 func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
@@ -165,7 +165,7 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 		return nil
 	}
 	if installErr != nil {
-		return fmt.Errorf("installation failed: %w\n\nRun 'qvm doctor' to diagnose issues.", installErr)
+		return withHint(fmt.Errorf("installation failed: %w", installErr), "Run 'qvm doctor' to diagnose issues.")
 	}
 
 	fmt.Fprintf(a.streams.Out, "\nQt %s (%s) installed successfully.\n", version, arch)
@@ -234,7 +234,7 @@ func (a *app) runInstallTool(ctx context.Context, cmd *cli.Command, arg string) 
 	<-doneCh
 
 	if installErr != nil {
-		return fmt.Errorf("tool installation failed: %w\n\nRun 'qvm doctor' to diagnose issues.", installErr)
+		return withHint(fmt.Errorf("tool installation failed: %w", installErr), "Run 'qvm doctor' to diagnose issues.")
 	}
 
 	fmt.Fprintf(a.streams.Out, "\nTool %s@%s installed successfully.\n", toolName, toolVersion)

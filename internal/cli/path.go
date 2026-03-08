@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -28,13 +27,13 @@ func (a *app) newPathCommand() *cli.Command {
 func (a *app) runPath(_ context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
 	if arg == "" {
-		return errors.New("missing argument\n\n" +
-			"Usage:\n" +
-			"  qvm path qt@<version>         Print Qt install directory\n" +
-			"  qvm path <tool>[@<version>]   Print tool install directory\n\n" +
-			"Examples:\n" +
-			"  qvm path qt@6.8.3\n" +
-			"  cmake -DCMAKE_PREFIX_PATH=$(qvm path qt@6.8.3) ..")
+		return newHintError("missing argument",
+			"Usage:\n"+
+				"  qvm path qt@<version>         Print Qt install directory\n"+
+				"  qvm path <tool>[@<version>]   Print tool install directory\n\n"+
+				"Examples:\n"+
+				"  qvm path qt@6.8.3\n"+
+				"  cmake -DCMAKE_PREFIX_PATH=$(qvm path qt@6.8.3) ..")
 	}
 
 	registry, err := storage.NewRegistryManager()
@@ -67,15 +66,15 @@ func (a *app) pathQt(reg *storage.Registry, version, arch string) error {
 	switch len(matches) {
 	case 0:
 		if arch != "" {
-			return fmt.Errorf(
-				"Qt %s (arch: %s) is not installed\n\nTo install it: qvm install qt@%s --arch %s",
-				version,
-				arch,
-				version,
-				arch,
+			return withHint(
+				fmt.Errorf("Qt %s (arch: %s) is not installed", version, arch),
+				fmt.Sprintf("To install it: qvm install qt@%s --arch %s", version, arch),
 			)
 		}
-		return fmt.Errorf("Qt %s is not installed\n\nTo install it: qvm install qt@%s", version, version)
+		return withHint(
+			fmt.Errorf("Qt %s is not installed", version),
+			fmt.Sprintf("To install it: qvm install qt@%s", version),
+		)
 	case 1:
 		fmt.Fprintln(a.streams.Out, matches[0].InstallDir)
 		return nil
@@ -93,12 +92,9 @@ func (a *app) pathQt(reg *storage.Registry, version, arch string) error {
 		for i, m := range matches {
 			archs[i] = m.Arch
 		}
-		return fmt.Errorf(
-			"Qt %s is installed for multiple archs: %s\n\nUse --arch to specify which one, e.g.:\n  qvm path qt@%s --arch %s",
-			version,
-			strings.Join(archs, ", "),
-			version,
-			archs[0],
+		return withHint(
+			fmt.Errorf("Qt %s is installed for multiple archs: %s", version, strings.Join(archs, ", ")),
+			fmt.Sprintf("Use --arch to specify which one, e.g.:\n  qvm path qt@%s --arch %s", version, archs[0]),
 		)
 	}
 }
@@ -119,13 +115,13 @@ func (a *app) pathTool(reg *storage.Registry, arg string) error {
 		}
 	}
 	if toolVersion != "" {
-		return fmt.Errorf(
-			"tool %s@%s is not installed\n\nTo install it: qvm install %s@%s",
-			toolName,
-			toolVersion,
-			toolName,
-			toolVersion,
+		return withHint(
+			fmt.Errorf("tool %s@%s is not installed", toolName, toolVersion),
+			fmt.Sprintf("To install it: qvm install %s@%s", toolName, toolVersion),
 		)
 	}
-	return fmt.Errorf("tool %s is not installed\n\nRun 'qvm list tools --all' to see available tools.", toolName)
+	return withHint(
+		fmt.Errorf("tool %s is not installed", toolName),
+		"Run 'qvm list tools --all' to see available tools.",
+	)
 }

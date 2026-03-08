@@ -138,7 +138,7 @@ func (a *app) runMirrorSelect(ctx context.Context, cmd *cli.Command) error {
 	urlArg := cmd.Args().Get(0)
 
 	if !auto && urlArg == "" {
-		return errors.New("specify --auto or a URL\n\nUsage: qvm mirror select --auto | qvm mirror select <url>")
+		return newHintError("specify --auto or a URL", "Usage: qvm mirror select --auto | qvm mirror select <url>")
 	}
 	if auto && urlArg != "" {
 		return errors.New("cannot combine --auto with a URL argument")
@@ -212,7 +212,7 @@ func (a *app) mirrorSelectURL(ctx context.Context, cfg *config.Config, rawURL st
 	}
 	if isBlacklisted(rawURL, cfg.Repository.Blacklist) {
 		return fmt.Errorf(
-			"mirror %s is in the blacklist; remove it with: qvm config set repository.blacklist ...",
+			"mirror %s is in the blacklist; remove it with 'qvm config set repository.blacklist <value>'",
 			mirrorDisplayName(rawURL),
 		)
 	}

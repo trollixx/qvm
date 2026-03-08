@@ -68,15 +68,15 @@ func (a *app) runInfoQt(reg *storage.Registry, version, arch, format string) err
 
 	if len(matches) == 0 {
 		if arch != "" {
-			return fmt.Errorf(
-				"Qt %s (arch: %s) is not installed\n\nTo install it: qvm install qt@%s --arch %s",
-				version,
-				arch,
-				version,
-				arch,
+			return withHint(
+				fmt.Errorf("Qt %s (arch: %s) is not installed", version, arch),
+				fmt.Sprintf("To install it: qvm install qt@%s --arch %s", version, arch),
 			)
 		}
-		return fmt.Errorf("Qt %s is not installed\n\nTo install it: qvm install qt@%s", version, version)
+		return withHint(
+			fmt.Errorf("Qt %s is not installed", version),
+			fmt.Sprintf("To install it: qvm install qt@%s", version),
+		)
 	}
 
 	if format == "json" {
@@ -112,15 +112,15 @@ func (a *app) runInfoTool(reg *storage.Registry, arg, format string) error {
 
 	if len(matches) == 0 {
 		if toolVersion != "" {
-			return fmt.Errorf(
-				"tool %s@%s is not installed\n\nTo install it: qvm install %s@%s",
-				toolName,
-				toolVersion,
-				toolName,
-				toolVersion,
+			return withHint(
+				fmt.Errorf("tool %s@%s is not installed", toolName, toolVersion),
+				fmt.Sprintf("To install it: qvm install %s@%s", toolName, toolVersion),
 			)
 		}
-		return fmt.Errorf("tool %s is not installed\n\nRun 'qvm list tools --all' to see available tools.", toolName)
+		return withHint(
+			fmt.Errorf("tool %s is not installed", toolName),
+			"Run 'qvm list tools --all' to see available tools.",
+		)
 	}
 
 	if format == "json" {

@@ -312,9 +312,9 @@ func (a *app) runListQtFiltered(
 	}
 
 	if len(filtered) == 0 {
-		return fmt.Errorf(
-			"no Qt versions matching %q found\n\nRun 'qvm list --all' to see all available versions.",
-			vf.String(),
+		return withHint(
+			fmt.Errorf("no Qt versions matching %q found", vf.String()),
+			"Run 'qvm list --all' to see all available versions.",
 		)
 	}
 
@@ -413,9 +413,9 @@ func (a *app) runListQtVersion(ctx context.Context, fetcher *repository.Metadata
 		}
 	}
 	if vi == nil {
-		return fmt.Errorf(
-			"Qt version %s not found in repository\n\nRun 'qvm list --all' to see available versions.",
-			version,
+		return withHint(
+			fmt.Errorf("Qt version %s not found in repository", version),
+			"Run 'qvm list --all' to see available versions.",
 		)
 	}
 

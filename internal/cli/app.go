@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -37,8 +38,14 @@ func newRootCommand(streams *IOStreams) *cli.Command {
 		Writer:                a.streams.Out,
 		ErrWriter:             a.streams.ErrOut,
 		ExitErrHandler: func(_ context.Context, _ *cli.Command, err error) {
-			if err != nil && err.Error() != "" {
-				fmt.Fprintln(a.streams.ErrOut, err.Error())
+			if err == nil || err.Error() == "" {
+				return
+			}
+			fmt.Fprintln(a.streams.ErrOut, err.Error())
+			var he *hintError
+			if errors.As(err, &he) {
+				fmt.Fprintln(a.streams.ErrOut)
+				fmt.Fprintln(a.streams.ErrOut, he.hint)
 			}
 		},
 		Action: a.runDefault,

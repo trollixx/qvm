@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -52,7 +51,7 @@ func (a *app) runConfigGet(ctx context.Context, cmd *cli.Command) error {
 
 	key := cmd.Args().Get(0)
 	if key == "" {
-		return errors.New("argument required\n\nRun 'qvm config get --help' for usage.")
+		return newHintError("argument required", "Run 'qvm config get --help' for usage.")
 	}
 
 	cfg, err := config.Load()
@@ -75,7 +74,7 @@ func (a *app) runConfigSet(ctx context.Context, cmd *cli.Command) error {
 	key := cmd.Args().Get(0)
 	value := cmd.Args().Get(1)
 	if key == "" || value == "" {
-		return errors.New("key and value required\n\nRun 'qvm config set --help' for usage.")
+		return newHintError("key and value required", "Run 'qvm config set --help' for usage.")
 	}
 
 	cfg, err := config.Load()

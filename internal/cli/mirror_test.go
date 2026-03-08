@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // -- dedupURLs -----------------------------------------------------------------
@@ -105,7 +106,11 @@ func TestNormalizeURL_PreservesExistingSlash(t *testing.T) {
 // -- mirror command routing ----------------------------------------------------
 
 func TestMirrorSelect_NoArgs(t *testing.T) {
-	assertErrContains(t, run(t, "mirror", "select"), "Usage:")
+	err := run(t, "mirror", "select")
+	assertErrContains(t, err, "specify --auto or a URL")
+	var he *hintError
+	require.ErrorAs(t, err, &he)
+	assert.Contains(t, he.hint, "Usage:")
 }
 
 func TestMirrorSelect_AutoAndURL(t *testing.T) {
