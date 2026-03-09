@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -240,13 +239,14 @@ func (f *MetadataFetcher) FetchAllTools(ctx context.Context) ([]ToolInfo, error)
 	toolNames := []string{"qtcreator", "cmake", "ifw", "mingw", "llvm_mingw", "ninja", "openssl", "vcredist"}
 	var tools []ToolInfo
 	for _, name := range toolNames {
-		err := ctx.Err()
-		if err != nil {
-			return tools, err
+		ctxErr := ctx.Err()
+		if ctxErr != nil {
+			return tools, ctxErr
 		}
 		tool, err := f.FetchTool(ctx, name)
 		if err != nil {
-			// Non-fatal: skip tools that fail to fetch.
+			// Non-fatal: skip tools that fail to fetch, but warn so the failure is diagnosable.
+			fmt.Fprintf(os.Stderr, "warning: fetching tool %s: %v\n", name, err)
 			continue
 		}
 		tools = append(tools, *tool)
@@ -308,8 +308,8 @@ func (f *MetadataFetcher) fetchExtensions(ctx context.Context, vi *QtVersionInfo
 	}
 
 	// Keep modules sorted alphabetically.
-	sort.Slice(vi.Modules, func(i, j int) bool {
-		return vi.Modules[i].Name < vi.Modules[j].Name
+	slices.SortFunc(vi.Modules, func(a, b Module) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 }
 
@@ -532,9 +532,9 @@ func parseRepoIndex(body []byte, baseURL string) (*RepoIndex, error) {
 type pkgClass int
 
 const (
-	pkgClassQt    pkgClass = iota
-	pkgClassTool  pkgClass = iota
-	pkgClassOther pkgClass = iota
+	pkgClassQt pkgClass = iota
+	pkgClassTool
+	pkgClassOther
 )
 
 func classifyPackage(name string) pkgClass {
@@ -639,19 +639,7 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 	arch := extractTarget(parts)
 	if arch == "" {
 		// Check for doc/examples/sources by package name suffix (no arch needed).
-		nameLower := strings.ToLower(pkg.Name)
-		if strings.Contains(nameLower, ".doc.") || strings.HasSuffix(nameLower, ".doc") {
-			vi.HasDocs = true
-		}
-		if strings.Contains(nameLower, ".examples.") || strings.HasSuffix(nameLower, ".examples") {
-			vi.HasExamples = true
-		}
-		if strings.Contains(nameLower, "sources") || strings.Contains(nameLower, "_src") {
-			vi.HasSources = true
-		}
-		if strings.Contains(nameLower, "debug_info") || strings.Contains(nameLower, "debuginfo") {
-			vi.HasDebugInfo = true
-		}
+		setVersionFeatureFlags(vi, pkg.Name)
 		// Store archives so they can be resolved for download.
 		if refs := buildArchiveRefs(pkg, baseURL); len(refs) > 0 {
 			vi.PackageArchives[pkg.Name] = refs
@@ -698,19 +686,7 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 	}
 
 	// Check for doc/examples/sources/debug_info by package name suffix.
-	nameLower := strings.ToLower(pkg.Name)
-	if strings.Contains(nameLower, ".doc.") || strings.HasSuffix(nameLower, ".doc") {
-		vi.HasDocs = true
-	}
-	if strings.Contains(nameLower, ".examples.") || strings.HasSuffix(nameLower, ".examples") {
-		vi.HasExamples = true
-	}
-	if strings.Contains(nameLower, "sources") || strings.Contains(nameLower, "_src") {
-		vi.HasSources = true
-	}
-	if strings.Contains(nameLower, "debug_info") || strings.Contains(nameLower, "debuginfo") {
-		vi.HasDebugInfo = true
-	}
+	setVersionFeatureFlags(vi, pkg.Name)
 }
 
 func processToolPackage(pkg packageXML, toolMap map[string]*ToolInfo, baseURL string) {
@@ -748,6 +724,24 @@ func parseToolIndex(body []byte, toolName, baseURL string) (*ToolInfo, error) {
 	}
 	// Return empty if not found in parsed data.
 	return &ToolInfo{Name: toolName}, nil
+}
+
+// setVersionFeatureFlags inspects a package name and sets the corresponding
+// feature flags (HasDocs, HasExamples, HasSources, HasDebugInfo) on vi.
+func setVersionFeatureFlags(vi *QtVersionInfo, pkgName string) {
+	nameLower := strings.ToLower(pkgName)
+	if strings.Contains(nameLower, ".doc.") || strings.HasSuffix(nameLower, ".doc") {
+		vi.HasDocs = true
+	}
+	if strings.Contains(nameLower, ".examples.") || strings.HasSuffix(nameLower, ".examples") {
+		vi.HasExamples = true
+	}
+	if strings.Contains(nameLower, "sources") || strings.Contains(nameLower, "_src") {
+		vi.HasSources = true
+	}
+	if strings.Contains(nameLower, "debug_info") || strings.Contains(nameLower, "debuginfo") {
+		vi.HasDebugInfo = true
+	}
 }
 
 // buildArchiveRefs constructs ArchiveRef values for every downloadable archive

@@ -20,11 +20,17 @@ import (
 // and there is nothing new to download.
 var ErrUpToDate = errors.New("already up to date")
 
+const (
+	defaultConcurrency    = 4
+	defaultTimeoutSeconds = 300
+)
+
 func randSuffix() string {
 	var b [4]byte
-	_, err := rand.Read(b[:])
-	if err != nil {
-		panic("crypto/rand.Read failed: " + err.Error())
+	if _, err := rand.Read(b[:]); err != nil {
+		// Fallback: use current time if OS entropy source is unavailable.
+		t := time.Now().UnixNano()
+		b[0], b[1], b[2], b[3] = byte(t), byte(t>>8), byte(t>>16), byte(t>>24)
 	}
 	return hex.EncodeToString(b[:])
 }
@@ -39,6 +45,7 @@ type ProgressEvent struct {
 	Speed        float64 // bytes/sec (download phase only)
 	ArchiveIndex int     // 1-based index of the archive being processed (0 = unknown)
 	ArchiveTotal int     // total number of archives in this install (0 = unknown)
+	Warning      string  // non-empty message when Phase == "warning"
 }
 
 // Options configures a Qt SDK installation.
@@ -176,11 +183,11 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	dlCh := make(chan DownloadEvent, 256)
 	concurrency := opts.Concurrency
 	if concurrency <= 0 {
-		concurrency = 4
+		concurrency = defaultConcurrency
 	}
 	timeout := opts.Timeout
 	if timeout <= 0 {
-		timeout = 300
+		timeout = defaultTimeoutSeconds
 	}
 	downloader := NewDownloader(concurrency, timeout, dlDir)
 
@@ -261,10 +268,10 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 
 	// Patch qt.conf.
 	sendProgress(progressCh, ProgressEvent{Phase: "patching"})
-	err = PatchQtConf(installDir)
-	if err != nil {
-		// Non-fatal; warn but continue.
-		fmt.Fprintf(os.Stderr, "warning: patching qt.conf failed: %v\n", err)
+	patchErr := PatchQtConf(installDir)
+	if patchErr != nil {
+		// Non-fatal; surface as a warning through the progress channel.
+		sendProgress(progressCh, ProgressEvent{Phase: "warning", Warning: "patching qt.conf failed: " + patchErr.Error()})
 	}
 
 	// Calculate installed size.
@@ -339,11 +346,11 @@ func (inst *Installer) InstallTool(ctx context.Context, opts ToolOptions, progre
 
 	concurrency := opts.Concurrency
 	if concurrency <= 0 {
-		concurrency = 4
+		concurrency = defaultConcurrency
 	}
 	timeout := opts.Timeout
 	if timeout <= 0 {
-		timeout = 300
+		timeout = defaultTimeoutSeconds
 	}
 
 	sendProgress(progressCh, ProgressEvent{Phase: "downloading"})
@@ -382,10 +389,16 @@ func sendProgress(ch chan<- ProgressEvent, ev ProgressEvent) {
 // installFiles moves src to dst, falling back to a copy if rename fails (e.g. cross-device).
 // If dst already exists, files from src are merged into it instead.
 func installFiles(src, dst string) error {
-	_, statErr := os.Stat(dst)
-	if !os.IsNotExist(statErr) {
+	_, err := os.Stat(dst)
+	switch {
+	case err == nil:
+		// dst exists - merge src into it.
 		return copyDir(src, dst)
+	case !os.IsNotExist(err):
+		// Unexpected error (e.g. permission denied) - propagate instead of silently attempting a copy.
+		return fmt.Errorf("checking install dir: %w", err)
 	}
+	// dst does not exist - try a fast rename first.
 	renameErr := os.Rename(src, dst)
 	if renameErr == nil {
 		return nil
@@ -429,29 +442,8 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	}
 	defer out.Close()
 
-	_, err = copyBuf(out, in)
+	_, err = io.Copy(out, in)
 	return err
-}
-
-func copyBuf(dst, src *os.File) (int64, error) {
-	buf := make([]byte, 32*1024)
-	var total int64
-	for {
-		n, err := src.Read(buf)
-		if n > 0 {
-			written, werr := dst.Write(buf[:n])
-			total += int64(written)
-			if werr != nil {
-				return total, werr
-			}
-		}
-		if err != nil {
-			if err == io.EOF {
-				return total, nil
-			}
-			return total, err
-		}
-	}
 }
 
 // normalizeModuleNames ensures each module name has the "qt" prefix,

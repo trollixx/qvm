@@ -120,6 +120,7 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 		installRoot = cfg.Install.Dir
 	}
 
+	dryRun := cmd.Bool("dry-run")
 	opts := install.Options{
 		Version:     version,
 		Arch:        arch,
@@ -132,14 +133,12 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 		Concurrency: cfg.Download.Concurrency,
 		Timeout:     cfg.Download.TimeoutSeconds,
 		Force:       force,
-		DryRun:      cmd.Bool("dry-run"),
+		DryRun:      dryRun,
 	}
 
 	quiet := cmd.Bool("quiet")
 	progressCh := make(chan install.ProgressEvent, 256)
 	doneCh := make(chan struct{})
-
-	dryRun := cmd.Bool("dry-run")
 	printer := a.streams.NewProgressPrinter()
 	go func() {
 		defer close(doneCh)
@@ -312,6 +311,8 @@ func (p *ProgressPrinter) print(ev install.ProgressEvent) {
 			fmt.Fprintf(p.w, "\r\033[K")
 		}
 		fmt.Fprintf(p.w, "Patching qt.conf...\n")
+	case "warning":
+		fmt.Fprintf(p.w, "warning: %s\n", ev.Warning)
 	case "registering":
 		fmt.Fprintf(p.w, "Registering installation...\n")
 	case "done":

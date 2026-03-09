@@ -32,9 +32,7 @@ func (a *app) newDoctorCommand() *cli.Command {
 	}
 }
 
-func (a *app) runDoctor(ctx context.Context, cmd *cli.Command) error {
-	_ = ctx
-	_ = cmd
+func (a *app) runDoctor(ctx context.Context, _ *cli.Command) error {
 
 	fmt.Fprintf(a.streams.Out, "qvm v%s   %s\n\n", Version, osDescription())
 
@@ -77,7 +75,7 @@ func (a *app) runDoctor(ctx context.Context, cmd *cli.Command) error {
 		fmt.Fprintln(a.streams.Out, "  (no Qt installations)")
 	} else {
 		for _, q := range reg.Qt {
-			a.checkQtInstallation(q)
+			a.checkQtInstallation(ctx, q)
 		}
 	}
 
@@ -186,7 +184,7 @@ func (a *app) checkInstallDir(cfg *config.Config) {
 	a.printCheck(checkOK, "Qt install dir", "OK  "+dir)
 }
 
-func (a *app) checkQtInstallation(q storage.InstalledQt) {
+func (a *app) checkQtInstallation(ctx context.Context, q storage.InstalledQt) {
 	label := fmt.Sprintf("Qt %s  %s", q.Version, q.Arch)
 
 	// Check directory exists.
@@ -206,7 +204,7 @@ func (a *app) checkQtInstallation(q storage.InstalledQt) {
 	}
 
 	// Run qmake -version.
-	out, err := exec.CommandContext(context.Background(), qmakeExe, "-version").Output()
+	out, err := exec.CommandContext(ctx, qmakeExe, "-version").Output()
 	if err != nil {
 		fmt.Fprintf(a.streams.Out, "  %s  %s\n", checkWarn, label)
 		fmt.Fprintf(a.streams.Out, "       qmake: %s\n", qmakeExe)

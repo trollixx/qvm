@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
 
 	qerr "github.com/trollixx/qvm/internal/errors"
 )
@@ -175,12 +176,12 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 
 	// Documentation - scoped to all installed modules.
 	if opts.Docs {
-		archives = append(archives, resolveDocArchives(vi, prefix, allModules)...)
+		archives = append(archives, resolveModuleScopedArchives(vi, prefix, "doc", allModules)...)
 	}
 
 	// Examples - scoped to all installed modules.
 	if opts.Examples {
-		archives = append(archives, resolveExamplesArchives(vi, prefix, allModules)...)
+		archives = append(archives, resolveModuleScopedArchives(vi, prefix, "examples", allModules)...)
 	}
 
 	// Sources.
@@ -200,23 +201,12 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 	return archives, nil
 }
 
-func resolveDocArchives(vi *QtVersionInfo, prefix string, modules []string) []ResolvedArchive {
+// resolveModuleScopedArchives resolves archives for a given package segment
+// (e.g. "doc" or "examples") scoped to the provided list of modules.
+func resolveModuleScopedArchives(vi *QtVersionInfo, prefix, segment string, modules []string) []ResolvedArchive {
 	var result []ResolvedArchive
 	for _, mod := range modules {
-		pkg := prefix + ".doc." + mod
-		if refs, ok := vi.PackageArchives[pkg]; ok {
-			for _, ref := range refs {
-				result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
-			}
-		}
-	}
-	return result
-}
-
-func resolveExamplesArchives(vi *QtVersionInfo, prefix string, modules []string) []ResolvedArchive {
-	var result []ResolvedArchive
-	for _, mod := range modules {
-		pkg := prefix + ".examples." + mod
+		pkg := prefix + "." + segment + "." + mod
 		if refs, ok := vi.PackageArchives[pkg]; ok {
 			for _, ref := range refs {
 				result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
@@ -278,7 +268,7 @@ func archiveModuleName(filename string) string {
 		return ""
 	}
 	// If the filename starts with a letter, there's no version prefix.
-	if (filename[0] >= 'a' && filename[0] <= 'z') || (filename[0] >= 'A' && filename[0] <= 'Z') {
+	if unicode.IsLetter(rune(filename[0])) {
 		if dashIdx := strings.IndexByte(filename, '-'); dashIdx > 0 {
 			return filename[:dashIdx]
 		}
@@ -288,9 +278,7 @@ func archiveModuleName(filename string) string {
 	for i := 1; i < len(filename); i++ {
 		ch := filename[i]
 		prev := filename[i-1]
-		isLetter := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
-		isPrevDigit := prev >= '0' && prev <= '9'
-		if isLetter && isPrevDigit {
+		if unicode.IsLetter(rune(ch)) && unicode.IsDigit(rune(prev)) {
 			rest := filename[i:]
 			if dashIdx := strings.IndexByte(rest, '-'); dashIdx > 0 {
 				return rest[:dashIdx]
