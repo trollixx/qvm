@@ -19,23 +19,23 @@ func (w *Windows) DefaultInstallDir() string {
 func (w *Windows) DefaultArch(qtVersion string) string {
 	v, err := qtmeta.ParseVersion(qtVersion)
 	if err != nil {
-		return "win64_msvc2019_64"
+		return archWin64MSVC2019
 	}
 	if v.GTE(qtmeta.MustParseVersion(qt66)) {
-		return "win64_msvc2022_64"
+		return archWin64MSVC2022
 	}
 	if v.Major() < 6 {
 		// Qt 5 only ships msvc2019 archives.
-		return "win64_msvc2019_64"
+		return archWin64MSVC2019
 	}
 	// Qt 6.0-6.5: both msvc2019 and msvc2022 exist; prefer what's installed.
 	if hasMSVC("2019") {
-		return "win64_msvc2019_64"
+		return archWin64MSVC2019
 	}
 	if hasMSVC("2022") {
-		return "win64_msvc2022_64"
+		return archWin64MSVC2022
 	}
-	return "win64_msvc2019_64"
+	return archWin64MSVC2019
 }
 
 func (w *Windows) CheckCompilerPresent(arch string) (bool, string) {

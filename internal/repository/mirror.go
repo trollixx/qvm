@@ -120,6 +120,7 @@ func (m *MirrorList) ProbeURL(version string, major int) string {
 }
 
 // DirectoryURL returns the HTML directory listing URL for discovering available versions.
+//
 // Deprecated: prefer DirectoryURLs which includes fallback mirrors.
 func (m *MirrorList) DirectoryURL() string {
 	host := m.host
@@ -149,7 +150,7 @@ func versionToRepoStr(version string, major int) string {
 	patch := parts[2]
 	// Qt 5.9.0 special case: patch omitted.
 	if major == 5 && minor == "9" && patch == "0" {
-		return major_minor(major, minor)
+		return majorMinor(major, minor)
 	}
 	// Qt 5 with patch 0: patch omitted (e.g. 5.12.0 -> "5120", but 5.12.3 -> "5123").
 	// aqtinstall omits patch only for prerelease; for stable releases patch is always included
@@ -157,7 +158,7 @@ func versionToRepoStr(version string, major int) string {
 	return fmt.Sprintf("%d%s%s", major, minor, patch)
 }
 
-func major_minor(major int, minor string) string {
+func majorMinor(major int, minor string) string {
 	return fmt.Sprintf("%d%s", major, minor)
 }
 

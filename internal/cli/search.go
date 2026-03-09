@@ -131,7 +131,7 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 		matched = append(matched, item)
 	}
 
-	if format == "json" {
+	if format == formatJSON {
 		jsonResults := make([]searchResult, len(matched))
 		for i, m := range matched {
 			jsonResults[i] = searchResult{Kind: m.kind, Name: m.name, Display: m.display}

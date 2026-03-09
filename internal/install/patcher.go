@@ -24,32 +24,7 @@ func PatchQtConf(installDir string) error {
 	// If file already exists, replace the Prefix line in-place so any other
 	// settings (Translations, Plugins, ...) are preserved.
 	if len(data) > 0 {
-		lines := strings.Split(string(data), "\n")
-		found := false
-		for i, line := range lines {
-			if strings.HasPrefix(strings.TrimSpace(line), "Prefix") {
-				lines[i] = "Prefix=" + prefix
-				found = true
-				break
-			}
-		}
-		if !found {
-			// Existing file has no Prefix line - insert one after [Paths].
-			inserted := false
-			for i, line := range lines {
-				if strings.TrimSpace(line) == "[Paths]" {
-					tail := make([]string, len(lines)-i-1)
-					copy(tail, lines[i+1:])
-					lines = append(lines[:i+1], append([]string{"Prefix=" + prefix}, tail...)...)
-					inserted = true
-					break
-				}
-			}
-			if !inserted {
-				lines = append([]string{"[Paths]", "Prefix=" + prefix, ""}, lines...)
-			}
-		}
-		err = os.WriteFile(qtConfPath, []byte(strings.Join(lines, "\n")), 0o644) //nolint:gosec // 0644 ok
+		err = updateQtConf(data, prefix, qtConfPath)
 		if err != nil {
 			return fmt.Errorf("writing qt.conf: %w", err)
 		}
@@ -67,4 +42,27 @@ func PatchQtConf(installDir string) error {
 		return fmt.Errorf("writing qt.conf: %w", err)
 	}
 	return nil
+}
+
+// updateQtConf rewrites the Prefix line in an existing qt.conf, preserving all other settings.
+func updateQtConf(data []byte, prefix, path string) error {
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "Prefix") {
+			lines[i] = "Prefix=" + prefix
+			return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644) //nolint:gosec // 0644 ok for Qt SDK
+		}
+	}
+	// No Prefix line — insert one after [Paths].
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "[Paths]" {
+			tail := make([]string, len(lines)-i-1)
+			copy(tail, lines[i+1:])
+			lines = append(lines[:i+1], append([]string{"Prefix=" + prefix}, tail...)...)
+			return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644) //nolint:gosec // 0644 ok for Qt SDK
+		}
+	}
+	// No [Paths] section — prepend one.
+	lines = append([]string{"[Paths]", "Prefix=" + prefix, ""}, lines...)
+	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644) //nolint:gosec // 0644 ok for Qt SDK
 }

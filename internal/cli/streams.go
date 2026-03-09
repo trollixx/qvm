@@ -40,9 +40,9 @@ func NewTestIOStreams() (*IOStreams, *bytes.Buffer, *bytes.Buffer) {
 	}, out, errOut
 }
 
-// NewProgressPrinter creates a fresh progressPrinter writing to s.ErrOut.
-func (s *IOStreams) NewProgressPrinter() *progressPrinter {
-	return &progressPrinter{
+// NewProgressPrinter creates a fresh ProgressPrinter writing to s.ErrOut.
+func (s *IOStreams) NewProgressPrinter() *ProgressPrinter {
+	return &ProgressPrinter{
 		isTTY: s.isTTY,
 		w:     s.ErrOut,
 	}

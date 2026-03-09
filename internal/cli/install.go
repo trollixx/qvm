@@ -180,13 +180,7 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 }
 
 func (a *app) runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
-	toolName := arg
-	toolVersion := ""
-
-	if idx := strings.Index(arg, "@"); idx >= 0 {
-		toolName = arg[:idx]
-		toolVersion = arg[idx+1:]
-	}
+	toolName, toolVersion, _ := strings.Cut(arg, "@")
 
 	if toolVersion == "" {
 		return fmt.Errorf("specify a version: qvm install %s@<version>", toolName)
@@ -254,16 +248,16 @@ func (a *app) printDryRun(ev install.ProgressEvent) {
 	fmt.Fprintf(a.streams.Out, "  %s%s\n", ev.Archive, size)
 }
 
-// progressPrinter renders install progress events to stderr.
+// ProgressPrinter renders install progress events to stderr.
 // isTTY controls whether cursor-movement escape sequences are used.
-type progressPrinter struct {
+type ProgressPrinter struct {
 	isTTY bool
 	w     io.Writer
 	lines map[string]int // archive name -> line index (0-based from first download line)
 	total int            // number of lines printed so far
 }
 
-func (p *progressPrinter) print(ev install.ProgressEvent) {
+func (p *ProgressPrinter) print(ev install.ProgressEvent) {
 	switch ev.Phase {
 	case "resolving":
 		fmt.Fprintf(p.w, "Resolving archives...\n")

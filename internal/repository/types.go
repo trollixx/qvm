@@ -32,7 +32,7 @@ type QtVersionInfo struct {
 	Major        int       `json:"major"`
 	IsLTS        bool      `json:"is_lts,omitempty"`
 	IsPreview    bool      `json:"is_preview,omitempty"`
-	ReleaseDate  time.Time `json:"release_date,omitempty"`
+	ReleaseDate  time.Time `json:"release_date,omitzero"`
 	Archs        []Arch    `json:"archs,omitempty"`
 	Modules      []Module  `json:"modules,omitempty"` // Add-on modules only (not essentials; those are per-arch)
 	HasDocs      bool      `json:"has_docs,omitempty"`
@@ -80,7 +80,7 @@ func (vi *QtVersionInfo) ModulesForArch(archName string) []Module {
 type ToolVersionInfo struct {
 	Version     string       `json:"version"`
 	DisplayName string       `json:"display_name"`
-	ReleaseDate time.Time    `json:"release_date,omitempty"`
+	ReleaseDate time.Time    `json:"release_date,omitzero"`
 	Archives    []ArchiveRef `json:"archives,omitempty"`
 }
 

@@ -3,6 +3,7 @@ package install
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -105,7 +106,7 @@ func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error
 	var header *tar.Header
 	for {
 		header, err = tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

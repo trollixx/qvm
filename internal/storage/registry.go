@@ -26,7 +26,7 @@ type InstalledQt struct {
 	Arch        string          `json:"arch"`
 	InstallDir  string          `json:"install_dir"`
 	Modules     []string        `json:"modules,omitempty"`
-	Extras      InstalledExtras `json:"extras,omitempty"`
+	Extras      InstalledExtras `json:"extras,omitzero"`
 	InstalledAt time.Time       `json:"installed_at"`
 	SizeBytes   int64           `json:"size_bytes,omitempty"`
 }

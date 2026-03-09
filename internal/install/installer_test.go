@@ -181,7 +181,7 @@ func TestSendProgress(t *testing.T) {
 		})
 	})
 
-	t.Run("full channel does not block", func(t *testing.T) {
+	t.Run("full channel does not block", func(_ *testing.T) {
 		ch := make(chan ProgressEvent) // unbuffered, no receiver
 		done := make(chan struct{})
 		go func() {

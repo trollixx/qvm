@@ -18,11 +18,11 @@ func (l *Linux) DefaultInstallDir() string {
 	return home + "/Qt"
 }
 
-func (l *Linux) DefaultArch(qtVersion string) string {
+func (l *Linux) DefaultArch(_ string) string {
 	return "gcc_64"
 }
 
-func (l *Linux) CheckCompilerPresent(arch string) (bool, string) {
+func (l *Linux) CheckCompilerPresent(_ string) (bool, string) {
 	// Check for GCC.
 	path, err := exec.LookPath("gcc")
 	if err != nil {

@@ -18,11 +18,11 @@ func (d *Darwin) DefaultInstallDir() string {
 	return home + "/Qt"
 }
 
-func (d *Darwin) DefaultArch(qtVersion string) string {
+func (d *Darwin) DefaultArch(_ string) string {
 	return "macos"
 }
 
-func (d *Darwin) CheckCompilerPresent(arch string) (bool, string) {
+func (d *Darwin) CheckCompilerPresent(_ string) (bool, string) {
 	// Check for clang via Xcode command line tools.
 	path, err := exec.LookPath("clang++")
 	if err != nil {

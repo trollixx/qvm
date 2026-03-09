@@ -13,7 +13,7 @@ import (
 	"github.com/trollixx/qvm/internal/repository"
 )
 
-func okHandler(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }
+func okHandler(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }
 
 func TestProbeURLs_Reachable(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(okHandler))
@@ -41,7 +41,7 @@ func TestProbeURLs_Unreachable(t *testing.T) {
 }
 
 func TestProbeURLs_HTTP404(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer ts.Close()

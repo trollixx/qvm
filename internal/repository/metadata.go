@@ -515,6 +515,8 @@ func parseRepoIndex(body []byte, baseURL string) (*RepoIndex, error) {
 			if !virtual {
 				processToolPackage(pkg, toolMap, baseURL)
 			}
+		case pkgClassOther:
+			// Unknown package class; skip.
 		}
 	}
 
@@ -558,11 +560,12 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 	}
 	// Extract version from parts[1]: "qt6" -> 6, parts[2]: "6100" -> "6.10.0"
 	var major int
-	if strings.HasPrefix(parts[1], "qt6") {
+	switch {
+	case strings.HasPrefix(parts[1], "qt6"):
 		major = 6
-	} else if strings.HasPrefix(parts[1], "qt5") {
+	case strings.HasPrefix(parts[1], "qt5"):
 		major = 5
-	} else {
+	default:
 		return
 	}
 
@@ -680,7 +683,7 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 	// Essential modules are stored per-arch so that MinGW/LLVM archives do not
 	// appear as essentials when an MSVC target is selected.
 	if len(parts) < 5 || parts[3] != "addons" {
-		for _, archive := range strings.Split(pkg.DownloadableArchives, ",") {
+		for archive := range strings.SplitSeq(pkg.DownloadableArchives, ",") {
 			archive = strings.TrimSpace(archive)
 			if archive == "" {
 				continue

@@ -254,23 +254,9 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	if err != nil {
 		return err
 	}
-	// If installDir already exists, merge (for adding modules later).
-	_, err = os.Stat(installDir)
-	if os.IsNotExist(err) {
-		err = os.Rename(extractDir, installDir)
-		if err != nil {
-			// Rename across drives may fail; fall back to copy.
-			err2 := copyDir(extractDir, installDir)
-			if err2 != nil {
-				return fmt.Errorf("moving to install dir: %w", err2)
-			}
-		}
-	} else {
-		// Merge: copy new files over existing.
-		err = copyDir(extractDir, installDir)
-		if err != nil {
-			return fmt.Errorf("merging into install dir: %w", err)
-		}
+	err = installFiles(extractDir, installDir)
+	if err != nil {
+		return fmt.Errorf("installing files: %w", err)
 	}
 
 	// Patch qt.conf.
@@ -393,6 +379,20 @@ func sendProgress(ch chan<- ProgressEvent, ev ProgressEvent) {
 	}
 }
 
+// installFiles moves src to dst, falling back to a copy if rename fails (e.g. cross-device).
+// If dst already exists, files from src are merged into it instead.
+func installFiles(src, dst string) error {
+	_, statErr := os.Stat(dst)
+	if !os.IsNotExist(statErr) {
+		return copyDir(src, dst)
+	}
+	renameErr := os.Rename(src, dst)
+	if renameErr == nil {
+		return nil
+	}
+	return copyDir(src, dst)
+}
+
 // copyDir copies src directory tree to dst.
 func copyDir(src, dst string) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
@@ -486,8 +486,8 @@ func diffSlices(requested, installed []string) []string {
 // preserving order (existing first, then any new additions).
 func mergeSlices(existing, additions []string) []string {
 	set := make(map[string]struct{}, len(existing))
-	result := make([]string, len(existing))
-	copy(result, existing)
+	result := make([]string, 0, len(existing)+len(additions))
+	result = append(result, existing...)
 	for _, s := range existing {
 		set[s] = struct{}{}
 	}

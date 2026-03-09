@@ -5,6 +5,11 @@ import "github.com/trollixx/qvm/pkg/qtmeta"
 // qt66 is the Qt version threshold where MSVC 2022 became the default.
 const qt66 = "6.6.0"
 
+const (
+	archWin64MSVC2019 = "win64_msvc2019_64"
+	archWin64MSVC2022 = "win64_msvc2022_64"
+)
+
 // Platform provides platform-specific information and defaults.
 type Platform interface {
 	// DefaultInstallDir returns the default Qt install directory.
@@ -41,10 +46,10 @@ func DefaultArchForHost(host, qtVersion string) string {
 func windowsDefaultMSVC(qtVersion string) string {
 	v, err := qtmeta.ParseVersion(qtVersion)
 	if err != nil {
-		return "win64_msvc2019_64"
+		return archWin64MSVC2019
 	}
 	if v.GTE(qtmeta.MustParseVersion(qt66)) {
-		return "win64_msvc2022_64"
+		return archWin64MSVC2022
 	}
-	return "win64_msvc2019_64"
+	return archWin64MSVC2019
 }

@@ -860,7 +860,7 @@ func TestFetchSrcDocExamples_SkipsQt5(t *testing.T) {
 }
 
 func TestFetchSrcDocExamples_GracefulOnError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()
@@ -884,7 +884,7 @@ func TestFetchSrcDocExamples_GracefulOnError(t *testing.T) {
 
 func TestFetchExtensions_GracefulOnMissingExtension(t *testing.T) {
 	// Server that always returns 404.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()

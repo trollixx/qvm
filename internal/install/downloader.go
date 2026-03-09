@@ -171,7 +171,7 @@ func (d *Downloader) downloadOne(
 	}
 
 	total := resp.ContentLength + rangeStart
-	var done int64 = rangeStart
+	done := rangeStart
 	start := time.Now()
 
 	buf := make([]byte, 32*1024)

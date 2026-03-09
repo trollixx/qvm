@@ -74,7 +74,7 @@ func (a *app) runList(ctx context.Context, cmd *cli.Command) error {
 		return a.runListQtFiltered(ctx, fetcher, reg, vf, format)
 	}
 
-	if arg != "" && arg != "qt" && arg != "tools" {
+	if arg != "" && arg != "qt" && arg != listTargetTools {
 		return fmt.Errorf("unknown list target %q\n\n"+
 			"Usage:\n"+
 			"  qvm list                 Show installed versions\n"+
@@ -102,11 +102,11 @@ func (a *app) runListInstalled(arg, format string) error {
 		return fmt.Errorf("loading registry: %w", err)
 	}
 
-	if format == "json" {
+	if format == formatJSON {
 		switch arg {
 		case "qt":
 			return a.printJSON(reg.Qt)
-		case "tools":
+		case listTargetTools:
 			return a.printJSON(reg.Tools)
 		default:
 			return a.printJSON(reg)
@@ -116,7 +116,7 @@ func (a *app) runListInstalled(arg, format string) error {
 	switch arg {
 	case "qt":
 		a.printInstalledQt(reg)
-	case "tools":
+	case listTargetTools:
 		a.printInstalledTools(reg)
 	default:
 		a.printInstalledQt(reg)
@@ -219,7 +219,7 @@ func (a *app) runListAll(ctx context.Context, arg, format, host string) error {
 	switch arg {
 	case "qt":
 		return a.runListAllQt(ctx, fetcher, reg, format)
-	case "tools":
+	case listTargetTools:
 		return a.runListAllTools(ctx, fetcher, reg, format)
 	default:
 		err = a.runListAllQt(ctx, fetcher, reg, format)
@@ -242,7 +242,7 @@ func (a *app) runListAllQt(
 		return fmt.Errorf("fetching Qt versions: %w", err)
 	}
 
-	if format == "json" {
+	if format == formatJSON {
 		return a.printJSON(versions)
 	}
 
@@ -275,12 +275,13 @@ func (a *app) runListAllQt(
 		recommendedVersion := newestLTSPatch(vers)
 
 		for _, v := range vers {
-			label := ""
-			if v.IsPreview {
+			var label string
+			switch {
+			case v.IsPreview:
 				label = "Preview"
-			} else if v.IsLTS {
+			case v.IsLTS:
 				label = "LTS"
-			} else if v.Version == vers[0].Version {
+			case v.Version == vers[0].Version:
 				label = "Latest"
 			}
 
@@ -318,7 +319,7 @@ func (a *app) runListQtFiltered(
 		)
 	}
 
-	if format == "json" {
+	if format == formatJSON {
 		return a.printJSON(filtered)
 	}
 
@@ -359,7 +360,7 @@ func (a *app) runListAllTools(
 		return fmt.Errorf("fetching tools: %w", err)
 	}
 
-	if format == "json" {
+	if format == formatJSON {
 		return a.printJSON(tools)
 	}
 
@@ -421,7 +422,7 @@ func (a *app) runListQtVersion(ctx context.Context, fetcher *repository.Metadata
 
 	vi.SetDefaultArch(platform.Current().DefaultArch(version))
 
-	if format == "json" {
+	if format == formatJSON {
 		return a.printJSON(vi)
 	}
 

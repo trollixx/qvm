@@ -100,12 +100,7 @@ func (a *app) pathQt(reg *storage.Registry, version, arch string) error {
 }
 
 func (a *app) pathTool(reg *storage.Registry, arg string) error {
-	toolName := arg
-	toolVersion := ""
-	if idx := strings.Index(arg, "@"); idx >= 0 {
-		toolName = arg[:idx]
-		toolVersion = arg[idx+1:]
-	}
+	toolName, toolVersion, _ := strings.Cut(arg, "@")
 
 	for i := range reg.Tools {
 		t := &reg.Tools[i]

@@ -79,7 +79,7 @@ func (a *app) runInfoQt(reg *storage.Registry, version, arch, format string) err
 		)
 	}
 
-	if format == "json" {
+	if format == formatJSON {
 		enc := json.NewEncoder(a.streams.Out)
 		enc.SetIndent("", "  ")
 		if len(matches) == 1 {
@@ -96,12 +96,7 @@ func (a *app) runInfoQt(reg *storage.Registry, version, arch, format string) err
 }
 
 func (a *app) runInfoTool(reg *storage.Registry, arg, format string) error {
-	toolName := arg
-	toolVersion := ""
-	if idx := strings.Index(arg, "@"); idx >= 0 {
-		toolName = arg[:idx]
-		toolVersion = arg[idx+1:]
-	}
+	toolName, toolVersion, _ := strings.Cut(arg, "@")
 
 	var matches []storage.InstalledTool
 	for _, t := range reg.Tools {
@@ -123,7 +118,7 @@ func (a *app) runInfoTool(reg *storage.Registry, arg, format string) error {
 		)
 	}
 
-	if format == "json" {
+	if format == formatJSON {
 		enc := json.NewEncoder(a.streams.Out)
 		enc.SetIndent("", "  ")
 		if len(matches) == 1 {
