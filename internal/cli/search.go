@@ -14,7 +14,6 @@ import (
 
 // searchResult is the exported form of searchItem for JSON serialization.
 type searchResult struct {
-	Kind    string `json:"kind"`
 	Name    string `json:"name"`
 	Display string `json:"display,omitempty"`
 }
@@ -34,7 +33,6 @@ func (a *app) newSearchCommand() *cli.Command {
 }
 
 type searchItem struct {
-	kind    string // "module" or "tool"
 	name    string
 	display string
 }
@@ -77,7 +75,6 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 				}
 				seenModules[m.Name] = true
 				item := searchItem{
-					kind:    "module",
 					name:    m.Name,
 					display: m.DisplayName,
 				}
@@ -106,18 +103,17 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 			continue
 		}
 		item := items[r.Index]
-		key := item.kind + ":" + item.name
-		if seen[key] {
+		if seen[item.name] {
 			continue
 		}
-		seen[key] = true
+		seen[item.name] = true
 		matched = append(matched, item)
 	}
 
 	if format == formatJSON {
 		jsonResults := make([]searchResult, len(matched))
 		for i, m := range matched {
-			jsonResults[i] = searchResult{Kind: m.kind, Name: m.name, Display: m.display}
+			jsonResults[i] = searchResult{Name: m.name, Display: m.display}
 		}
 		enc := json.NewEncoder(a.streams.Out)
 		enc.SetIndent("", "  ")
@@ -130,7 +126,7 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 		if display == "" {
 			display = item.name
 		}
-		fmt.Fprintf(a.streams.Out, "  [%-6s] %-24s %s\n", item.kind, item.name, display)
+		fmt.Fprintf(a.streams.Out, "  %-24s %s\n", item.name, display)
 	}
 
 	return nil

@@ -13,7 +13,6 @@ import (
 func defaultCfg() *config.Config {
 	cfg := &config.Config{}
 	cfg.Install.Dir = "/some/qt"
-	cfg.Install.ToolsDir = ""
 	cfg.Repository.URL = "https://download.qt.io/online/qtsdkrepository/"
 	cfg.Repository.Mirrors = []string{"https://mirror1.example.com/", "https://mirror2.example.com/"}
 	cfg.Download.Concurrency = 4
@@ -144,7 +143,4 @@ func TestConfigList_RequiredValuesPresent(t *testing.T) {
 		assert.NotEmpty(t, byKey[key], "value for required key %q should not be empty", key)
 	}
 
-	// install.tools_dir is intentionally empty (means "derive from install.dir at runtime").
-	_, hasDerived := byKey["install.tools_dir"]
-	assert.True(t, hasDerived, "install.tools_dir should appear in list even when empty")
 }

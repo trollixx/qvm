@@ -13,7 +13,6 @@ const (
 	CodeUnknownVersion   Code = "UNKNOWN_VERSION"
 	CodeUnknownArch      Code = "UNKNOWN_ARCH"
 	CodeUnknownModule    Code = "UNKNOWN_MODULE"
-	CodeUnknownTool      Code = "UNKNOWN_TOOL"
 	CodeNetworkError     Code = "NETWORK_ERROR"
 	CodeExtractError     Code = "EXTRACT_ERROR"
 	CodeChecksumError    Code = "CHECKSUM_ERROR"

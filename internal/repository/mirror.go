@@ -147,14 +147,6 @@ func (m *MirrorList) PerArchURL(version string, major int, archFolder string) []
 	return urls
 }
 
-// DirectoryURL returns the HTML directory listing URL for discovering available versions.
-//
-// Deprecated: prefer DirectoryURLs which includes fallback mirrors.
-func (m *MirrorList) DirectoryURL() string {
-	host := m.host
-	return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/", m.primary, host)
-}
-
 // DirectoryURLs returns directory listing URLs for all mirrors in order.
 func (m *MirrorList) DirectoryURLs() []string {
 	host := m.host

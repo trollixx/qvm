@@ -12,8 +12,7 @@ import (
 // Config holds all qvm configuration.
 type Config struct {
 	Install struct {
-		Dir      string `toml:"dir"`
-		ToolsDir string `toml:"tools_dir"`
+		Dir string `toml:"dir"`
 	} `toml:"install"`
 
 	Repository struct {
@@ -82,14 +81,6 @@ func Save(cfg *Config) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o600)
-}
-
-// ToolsDir returns the effective tools install directory.
-func (c *Config) ToolsDir() string {
-	if c.Install.ToolsDir != "" {
-		return c.Install.ToolsDir
-	}
-	return filepath.Join(c.Install.Dir, "Tools")
 }
 
 func configPath() (string, error) {

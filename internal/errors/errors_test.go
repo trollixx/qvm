@@ -26,9 +26,9 @@ func TestQvmError_Error(t *testing.T) {
 			err: &QvmError{
 				Code:        CodeUnknownVersion,
 				Message:     "version 9.9.9 not found",
-				Suggestions: []string{"try qt@6.7.0"},
+				Suggestions: []string{"try 6.7.0"},
 			},
-			wantExact: "version 9.9.9 not found\n\nSuggestions:\n  try qt@6.7.0",
+			wantExact: "version 9.9.9 not found\n\nSuggestions:\n  try 6.7.0",
 		},
 		{
 			name: "message with multiple suggestions",
@@ -91,7 +91,7 @@ func TestQvmError_Unwrap(t *testing.T) {
 	})
 
 	t.Run("without cause", func(t *testing.T) {
-		err := New(CodeUnknownTool, "no cause")
+		err := New(CodeUnknownModule, "no cause")
 		assert.NoError(t, err.Unwrap())
 	})
 }

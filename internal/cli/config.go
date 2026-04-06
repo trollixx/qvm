@@ -116,7 +116,6 @@ func (a *app) runConfigList(ctx context.Context, cmd *cli.Command) error {
 // The config struct uses nested anonymous structs, so we use a manual map.
 var configKeyMap = map[string][]string{ //nolint:gochecknoglobals // package-level config key registry
 	"install.dir":              {"Install", "Dir"},
-	"install.tools_dir":        {"Install", "ToolsDir"},
 	"repository.url":           {"Repository", "URL"},
 	"repository.mirrors":       {"Repository", "Mirrors"},
 	"repository.blacklist":     {"Repository", "Blacklist"},

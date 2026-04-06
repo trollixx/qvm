@@ -56,10 +56,7 @@ func TestUninstall_NoArg(t *testing.T) {
 	assertErrContains(t, run(t, "uninstall"), "missing argument")
 }
 
-// Uninstall treats bare arg as a version (stripping optional qt@ prefix).
-func TestUninstall_NonVersion(t *testing.T) {
-	// "qtcreator" is stripped of "qt" prefix -> version parse will fail downstream,
-	// but won't crash - it just won't find anything in the registry.
+func TestUninstall_NotInstalled(t *testing.T) {
 	err := run(t, "uninstall", "6.99.99", "--yes")
 	assertErrContains(t, err, "not installed")
 }
@@ -71,13 +68,7 @@ func TestInfo_NoArg(t *testing.T) {
 }
 
 func TestInfo_NotInstalled(t *testing.T) {
-	// Bare version that isn't installed gives "not installed".
 	assertErrContains(t, run(t, "info", "6.99.99"), "not installed")
-}
-
-func TestInfo_QtPrefix(t *testing.T) {
-	// qt@<version> still works.
-	assertErrContains(t, run(t, "info", "qt@6.99.99"), "not installed")
 }
 
 // -- search --------------------------------------------------------------------
