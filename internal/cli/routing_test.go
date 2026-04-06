@@ -33,32 +33,13 @@ func assertErrContains(t *testing.T, err error, substr string) {
 // -- install -------------------------------------------------------------------
 
 func TestInstall_NoArg(t *testing.T) {
-	assertErrContains(t, run(t, "install"), "missing argument")
+	assertErrContains(t, run(t, "install"), "specify a version")
 }
 
-// "qt" alone must give a version-hint error,
-// not a 404 trying to fetch tools_qt/Updates.xml.
+// "qt" alone must give a version-hint error.
 func TestInstall_QtNoVersion(t *testing.T) {
 	err := run(t, "install", "qt")
 	assertErrContains(t, err, "specify a version")
-	assertErrContains(t, err, "qt@")
-}
-
-// Tool with no @version must require a version.
-func TestInstall_Tool_NoVersion(t *testing.T) {
-	err := run(t, "install", "qtcreator")
-	assertErrContains(t, err, "version")
-	assertErrContains(t, err, "qtcreator")
-}
-
-// "qt" must not be treated as a tool: verify the error is about version
-// selection, not a 404 fetching tools_qt/Updates.xml.
-func TestInstall_QtRouting_NotTreatedAsTool(t *testing.T) {
-	err := run(t, "install", "qt")
-	require.Error(t, err)
-	// Must NOT mention tools_qt or Updates.xml.
-	assert.NotContains(t, err.Error(), "tools_qt")
-	assert.NotContains(t, err.Error(), "Updates.xml")
 }
 
 // -- list ----------------------------------------------------------------------
@@ -70,9 +51,9 @@ func TestList_NoArg(t *testing.T) {
 }
 
 func TestList_UnknownTarget(t *testing.T) {
+	// Non-numeric args that can't be parsed as a version filter are rejected.
 	err := run(t, "list", "notavalidthing")
-	assertErrContains(t, err, "unknown list target")
-	assertErrContains(t, err, "notavalidthing")
+	assertErrContains(t, err, "invalid version")
 }
 
 // -- uninstall -----------------------------------------------------------------
@@ -81,11 +62,12 @@ func TestUninstall_NoArg(t *testing.T) {
 	assertErrContains(t, run(t, "uninstall"), "missing argument")
 }
 
-// Tool uninstall requires @version.
-func TestUninstall_Tool_NoVersion(t *testing.T) {
-	// "qtcreator" without @version should error, not attempt removal.
-	err := run(t, "uninstall", "qtcreator", "--yes")
-	assertErrContains(t, err, "version")
+// Uninstall treats bare arg as a version (stripping optional qt@ prefix).
+func TestUninstall_NonVersion(t *testing.T) {
+	// "qtcreator" is stripped of "qt" prefix -> version parse will fail downstream,
+	// but won't crash - it just won't find anything in the registry.
+	err := run(t, "uninstall", "6.99.99", "--yes")
+	assertErrContains(t, err, "not installed")
 }
 
 // -- info ----------------------------------------------------------------------
@@ -94,14 +76,14 @@ func TestInfo_NoArg(t *testing.T) {
 	assertErrContains(t, run(t, "info"), "missing argument")
 }
 
-func TestInfo_NotQtAt(t *testing.T) {
-	// Non-qt@ args are treated as tool lookups; with empty registry, "not installed".
-	assertErrContains(t, run(t, "info", "something"), "not installed")
+func TestInfo_NotInstalled(t *testing.T) {
+	// Bare version that isn't installed gives "not installed".
+	assertErrContains(t, run(t, "info", "6.99.99"), "not installed")
 }
 
-func TestInfo_QueueOnly(t *testing.T) {
-	// "qt" without @version is treated as a tool lookup, not Qt SDK.
-	assertErrContains(t, run(t, "info", "qt"), "not installed")
+func TestInfo_QtPrefix(t *testing.T) {
+	// qt@<version> still works.
+	assertErrContains(t, run(t, "info", "qt@6.99.99"), "not installed")
 }
 
 // -- search --------------------------------------------------------------------

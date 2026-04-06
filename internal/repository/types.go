@@ -76,25 +76,9 @@ func (vi *QtVersionInfo) ModulesForArch(archName string) []Module {
 	return result
 }
 
-// ToolVersionInfo describes one installable version of a tool.
-type ToolVersionInfo struct {
-	Version     string       `json:"version"`
-	DisplayName string       `json:"display_name"`
-	ReleaseDate time.Time    `json:"release_date,omitzero"`
-	Archives    []ArchiveRef `json:"archives,omitempty"`
-}
-
-// ToolInfo describes an installable tool (e.g. qtcreator, cmake).
-type ToolInfo struct {
-	Name     string            `json:"name"`    // e.g. "qtcreator"
-	Display  string            `json:"display"` // e.g. "Qt Creator"
-	Versions []ToolVersionInfo `json:"versions,omitempty"`
-}
-
 // RepoIndex holds the full parsed repository state.
 type RepoIndex struct {
 	QtVersions []QtVersionInfo `json:"qt_versions,omitempty"`
-	Tools      []ToolInfo      `json:"tools,omitempty"`
 }
 
 // PackageUpdate mirrors one <PackageUpdate> element from Updates.xml.

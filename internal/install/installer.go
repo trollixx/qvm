@@ -64,15 +64,6 @@ type Options struct {
 	DryRun      bool // resolve and report archives without downloading
 }
 
-// ToolOptions configures a tool installation.
-type ToolOptions struct {
-	Name        string
-	Version     string
-	InstallDir  string
-	Concurrency int
-	Timeout     int
-}
-
 // Installer orchestrates the download -> verify -> extract -> patch -> register pipeline.
 type Installer struct {
 	resolver *repository.Resolver
@@ -315,65 +306,6 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 
 	sendProgress(progressCh, ProgressEvent{Phase: "done", Percent: 100})
 	return nil
-}
-
-// InstallTool performs a tool installation.
-func (inst *Installer) InstallTool(ctx context.Context, opts ToolOptions, progressCh chan<- ProgressEvent) error {
-	sendProgress(progressCh, ProgressEvent{Phase: "resolving"})
-
-	archives, err := inst.resolver.ResolveTool(ctx, opts.Name, opts.Version)
-	if err != nil {
-		return err
-	}
-
-	refs := make([]repository.ArchiveRef, len(archives))
-	for i, a := range archives {
-		refs[i] = a.Ref
-	}
-
-	dlDir, err := DownloadCacheDir()
-	if err != nil {
-		return fmt.Errorf("download cache dir: %w", err)
-	}
-
-	extractTmp := opts.InstallDir + ".qvm-tmp-" + randSuffix()
-	defer os.RemoveAll(extractTmp)
-
-	err = os.MkdirAll(extractTmp, 0o755) //nolint:gosec // 0755 for Qt SDK
-	if err != nil {
-		return err
-	}
-
-	concurrency := opts.Concurrency
-	if concurrency <= 0 {
-		concurrency = defaultConcurrency
-	}
-	timeout := opts.Timeout
-	if timeout <= 0 {
-		timeout = defaultTimeoutSeconds
-	}
-
-	sendProgress(progressCh, ProgressEvent{Phase: "downloading"})
-	downloader := NewDownloader(concurrency, timeout, dlDir)
-	localPaths, err := downloader.DownloadAll(ctx, refs, nil)
-	if err != nil {
-		return err
-	}
-
-	sendProgress(progressCh, ProgressEvent{Phase: "extracting"})
-	err = ExtractAll(localPaths, opts.InstallDir, nil)
-	if err != nil {
-		return err
-	}
-
-	sendProgress(progressCh, ProgressEvent{Phase: "registering"})
-	entry := storage.InstalledTool{
-		Name:        opts.Name,
-		Version:     opts.Version,
-		InstallDir:  opts.InstallDir,
-		InstalledAt: time.Now(),
-	}
-	return inst.registry.AddTool(entry)
 }
 
 func sendProgress(ch chan<- ProgressEvent, ev ProgressEvent) {

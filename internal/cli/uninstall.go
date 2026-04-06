@@ -17,8 +17,8 @@ func (a *app) newUninstallCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "uninstall",
 		Aliases:         []string{"remove"},
-		Usage:           "Uninstall a Qt version or tool",
-		ArgsUsage:       "qt@<version> | <tool>@<version>",
+		Usage:           "Uninstall a Qt version",
+		ArgsUsage:       "<version>",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			newArchFlag(),
@@ -35,11 +35,9 @@ func (a *app) runUninstall(ctx context.Context, cmd *cli.Command) error {
 	if arg == "" {
 		return errors.New("missing argument\n\n" +
 			"Usage:\n" +
-			"  qvm uninstall qt@<version>       Uninstall a Qt version\n" +
-			"  qvm uninstall <tool>@<version>   Uninstall a tool\n\n" +
-			"Examples:\n" +
-			"  qvm uninstall qt@6.8.3\n" +
-			"  qvm uninstall qtcreator@15.0.0")
+			"  qvm uninstall <version>       Uninstall a Qt version\n\n" +
+			"Example:\n" +
+			"  qvm uninstall 6.8.3")
 	}
 
 	cfg, err := config.Load()
@@ -54,10 +52,7 @@ func (a *app) runUninstall(ctx context.Context, cmd *cli.Command) error {
 
 	autoYes := cmd.Bool("yes")
 
-	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
-		return a.runUninstallQt(ctx, cmd, cfg, registry, version, autoYes)
-	}
-	return a.runUninstallTool(ctx, cmd, cfg, registry, arg, autoYes)
+	return a.runUninstallQt(ctx, cmd, cfg, registry, arg, autoYes)
 }
 
 func (a *app) runUninstallQt(
@@ -119,68 +114,6 @@ func (a *app) runUninstallQt(
 	}
 
 	fmt.Fprintf(a.streams.Out, "Qt %s uninstalled successfully.\n", version)
-	return nil
-}
-
-func (a *app) runUninstallTool(
-	ctx context.Context,
-	cmd *cli.Command,
-	cfg *config.Config,
-	registry *storage.RegistryManager,
-	arg string,
-	autoYes bool,
-) error {
-	_ = ctx
-	_ = cmd
-
-	toolName, toolVersion, ok := strings.Cut(arg, "@")
-	if !ok {
-		return newHintError(
-			"missing version",
-			fmt.Sprintf("Usage:\n  qvm uninstall <tool>@<version>\n\nExample:\n  qvm uninstall %s@<version>", arg),
-		)
-	}
-
-	reg, err := registry.Load()
-	if err != nil {
-		return fmt.Errorf("loading registry: %w", err)
-	}
-
-	var matches []storage.InstalledTool
-	for _, t := range reg.Tools {
-		if t.Name == toolName && (toolVersion == "" || t.Version == toolVersion) {
-			matches = append(matches, t)
-		}
-	}
-
-	if len(matches) == 0 {
-		return withHint(
-			fmt.Errorf("tool %s@%s is not installed", toolName, toolVersion),
-			"Run 'qvm list' to see installed versions.",
-		)
-	}
-
-	if !autoYes {
-		fmt.Fprintf(a.streams.Out, "The following tools will be removed:\n")
-		for _, t := range matches {
-			size := ""
-			if t.SizeBytes > 0 {
-				size = "  (" + formatSize(t.SizeBytes) + ")"
-			}
-			fmt.Fprintf(a.streams.Out, "  %s@%s  %s%s\n", t.Name, t.Version, t.InstallDir, size)
-		}
-		if !a.confirm("Proceed?") {
-			fmt.Fprintln(a.streams.Out, "Aborted.")
-			return nil
-		}
-	}
-
-	err = storage.CleanupTool(registry, toolName, toolVersion, cfg.ToolsDir())
-	if err != nil {
-		return fmt.Errorf("uninstall failed: %w", err)
-	}
-
-	fmt.Fprintf(a.streams.Out, "Tool %s@%s uninstalled successfully.\n", toolName, toolVersion)
 	return nil
 }
 

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -18,8 +17,8 @@ func (a *app) newInstallCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "install",
 		Aliases:         []string{"i"},
-		Usage:           "Install a Qt version or tool",
-		ArgsUsage:       "qt@<version> | <tool>[@<version>]",
+		Usage:           "Install a Qt version",
+		ArgsUsage:       "<version>",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			// What to install.
@@ -62,28 +61,11 @@ func (a *app) newInstallCommand() *cli.Command {
 
 func (a *app) runInstall(ctx context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
-	if arg == "" {
-		return newHintError("missing argument",
-			"Usage:\n"+
-				"  qvm install qt@<version>         Install a Qt SDK\n"+
-				"  qvm install <tool>@<version>     Install a tool\n\n"+
-				"Examples:\n"+
-				"  qvm install qt@6.8.3\n"+
-				"  qvm install qtcreator@15.0.0")
+	if arg == "" || arg == "qt" {
+		return newHintError("specify a version", "Example: qvm install 6.8.3")
 	}
 
-	if arg == "qt" {
-		return a.runInstallQtPickVersion(ctx, cmd)
-	}
-	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
-		return a.runInstallQt(ctx, cmd, version)
-	}
-	return a.runInstallTool(ctx, cmd, arg)
-}
-
-// runInstallQtPickVersion handles "qvm install qt" - no version specified.
-func (a *app) runInstallQtPickVersion(_ context.Context, _ *cli.Command) error {
-	return newHintError("specify a version: qvm install qt@<version>", "Example: qvm install qt@6.8.3")
+	return a.runInstallQt(ctx, cmd, arg)
 }
 
 func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
@@ -171,66 +153,10 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 
 	if !quiet && len(modules) == 0 {
 		fmt.Fprintf(a.streams.Out, "\nTip: Add-on modules are available (charts, webengine, multimedia, ...).\n")
-		fmt.Fprintf(a.streams.Out, "  Run 'qvm list qt@%s' to see them, or reinstall with:\n", version)
-		fmt.Fprintf(a.streams.Out, "  qvm install qt@%s -m <module1>,<module2>\n", version)
+		fmt.Fprintf(a.streams.Out, "  Run 'qvm list %s' to see them, or reinstall with:\n", version)
+		fmt.Fprintf(a.streams.Out, "  qvm install %s -m <module1>,<module2>\n", version)
 	}
 
-	return nil
-}
-
-func (a *app) runInstallTool(ctx context.Context, cmd *cli.Command, arg string) error {
-	toolName, toolVersion, _ := strings.Cut(arg, "@")
-
-	if toolVersion == "" {
-		return fmt.Errorf("specify a version: qvm install %s@<version>", toolName)
-	}
-
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
-
-	installer, err := buildDeps(cfg, cmd.String("host"))
-	if err != nil {
-		return fmt.Errorf("initializing dependencies: %w", err)
-	}
-
-	installDir := cmd.String("dir")
-	if installDir == "" {
-		installDir = cfg.ToolsDir()
-	}
-
-	toolOpts := install.ToolOptions{
-		Name:        toolName,
-		Version:     toolVersion,
-		InstallDir:  installDir,
-		Concurrency: cfg.Download.Concurrency,
-		Timeout:     cfg.Download.TimeoutSeconds,
-	}
-
-	quiet := cmd.Bool("quiet")
-	progressCh := make(chan install.ProgressEvent, 256)
-	doneCh := make(chan struct{})
-
-	printer := a.streams.NewProgressPrinter()
-	go func() {
-		defer close(doneCh)
-		for ev := range progressCh {
-			if !quiet {
-				printer.print(ev)
-			}
-		}
-	}()
-
-	installErr := installer.InstallTool(ctx, toolOpts, progressCh)
-	close(progressCh)
-	<-doneCh
-
-	if installErr != nil {
-		return withHint(fmt.Errorf("tool installation failed: %w", installErr), "Run 'qvm doctor' to diagnose issues.")
-	}
-
-	fmt.Fprintf(a.streams.Out, "\nTool %s@%s installed successfully.\n", toolName, toolVersion)
 	return nil
 }
 

@@ -31,39 +31,11 @@ type InstalledQt struct {
 	SizeBytes   int64           `json:"size_bytes,omitempty"`
 }
 
-// UnmarshalJSON migrates the legacy "target" key (renamed to "arch") transparently.
-func (q *InstalledQt) UnmarshalJSON(data []byte) error {
-	type Alias InstalledQt
-	var v struct {
-		Alias
-
-		Target string `json:"target"` // legacy field name
-	}
-	err := json.Unmarshal(data, &v)
-	if err != nil {
-		return err
-	}
-	*q = InstalledQt(v.Alias)
-	if q.Arch == "" && v.Target != "" {
-		q.Arch = v.Target
-	}
-	return nil
-}
-
-// InstalledTool describes an installed tool.
-type InstalledTool struct {
-	Name        string    `json:"name"`
-	Version     string    `json:"version"`
-	InstallDir  string    `json:"install_dir"`
-	InstalledAt time.Time `json:"installed_at"`
-	SizeBytes   int64     `json:"size_bytes,omitempty"`
-}
 
 // Registry is the root of the registry file.
 type Registry struct {
-	Version int             `json:"version"`
-	Qt      []InstalledQt   `json:"qt,omitempty"`
-	Tools   []InstalledTool `json:"tools,omitempty"`
+	Version int           `json:"version"`
+	Qt      []InstalledQt `json:"qt,omitempty"`
 }
 
 // RegistryManager manages loading and saving the qvm registry.
@@ -92,8 +64,6 @@ func (m *RegistryManager) Path() string {
 }
 
 // Load reads the registry from disk. Returns an empty registry if the file doesn't exist.
-// If the file contains legacy data (old "target" key), it is rewritten in place so
-// subsequent reads see the clean form.
 func (m *RegistryManager) Load() (*Registry, error) {
 	data, err := os.ReadFile(m.path)
 	if os.IsNotExist(err) {
@@ -114,31 +84,7 @@ func (m *RegistryManager) Load() (*Registry, error) {
 			registryVersion,
 		)
 	}
-	if needsMigration(data) {
-		_ = m.Save(&r) // best-effort; a read failure here is non-fatal
-	}
 	return &r, nil
-}
-
-// needsMigration reports whether the raw registry JSON contains any legacy "target"
-// entries that need to be rewritten as "arch".
-func needsMigration(data []byte) bool {
-	var raw struct {
-		Qt []json.RawMessage `json:"qt"`
-	}
-	if json.Unmarshal(data, &raw) != nil {
-		return false
-	}
-	for _, entry := range raw.Qt {
-		var fields struct {
-			Target string `json:"target"`
-			Arch   string `json:"arch"`
-		}
-		if json.Unmarshal(entry, &fields) == nil && fields.Target != "" && fields.Arch == "" {
-			return true
-		}
-	}
-	return false
 }
 
 // Save atomically writes the registry to disk.
@@ -212,47 +158,3 @@ func (m *RegistryManager) RemoveQt(version, arch string) error {
 	return m.Save(r)
 }
 
-// AddTool adds or replaces a tool installation record.
-func (m *RegistryManager) AddTool(entry InstalledTool) error {
-	unlock, err := lockFile(m.path)
-	if err != nil {
-		return fmt.Errorf("acquiring registry lock: %w", err)
-	}
-	defer unlock()
-
-	r, err := m.Load()
-	if err != nil {
-		return err
-	}
-	for i, t := range r.Tools {
-		if t.Name == entry.Name && t.Version == entry.Version {
-			r.Tools[i] = entry
-			return m.Save(r)
-		}
-	}
-	r.Tools = append(r.Tools, entry)
-	return m.Save(r)
-}
-
-// RemoveTool removes a tool installation record.
-func (m *RegistryManager) RemoveTool(name, version string) error {
-	unlock, err := lockFile(m.path)
-	if err != nil {
-		return fmt.Errorf("acquiring registry lock: %w", err)
-	}
-	defer unlock()
-
-	r, err := m.Load()
-	if err != nil {
-		return err
-	}
-	filtered := r.Tools[:0]
-	for _, t := range r.Tools {
-		if t.Name == name && (version == "" || t.Version == version) {
-			continue
-		}
-		filtered = append(filtered, t)
-	}
-	r.Tools = filtered
-	return m.Save(r)
-}

@@ -23,7 +23,7 @@ func (a *app) newSearchCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "search",
 		Aliases:   []string{"s"},
-		Usage:     "Search for Qt modules or tools",
+		Usage:     "Search for Qt modules",
 		ArgsUsage: "<query>",
 		Flags: []cli.Flag{
 			newFormatFlag(),
@@ -44,7 +44,7 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 	if query == "" {
 		return errors.New("missing argument\n\n" +
 			"Usage:\n" +
-			"  qvm search <query>       Search for Qt modules or tools\n\n" +
+			"  qvm search <query>       Search for Qt modules\n\n" +
 			"Example:\n" +
 			"  qvm search charts")
 	}
@@ -84,23 +84,6 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 				items = append(items, item)
 				names = append(names, m.Name)
 			}
-		}
-	}
-
-	// Fetch tools.
-	tools, err := fetcher.FetchAllTools(ctx)
-	if err != nil {
-		fmt.Fprintf(a.streams.ErrOut, "warning: could not fetch tools index: %v\n", err)
-	} else {
-		for _, t := range tools {
-			item := searchItem{
-				kind:    "tool",
-				name:    t.Name,
-				display: t.Display,
-			}
-			items = append(items, item)
-			// Search by tool name.
-			names = append(names, t.Name)
 		}
 	}
 

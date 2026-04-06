@@ -229,37 +229,6 @@ func TestParseRepoIndex_MultipleVersions(t *testing.T) {
 	assert.ElementsMatch(t, []string{"6.8.3", "6.10.0"}, versions)
 }
 
-// Tool packages are parsed into ToolInfo entries.
-func TestParseRepoIndex_Tools(t *testing.T) {
-	body := []byte(`<?xml version="1.0" encoding="UTF-8"?><Updates>
-		<PackageUpdate>
-			<Name>qt.tools.qtcreator</Name>
-			<DisplayName>Qt Creator</DisplayName>
-			<Virtual>false</Virtual>
-			<Version>14.0.2-0-202501151209</Version>
-			<ReleaseDate>2025-01-15</ReleaseDate>
-		</PackageUpdate>
-		<PackageUpdate>
-			<Name>qt.tools.cmake.win64</Name>
-			<DisplayName>CMake 3.28.0</DisplayName>
-			<Virtual>false</Virtual>
-			<Version>3.28.0-0-202401010000</Version>
-			<ReleaseDate>2024-01-01</ReleaseDate>
-		</PackageUpdate>
-	</Updates>`)
-
-	idx, err := parseRepoIndex(body, "")
-	require.NoError(t, err)
-	require.NotEmpty(t, idx.Tools)
-
-	names := make([]string, len(idx.Tools))
-	for i, tool := range idx.Tools {
-		names[i] = tool.Name
-	}
-	assert.Contains(t, names, "qtcreator")
-	assert.Contains(t, names, "cmake")
-}
-
 // Essential modules are derived from the DownloadableArchives of the 4-part target package.
 // Archive names follow "moduleName-OS-...-Arch.7z"; module name is the prefix before the first "-".
 func TestParseRepoIndex_EssentialModulesFromArchives(t *testing.T) {

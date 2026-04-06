@@ -20,8 +20,8 @@ func (a *app) newListCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "list",
 		Aliases:         []string{"ls"},
-		Usage:           "List installed or available Qt versions and tools",
-		ArgsUsage:       "[qt | qt@<major>[.<minor>[.<patch>]] | tools]",
+		Usage:           "List installed or available Qt versions",
+		ArgsUsage:       "[<major>[.<minor>[.<patch>]]]",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -41,8 +41,15 @@ func (a *app) runList(ctx context.Context, cmd *cli.Command) error {
 	format := cmd.String("format")
 	host := cmd.String("host")
 
-	// qt@<version> detail or filtered view - always fetches remote metadata.
-	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
+	version := arg
+
+	// Version filter: "6", "6.8", "6.8.3" -> detail or filtered view.
+	if version != "" {
+		vf, err := qtmeta.ParseVersionFilter(version)
+		if err != nil {
+			return fmt.Errorf("invalid version %q: %w", version, err)
+		}
+
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("loading config: %w", err)
@@ -50,11 +57,6 @@ func (a *app) runList(ctx context.Context, cmd *cli.Command) error {
 		fetcher, err := buildFetcher(cfg, host)
 		if err != nil {
 			return fmt.Errorf("initializing fetcher: %w", err)
-		}
-
-		vf, err := qtmeta.ParseVersionFilter(version)
-		if err != nil {
-			return fmt.Errorf("invalid version %q: %w", version, err)
 		}
 
 		// Full version (e.g. "6.8.3") -> detail view.
@@ -74,16 +76,6 @@ func (a *app) runList(ctx context.Context, cmd *cli.Command) error {
 		return a.runListQtFiltered(ctx, fetcher, reg, vf, format)
 	}
 
-	if arg != "" && arg != "qt" && arg != listTargetTools {
-		return fmt.Errorf("unknown list target %q\n\n"+
-			"Usage:\n"+
-			"  qvm list                 Show installed versions\n"+
-			"  qvm list --all           Show all available versions\n"+
-			"  qvm list qt@6            Show all Qt 6.x versions\n"+
-			"  qvm list qt@6.8          Show all Qt 6.8.x versions\n"+
-			"  qvm list qt@6.8.3        Show version details (archs, modules)", arg)
-	}
-
 	if showAll {
 		return a.runListAll(ctx, arg, format, host)
 	}
@@ -92,7 +84,7 @@ func (a *app) runList(ctx context.Context, cmd *cli.Command) error {
 
 // --- Installed-only views (default) ---
 
-func (a *app) runListInstalled(arg, format string) error {
+func (a *app) runListInstalled(_, format string) error {
 	registry, err := storage.NewRegistryManager()
 	if err != nil {
 		return fmt.Errorf("opening registry: %w", err)
@@ -103,26 +95,10 @@ func (a *app) runListInstalled(arg, format string) error {
 	}
 
 	if format == formatJSON {
-		switch arg {
-		case "qt":
-			return a.printJSON(reg.Qt)
-		case listTargetTools:
-			return a.printJSON(reg.Tools)
-		default:
-			return a.printJSON(reg)
-		}
+		return a.printJSON(reg.Qt)
 	}
 
-	switch arg {
-	case "qt":
-		a.printInstalledQt(reg)
-	case listTargetTools:
-		a.printInstalledTools(reg)
-	default:
-		a.printInstalledQt(reg)
-		fmt.Fprintln(a.streams.Out)
-		a.printInstalledTools(reg)
-	}
+	a.printInstalledQt(reg)
 	return nil
 }
 
@@ -132,7 +108,7 @@ func (a *app) printInstalledQt(reg *storage.Registry) {
 	if len(reg.Qt) == 0 {
 		fmt.Fprintln(a.streams.Out, "  (none)")
 		fmt.Fprintln(a.streams.Out)
-		fmt.Fprintln(a.streams.Out, "  Install one with: qvm install qt@<version>")
+		fmt.Fprintln(a.streams.Out, "  Install one with: qvm install<version>")
 		fmt.Fprintln(a.streams.Out, "  Run 'qvm list --all' to see available versions.")
 		return
 	}
@@ -157,26 +133,6 @@ func (a *app) printInstalledQt(reg *storage.Registry) {
 	}
 }
 
-func (a *app) printInstalledTools(reg *storage.Registry) {
-	fmt.Fprintln(a.streams.Out, "Installed tools")
-
-	if len(reg.Tools) == 0 {
-		fmt.Fprintln(a.streams.Out, "  (none)")
-		fmt.Fprintln(a.streams.Out)
-		fmt.Fprintln(a.streams.Out, "  Run 'qvm list tools --all' to see available tools.")
-		return
-	}
-
-	for _, t := range reg.Tools {
-		size := ""
-		if t.SizeBytes > 0 {
-			size = formatSize(t.SizeBytes)
-		}
-		fmt.Fprintf(a.streams.Out, "  %-16s %-12s %-40s %s\n",
-			t.Name, t.Version, t.InstallDir, size)
-	}
-}
-
 func buildExtrasLine(extras storage.InstalledExtras) string {
 	var parts []string
 	if extras.Docs {
@@ -196,7 +152,7 @@ func buildExtrasLine(extras storage.InstalledExtras) string {
 
 // --- All-available views (with installed markers) ---
 
-func (a *app) runListAll(ctx context.Context, arg, format, host string) error {
+func (a *app) runListAll(ctx context.Context, _, format, host string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -216,19 +172,7 @@ func (a *app) runListAll(ctx context.Context, arg, format, host string) error {
 		return fmt.Errorf("loading registry: %w", err)
 	}
 
-	switch arg {
-	case "qt":
-		return a.runListAllQt(ctx, fetcher, reg, format)
-	case listTargetTools:
-		return a.runListAllTools(ctx, fetcher, reg, format)
-	default:
-		err = a.runListAllQt(ctx, fetcher, reg, format)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(a.streams.Out)
-		return a.runListAllTools(ctx, fetcher, reg, format)
-	}
+	return a.runListAllQt(ctx, fetcher, reg, format)
 }
 
 func (a *app) runListAllQt(
@@ -289,7 +233,7 @@ func (a *app) runListAllQt(
 		}
 	}
 
-	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list qt@<version>' to see available targets and modules.")
+	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list<version>' to see available targets and modules.")
 	return nil
 }
 
@@ -345,56 +289,7 @@ func (a *app) runListQtFiltered(
 		a.printVersionRow(v, label, installedVersions, recommendedVersion)
 	}
 
-	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list qt@<version>' to see available targets and modules.")
-	return nil
-}
-
-func (a *app) runListAllTools(
-	ctx context.Context,
-	fetcher *repository.MetadataFetcher,
-	reg *storage.Registry,
-	format string,
-) error {
-	tools, err := fetcher.FetchAllTools(ctx)
-	if err != nil {
-		return fmt.Errorf("fetching tools: %w", err)
-	}
-
-	if format == formatJSON {
-		return a.printJSON(tools)
-	}
-
-	// Build installed lookup: tool name -> version -> true.
-	installedTools := map[string]map[string]bool{}
-	for _, t := range reg.Tools {
-		if installedTools[t.Name] == nil {
-			installedTools[t.Name] = map[string]bool{}
-		}
-		installedTools[t.Name][t.Version] = true
-	}
-
-	fmt.Fprintln(a.streams.Out, "Available tools")
-	fmt.Fprintln(a.streams.Out)
-
-	for _, t := range tools {
-		display := t.Display
-		if display == "" {
-			display = t.Name
-		}
-		fmt.Fprintf(a.streams.Out, "  %s  (%s)\n", display, t.Name)
-		for _, v := range t.Versions {
-			date := ""
-			if !v.ReleaseDate.IsZero() {
-				date = v.ReleaseDate.Format("2006-01-02")
-			}
-			marker := ""
-			if installedTools[t.Name][v.Version] {
-				marker = "  \u2713 installed"
-			}
-			fmt.Fprintf(a.streams.Out, "      %-20s %s%s\n", v.Version, date, marker)
-		}
-	}
-
+	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list<version>' to see available targets and modules.")
 	return nil
 }
 

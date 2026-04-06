@@ -9,6 +9,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+
 	"github.com/trollixx/qvm/internal/storage"
 )
 
@@ -16,8 +17,8 @@ func (a *app) newInfoCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "info",
 		Aliases:         []string{"show"},
-		Usage:           "Show detailed info about an installed Qt version or tool",
-		ArgsUsage:       "qt@<version> | <tool>[@<version>]",
+		Usage:           "Show detailed info about an installed Qt version",
+		ArgsUsage:       "<version>",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			newArchFlag(),
@@ -34,10 +35,9 @@ func (a *app) runInfo(ctx context.Context, cmd *cli.Command) error {
 	if arg == "" {
 		return errors.New("missing argument\n\n" +
 			"Usage:\n" +
-			"  qvm info qt@<version>            Show Qt version details\n" +
-			"  qvm info <tool>[@<version>]      Show tool details\n\n" +
+			"  qvm info <version>            Show Qt version details\n\n" +
 			"Example:\n" +
-			"  qvm info qt@6.8.3")
+			"  qvm info 6.8.3")
 	}
 
 	format := cmd.String("format")
@@ -52,10 +52,7 @@ func (a *app) runInfo(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("loading registry: %w", err)
 	}
 
-	if version, ok := strings.CutPrefix(arg, "qt@"); ok {
-		return a.runInfoQt(reg, version, cmd.String("arch"), format)
-	}
-	return a.runInfoTool(reg, arg, format)
+	return a.runInfoQt(reg, arg, cmd.String("arch"), format)
 }
 
 func (a *app) runInfoQt(reg *storage.Registry, version, arch, format string) error {
@@ -70,12 +67,12 @@ func (a *app) runInfoQt(reg *storage.Registry, version, arch, format string) err
 		if arch != "" {
 			return withHint(
 				fmt.Errorf("Qt %s (arch: %s) is not installed", version, arch),
-				fmt.Sprintf("To install it: qvm install qt@%s --arch %s", version, arch),
+				fmt.Sprintf("To install it: qvm install %s --arch %s", version, arch),
 			)
 		}
 		return withHint(
 			fmt.Errorf("Qt %s is not installed", version),
-			fmt.Sprintf("To install it: qvm install qt@%s", version),
+			fmt.Sprintf("To install it: qvm install %s", version),
 		)
 	}
 
@@ -93,54 +90,6 @@ func (a *app) runInfoQt(reg *storage.Registry, version, arch, format string) err
 		fmt.Fprintln(a.streams.Out)
 	}
 	return nil
-}
-
-func (a *app) runInfoTool(reg *storage.Registry, arg, format string) error {
-	toolName, toolVersion, _ := strings.Cut(arg, "@")
-
-	var matches []storage.InstalledTool
-	for _, t := range reg.Tools {
-		if t.Name == toolName && (toolVersion == "" || t.Version == toolVersion) {
-			matches = append(matches, t)
-		}
-	}
-
-	if len(matches) == 0 {
-		if toolVersion != "" {
-			return withHint(
-				fmt.Errorf("tool %s@%s is not installed", toolName, toolVersion),
-				fmt.Sprintf("To install it: qvm install %s@%s", toolName, toolVersion),
-			)
-		}
-		return withHint(
-			fmt.Errorf("tool %s is not installed", toolName),
-			"Run 'qvm list tools --all' to see available tools.",
-		)
-	}
-
-	if format == formatJSON {
-		enc := json.NewEncoder(a.streams.Out)
-		enc.SetIndent("", "  ")
-		if len(matches) == 1 {
-			return enc.Encode(matches[0])
-		}
-		return enc.Encode(matches)
-	}
-
-	for _, t := range matches {
-		a.printToolInfo(t)
-		fmt.Fprintln(a.streams.Out)
-	}
-	return nil
-}
-
-func (a *app) printToolInfo(t storage.InstalledTool) {
-	fmt.Fprintf(a.streams.Out, "%s  %s\n", t.Name, t.Version)
-	fmt.Fprintf(a.streams.Out, "  Install dir:  %s\n", t.InstallDir)
-	fmt.Fprintf(a.streams.Out, "  Installed at: %s\n", t.InstalledAt.Format("2006-01-02 15:04:05"))
-	if t.SizeBytes > 0 {
-		fmt.Fprintf(a.streams.Out, "  Size:         %s\n", formatSize(t.SizeBytes))
-	}
 }
 
 func (a *app) printQtInfo(q storage.InstalledQt) {

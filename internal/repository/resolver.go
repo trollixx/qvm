@@ -282,33 +282,3 @@ func archiveModuleName(filename string) string {
 	return ""
 }
 
-// ResolveTool resolves archives for a named tool at a specific version.
-func (r *Resolver) ResolveTool(ctx context.Context, toolName, version string) ([]ResolvedArchive, error) {
-	toolInfo, err := r.fetcher.FetchTool(ctx, toolName)
-	if err != nil {
-		return nil, fmt.Errorf("fetching tool %s: %w", toolName, err)
-	}
-
-	for _, tv := range toolInfo.Versions {
-		if tv.Version == version {
-			archives := make([]ResolvedArchive, 0, len(tv.Archives))
-			for _, ref := range tv.Archives {
-				archives = append(archives, ResolvedArchive{
-					Name: toolName + "@" + version,
-					Ref:  ref,
-				})
-			}
-			if len(archives) == 0 {
-				return nil, fmt.Errorf("tool %s@%s has no archives", toolName, version)
-			}
-			return archives, nil
-		}
-	}
-
-	available := make([]string, 0, len(toolInfo.Versions))
-	for _, tv := range toolInfo.Versions {
-		available = append(available, tv.Version)
-	}
-	return nil, qerr.Newf(qerr.CodeUnknownTool, "tool %s version %q not found\n\nAvailable: %s",
-		toolName, version, strings.Join(available, ", "))
-}

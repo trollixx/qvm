@@ -53,33 +53,3 @@ func Cleanup(reg *RegistryManager, version, arch, expectedRoot string) error {
 	return reg.RemoveQt(version, arch)
 }
 
-// CleanupTool removes an installed tool directory and updates the registry.
-// expectedRoot is the tools root directory; only paths under this root will be removed.
-func CleanupTool(reg *RegistryManager, name, version, expectedRoot string) error {
-	r, err := reg.Load()
-	if err != nil {
-		return err
-	}
-
-	var toRemove []InstalledTool
-	for _, t := range r.Tools {
-		if t.Name == name && (version == "" || t.Version == version) {
-			toRemove = append(toRemove, t)
-		}
-	}
-	if len(toRemove) == 0 {
-		return fmt.Errorf("tool %s@%s is not registered", name, version)
-	}
-
-	for _, t := range toRemove {
-		if !isSafePath(t.InstallDir, expectedRoot) {
-			return fmt.Errorf("refusing to remove %s: path is outside expected root %s", t.InstallDir, expectedRoot)
-		}
-		err = os.RemoveAll(t.InstallDir)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("removing %s: %w", t.InstallDir, err)
-		}
-	}
-
-	return reg.RemoveTool(name, version)
-}

@@ -222,36 +222,6 @@ func folderToVersionInfo(folder string) (QtVersionInfo, bool) {
 	}, true
 }
 
-// FetchTool fetches metadata for a named tool.
-func (f *MetadataFetcher) FetchTool(ctx context.Context, toolName string) (*ToolInfo, error) {
-	urls := f.mirrors.ToolURLsFor(toolName)
-	body, successURL, err := f.fetchRaw(ctx, urls)
-	if err != nil {
-		return nil, err
-	}
-	return parseToolIndex(body, toolName, dirURL(successURL))
-}
-
-// FetchAllTools fetches metadata for all known tools.
-func (f *MetadataFetcher) FetchAllTools(ctx context.Context) ([]ToolInfo, error) {
-	toolNames := []string{"qtcreator", "cmake", "ifw", "mingw", "llvm_mingw", "ninja", "openssl", "vcredist"}
-	var tools []ToolInfo
-	for _, name := range toolNames {
-		ctxErr := ctx.Err()
-		if ctxErr != nil {
-			return tools, ctxErr
-		}
-		tool, err := f.FetchTool(ctx, name)
-		if err != nil {
-			// Non-fatal: skip tools that fail to fetch, but warn so the failure is diagnosable.
-			fmt.Fprintf(os.Stderr, "warning: fetching tool %s: %v\n", name, err)
-			continue
-		}
-		tools = append(tools, *tool)
-	}
-	return tools, nil
-}
-
 // fetchExtensions fetches extension modules (qtwebengine, qtpdf) for Qt 6.8+
 // and merges them into vi as regular add-on modules.
 func (f *MetadataFetcher) fetchExtensions(ctx context.Context, vi *QtVersionInfo) {
@@ -495,55 +465,27 @@ func parseRepoIndex(body []byte, baseURL string) (*RepoIndex, error) {
 
 	idx := &RepoIndex{}
 	versionMap := map[string]*QtVersionInfo{}
-	toolMap := map[string]*ToolInfo{}
 
 	for _, pkg := range upd.Packages {
 		virtual := isVirtual(pkg.Virtual)
 
-		switch classifyPackage(pkg.Name) {
-		case pkgClassQt:
+		if isQtPackage(pkg.Name) {
 			// Process all Qt packages - virtual and non-virtual.
 			// Virtual packages are skipped for module/arch registration but their
 			// archive refs are still collected (needed for Qt 6.8+ addon packages).
 			processQtPackage(pkg, versionMap, baseURL, virtual)
-		case pkgClassTool:
-			if !virtual {
-				processToolPackage(pkg, toolMap, baseURL)
-			}
-		case pkgClassOther:
-			// Unknown package class; skip.
 		}
 	}
 
 	for _, v := range versionMap {
 		idx.QtVersions = append(idx.QtVersions, *v)
 	}
-	for _, t := range toolMap {
-		idx.Tools = append(idx.Tools, *t)
-	}
 	return idx, nil
 }
 
-type pkgClass int
-
-const (
-	pkgClassQt pkgClass = iota
-	pkgClassTool
-	pkgClassOther
-)
-
-func classifyPackage(name string) pkgClass {
+func isQtPackage(name string) bool {
 	parts := strings.Split(name, ".")
-	if len(parts) < 2 {
-		return pkgClassOther
-	}
-	if parts[0] == "qt" && strings.HasPrefix(parts[1], "qt6") {
-		return pkgClassQt
-	}
-	if parts[0] == "qt" && parts[1] == "tools" {
-		return pkgClassTool
-	}
-	return pkgClassOther
+	return len(parts) >= 2 && parts[0] == "qt" && strings.HasPrefix(parts[1], "qt6")
 }
 
 func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, baseURL string, virtual bool) {
@@ -676,43 +618,6 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 
 	// Check for doc/examples/sources/debug_info by package name suffix.
 	setVersionFeatureFlags(vi, pkg.Name)
-}
-
-func processToolPackage(pkg packageXML, toolMap map[string]*ToolInfo, baseURL string) {
-	// Name format: qt.tools.qtcreator or qt.tools.cmake.win64
-	parts := strings.Split(pkg.Name, ".")
-	if len(parts) < 3 {
-		return
-	}
-	toolName := parts[2]
-
-	tool, ok := toolMap[toolName]
-	if !ok {
-		tool = &ToolInfo{Name: toolName, Display: pkg.DisplayName}
-		toolMap[toolName] = tool
-	}
-
-	tv := ToolVersionInfo{
-		Version:     pkg.Version,
-		DisplayName: pkg.DisplayName,
-		ReleaseDate: parseDate(pkg.ReleaseDate),
-		Archives:    buildArchiveRefs(pkg, baseURL),
-	}
-	tool.Versions = append(tool.Versions, tv)
-}
-
-func parseToolIndex(body []byte, toolName, baseURL string) (*ToolInfo, error) {
-	idx, err := parseRepoIndex(body, baseURL)
-	if err != nil {
-		return nil, err
-	}
-	for _, t := range idx.Tools {
-		if t.Name == toolName {
-			return &t, nil
-		}
-	}
-	// Return empty if not found in parsed data.
-	return &ToolInfo{Name: toolName}, nil
 }
 
 // setVersionFeatureFlags inspects a package name and sets the corresponding

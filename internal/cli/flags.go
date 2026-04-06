@@ -11,14 +11,12 @@ import (
 	"github.com/trollixx/qvm/internal/repository"
 )
 
-const (
-	formatJSON      = "json"
-	listTargetTools = "tools"
-)
+const formatJSON = "json"
+
 
 // showHelpOnNotFound is a CommandNotFound handler that shows the command's help
 // instead of printing "No help topic for ...". This is needed because positional
-// args (e.g. "qt@5.15.2") are mistaken for subcommands when --help is used.
+// args (e.g. "6.8.3") are mistaken for subcommands when --help is used.
 func showHelpOnNotFound(_ context.Context, cmd *cli.Command, _ string) {
 	_ = cli.ShowSubcommandHelp(cmd)
 }

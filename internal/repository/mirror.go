@@ -62,20 +62,6 @@ func (m *MirrorList) URLsForMasterList() []string {
 	return urls
 }
 
-// ToolURLsFor returns URLs for tools metadata.
-func (m *MirrorList) ToolURLsFor(toolName string) []string {
-	host := m.host
-	all := append([]string{m.primary}, m.fallbacks...)
-	urls := make([]string, 0, len(all))
-	for _, base := range all {
-		urls = append(
-			urls,
-			fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/tools_%s/Updates.xml", base, host, toolName),
-		)
-	}
-	return urls
-}
-
 // buildURL constructs a Qt SDK repository Updates.xml URL.
 // base is the mirror root (e.g. "https://download.qt.io/"); online/qtsdkrepository/ is inserted automatically.
 // Qt 6.8+ uses a two-level folder structure:

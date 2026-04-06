@@ -79,17 +79,6 @@ func (a *app) runDoctor(ctx context.Context, _ *cli.Command) error {
 		}
 	}
 
-	// 6. Tools.
-	fmt.Fprintln(a.streams.Out)
-	fmt.Fprintln(a.streams.Out, "Tools")
-	if len(reg.Tools) == 0 {
-		fmt.Fprintln(a.streams.Out, "  (no tools installed)")
-	} else {
-		for _, t := range reg.Tools {
-			a.checkToolInstallation(t)
-		}
-	}
-
 	return nil
 }
 
@@ -232,19 +221,6 @@ func (a *app) checkQtInstallation(ctx context.Context, q storage.InstalledQt) {
 			fmt.Fprintf(a.streams.Out, "       %s  %s\n", checkOK, msg)
 		}
 	}
-}
-
-func (a *app) checkToolInstallation(t storage.InstalledTool) {
-	label := fmt.Sprintf("%s  %s", t.Name, t.Version)
-
-	_, err := os.Stat(t.InstallDir)
-	if os.IsNotExist(err) {
-		fmt.Fprintf(a.streams.Out, "  %s  %s\n", checkFail, label)
-		fmt.Fprintf(a.streams.Out, "       directory missing: %s\n", t.InstallDir)
-		return
-	}
-
-	fmt.Fprintf(a.streams.Out, "  %s  %s\n", checkOK, label)
 }
 
 func findQmakeInDir(installDir string) string {
