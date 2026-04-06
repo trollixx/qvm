@@ -11,28 +11,28 @@ import (
 	"github.com/trollixx/qvm/internal/storage"
 )
 
-func (a *app) newPathCommand() *cli.Command {
+func (a *app) newPrefixCommand() *cli.Command {
 	return &cli.Command{
-		Name:            "path",
+		Name:            "prefix",
 		Usage:           "Print the install directory of a Qt version",
 		ArgsUsage:       "<version>",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			newArchFlag(),
 		},
-		Action: a.runPath,
+		Action: a.runPrefix,
 	}
 }
 
-func (a *app) runPath(_ context.Context, cmd *cli.Command) error {
+func (a *app) runPrefix(_ context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
 	if arg == "" {
 		return newHintError("missing argument",
 			"Usage:\n"+
-				"  qvm path <version>         Print Qt install directory\n\n"+
+				"  qvm prefix <version>         Print Qt install directory\n\n"+
 				"Examples:\n"+
-				"  qvm path 6.8.3\n"+
-				"  cmake -DCMAKE_PREFIX_PATH=$(qvm path 6.8.3) ..")
+				"  qvm prefix 6.8.3\n"+
+				"  cmake -DCMAKE_PREFIX_PATH=$(qvm prefix 6.8.3) ..")
 	}
 
 	registry, err := storage.NewRegistryManager()
@@ -45,10 +45,10 @@ func (a *app) runPath(_ context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("loading registry: %w", err)
 	}
 
-	return a.pathQt(reg, arg, cmd.String("arch"))
+	return a.prefixQt(reg, arg, cmd.String("arch"))
 }
 
-func (a *app) pathQt(reg *storage.Registry, version, arch string) error {
+func (a *app) prefixQt(reg *storage.Registry, version, arch string) error {
 	// Collect all matching installs.
 	var matches []storage.InstalledQt
 	for i := range reg.Qt {
@@ -89,7 +89,7 @@ func (a *app) pathQt(reg *storage.Registry, version, arch string) error {
 		}
 		return withHint(
 			fmt.Errorf("Qt %s is installed for multiple archs: %s", version, strings.Join(archs, ", ")),
-			fmt.Sprintf("Use --arch to specify which one, e.g.:\n  qvm path %s --arch %s", version, archs[0]),
+			fmt.Sprintf("Use --arch to specify which one, e.g.:\n  qvm prefix %s --arch %s", version, archs[0]),
 		)
 	}
 }

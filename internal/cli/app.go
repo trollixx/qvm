@@ -54,7 +54,7 @@ func newRootCommand(streams *IOStreams) *cli.Command {
 			a.newListCommand(),
 			a.newListRemoteCommand(),
 			a.newUninstallCommand(),
-			a.newPathCommand(),
+			a.newPrefixCommand(),
 			a.newInfoCommand(),
 			a.newSearchCommand(),
 			a.newDoctorCommand(),
@@ -72,7 +72,7 @@ func (a *app) runDefault(_ context.Context, _ *cli.Command) error {
 	fmt.Fprintln(a.streams.Out, "Quick start:")
 	fmt.Fprintln(a.streams.Out, "  qvm list-remote          List available Qt versions")
 	fmt.Fprintln(a.streams.Out, "  qvm install 6.8.3        Install a Qt version")
-	fmt.Fprintln(a.streams.Out, "  qvm path 6.8.3           Print install directory")
+	fmt.Fprintln(a.streams.Out, "  qvm prefix 6.8.3         Print install directory")
 	fmt.Fprintln(a.streams.Out, "  qvm list                 Show what's installed")
 	fmt.Fprintln(a.streams.Out, "  qvm doctor               Check environment health")
 	fmt.Fprintln(a.streams.Out)
