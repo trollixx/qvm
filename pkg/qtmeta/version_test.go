@@ -16,10 +16,8 @@ func TestParseVersion(t *testing.T) {
 		wantErr   bool
 	}{
 		{"6.10.0", 6, 10, 0, false},
-		{"5.15.18", 5, 15, 18, false},
 		{"6.8.3", 6, 8, 3, false},
 		{"6.0.0", 6, 0, 0, false},
-		{"5.9.0", 5, 9, 0, false},
 		{"", 0, 0, 0, true},
 		{"6.10", 0, 0, 0, true},
 		{"abc", 0, 0, 0, true},
@@ -47,8 +45,7 @@ func TestVersionLess(t *testing.T) {
 		{"6.8.3", "6.10.0", true},
 		{"6.10.0", "6.8.3", false},
 		{"6.8.3", "6.8.3", false},
-		{"5.15.18", "6.0.0", true},
-		{"6.0.0", "5.15.18", false},
+		{"6.0.0", "6.8.3", true},
 		{"6.8.0", "6.8.1", true},
 	}
 	for _, tc := range tests {
@@ -63,7 +60,7 @@ func TestVersionLess(t *testing.T) {
 }
 
 func TestIsLTS(t *testing.T) {
-	lts := []string{"6.8.0", "6.8.3", "6.5.0", "6.5.3", "6.2.0", "5.15.18", "5.12.0", "5.9.0"}
+	lts := []string{"6.8.0", "6.8.3", "6.5.0", "6.5.3", "6.2.0"}
 	notLTS := []string{"6.10.0", "6.7.3", "6.6.0", "6.4.0"}
 
 	for _, v := range lts {
@@ -84,7 +81,7 @@ func TestParseVersionFilter(t *testing.T) {
 		{"6", "6", false, false},
 		{"6.9", "6.9", false, false},
 		{"6.9.0", "6.9.0", true, false},
-		{"5.15.18", "5.15.18", true, false},
+		{"6.2.0", "6.2.0", true, false},
 		{"", "", false, true},
 		{"abc", "", false, true},
 		{"6.abc", "", false, true},
@@ -114,12 +111,12 @@ func TestVersionFilterMatches(t *testing.T) {
 		// Major-only filter.
 		{"6", "6.8.3", true},
 		{"6", "6.10.0", true},
-		{"6", "5.15.18", false},
+		{"6", "7.0.0", false},
 		// Major.minor filter.
 		{"6.8", "6.8.0", true},
 		{"6.8", "6.8.3", true},
 		{"6.8", "6.9.0", false},
-		{"6.8", "5.8.0", false},
+		{"6.8", "7.8.0", false},
 		// Full version filter.
 		{"6.8.3", "6.8.3", true},
 		{"6.8.3", "6.8.0", false},
@@ -135,6 +132,6 @@ func TestVersionFilterMatches(t *testing.T) {
 
 func TestMajorVersion(t *testing.T) {
 	assert.Equal(t, 6, MajorVersion("6.10.0"))
-	assert.Equal(t, 5, MajorVersion("5.15.18"))
+	assert.Equal(t, 6, MajorVersion("6.5.3"))
 	assert.Equal(t, 0, MajorVersion("bad"))
 }

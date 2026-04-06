@@ -83,24 +83,19 @@ func (r *Resolver) Resolve(ctx context.Context, opts ResolveOptions) ([]Resolved
 	return resolveArchives(vi, opts)
 }
 
-// lookupAddonArchives tries both Qt 6-style (with "addons") and Qt 5-style (without)
-// package keys to find archives for a module.
+// lookupAddonArchives finds archives for an addon module using the Qt 6
+// package key format: prefix.addons.mod.arch.
 func lookupAddonArchives(vi *QtVersionInfo, prefix, mod, arch string) (bool, []ResolvedArchive) {
-	// Qt 6: prefix.addons.mod.arch
-	keys := []string{
-		prefix + ".addons." + mod + "." + arch,
-		prefix + "." + mod + "." + arch,
+	pkg := prefix + ".addons." + mod + "." + arch
+	refs, ok := vi.PackageArchives[pkg]
+	if !ok {
+		return false, nil
 	}
-	for _, pkg := range keys {
-		if refs, ok := vi.PackageArchives[pkg]; ok {
-			result := make([]ResolvedArchive, 0, len(refs))
-			for _, ref := range refs {
-				result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
-			}
-			return true, result
-		}
+	result := make([]ResolvedArchive, 0, len(refs))
+	for _, ref := range refs {
+		result = append(result, ResolvedArchive{Name: pkg, Ref: ref})
 	}
-	return false, nil
+	return true, result
 }
 
 // resolveArchives resolves the concrete archives from a QtVersionInfo and options.
@@ -132,9 +127,7 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 		}
 	}
 
-	// Add-on module archives. Two naming schemes:
-	//   Qt 6: prefix + ".addons." + mod + "." + arch
-	//   Qt 5: prefix + "." + mod + "." + arch  (no "addons" segment)
+	// Add-on module archives.
 	for _, mod := range opts.Modules {
 		if found, res := lookupAddonArchives(vi, prefix, mod, opts.Arch); found {
 			archives = append(archives, res...)

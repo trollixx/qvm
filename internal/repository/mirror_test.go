@@ -70,38 +70,9 @@ func TestBuildURL_Qt6Pre68_SingleLevel(t *testing.T) {
 	}
 }
 
-func TestBuildURL_Qt5_SingleLevel(t *testing.T) {
-	base := "https://download.qt.io/"
-	host := "windows_x86"
-
-	tests := []struct {
-		version string
-		major   int
-		want    string
-	}{
-		{
-			"5.15.18", 5,
-			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_51518/Updates.xml",
-		},
-		{
-			"5.15.0", 5,
-			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5150/Updates.xml",
-		},
-		{
-			"5.9.0", 5,
-			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_59/Updates.xml",
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.version, func(t *testing.T) {
-			assert.Equal(t, tc.want, buildURL(base, host, tc.version, tc.major))
-		})
-	}
-}
-
 func TestIsQt68Plus(t *testing.T) {
 	trueFor := []string{"6.8.0", "6.8.3", "6.9.0", "6.10.0", "6.11.0"}
-	falseFor := []string{"6.7.3", "6.5.3", "6.2.0", "5.15.18"}
+	falseFor := []string{"6.7.3", "6.5.3", "6.2.0"}
 
 	for _, v := range trueFor {
 		assert.True(t, isQt68Plus(v), "%s should be Qt 6.8+", v)
@@ -120,9 +91,6 @@ func TestVersionToRepoStr(t *testing.T) {
 		{"6.10.0", 6, "6100"},
 		{"6.8.3", 6, "683"},
 		{"6.8.0", 6, "680"},
-		{"5.15.18", 5, "51518"},
-		{"5.15.0", 5, "5150"},
-		{"5.9.0", 5, "59"}, // Qt 5.9.0 special case: patch omitted
 	}
 	for _, tc := range tests {
 		t.Run(tc.version, func(t *testing.T) {
@@ -153,7 +121,6 @@ func TestExtractFolderNames(t *testing.T) {
 		<a href="../">../</a>
 		<a href="qt6_683/">qt6_683/</a>
 		<a href="qt6_6100/">qt6_6100/</a>
-		<a href="qt5_51518/">qt5_51518/</a>
 		<a href="tools_qtcreator/">tools_qtcreator/</a>
 		<a href="http://external.com/path/ignored">external</a>
 	</body></html>`
@@ -162,7 +129,6 @@ func TestExtractFolderNames(t *testing.T) {
 
 	assert.Contains(t, got, "qt6_683")
 	assert.Contains(t, got, "qt6_6100")
-	assert.Contains(t, got, "qt5_51518")
 	assert.Contains(t, got, "tools_qtcreator")
 	// External URL with a path separator in the href should not appear.
 	for _, name := range got {
@@ -179,8 +145,6 @@ func TestFolderToVersionInfo(t *testing.T) {
 		}{
 			{"qt6_683", "6.8.3", true},
 			{"qt6_6100", "6.10.0", false},
-			{"qt5_51518", "5.15.18", true},
-			{"qt5_59", "5.9.0", true},
 		}
 		for _, tc := range tests {
 			t.Run(tc.folder, func(t *testing.T) {
@@ -260,11 +224,6 @@ func TestExtensionURLsFor(t *testing.T) {
 		urls := m.ExtensionURLsFor("qtwebengine", "6.7.3", 6, "win64_msvc2022_64")
 		assert.Nil(t, urls)
 	})
-
-	t.Run("Qt 5 returns nil", func(t *testing.T) {
-		urls := m.ExtensionURLsFor("qtwebengine", "5.15.18", 5, "win64_msvc2019_64")
-		assert.Nil(t, urls)
-	})
 }
 
 func TestSrcDocExURLsFor(t *testing.T) {
@@ -302,11 +261,6 @@ func TestSrcDocExURLsFor(t *testing.T) {
 			"https://mirror.example.com/online/qtsdkrepository/windows_x86/desktop/qt6_673_src_doc_examples/Updates.xml",
 			urls[1],
 		)
-	})
-
-	t.Run("Qt 5 returns nil", func(t *testing.T) {
-		urls := m.SrcDocExURLsFor("5.15.18", 5)
-		assert.Nil(t, urls)
 	})
 }
 

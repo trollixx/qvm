@@ -60,13 +60,8 @@ func TestRepoSuffixToVersion(t *testing.T) {
 		{"683", 6, "6.8.3"},
 		{"680", 6, "6.8.0"},
 		{"690", 6, "6.9.0"},
-		{"51518", 5, "5.15.18"},
-		{"5150", 5, "5.15.0"},
-		{"590", 5, "5.9.0"},
-		{"59", 5, "5.9.0"}, // Qt 5.9.0 special case: patch omitted in folder name
 		// wrong major prefix
 		{"6100", 5, ""},
-		{"51518", 6, ""},
 		// too short
 		{"6", 6, ""},
 	}
@@ -180,27 +175,6 @@ func TestParseRepoIndex_VirtualSkipped(t *testing.T) {
 	)
 }
 
-// Qt 5 package naming.
-func TestParseRepoIndex_Qt5(t *testing.T) {
-	xml := packagesXML([]struct{ name, virtual, archives string }{
-		{"qt.qt5.51518.win64_msvc2019_64", "false", "qtbase-Windows-msvc.7z"},
-		{"qt.qt5.51518.addons.qtcharts", "false", ""},
-		{"qt.qt5.51518.addons.qtwebengine", "false", ""},
-		{"qt.qt5.51518.addons.qtcharts.win64_msvc2019_64", "true", "qtcharts-Windows-msvc.7z"},
-	})
-
-	idx, err := parseRepoIndex(xml, "")
-	require.NoError(t, err)
-	require.Len(t, idx.QtVersions, 1)
-
-	vi := idx.QtVersions[0]
-	assert.Equal(t, "5.15.18", vi.Version)
-	assert.Equal(t, 5, vi.Major)
-	assert.Empty(t, essentialModuleNames(vi.Modules))
-	assert.ElementsMatch(t, []string{"qtbase"}, essentialModuleNamesForArch(vi.Archs, "win64_msvc2019_64"))
-	assert.ElementsMatch(t, []string{"qtcharts", "qtwebengine"}, addonModuleNames(vi.Modules))
-}
-
 // IsLTS is set correctly.
 func TestParseRepoIndex_LTSFlag(t *testing.T) {
 	xml := packagesXML([]struct{ name, virtual, archives string }{
@@ -243,7 +217,6 @@ func TestParseRepoIndex_MultipleVersions(t *testing.T) {
 	xml := packagesXML([]struct{ name, virtual, archives string }{
 		{"qt.qt6.683.win64_msvc2022_64", "false", "qtbase.7z"},
 		{"qt.qt6.6100.win64_msvc2022_64", "false", "qtbase.7z"},
-		{"qt.qt5.51518.win64_msvc2019_64", "false", "qtbase.7z"},
 	})
 
 	idx, err := parseRepoIndex(xml, "")
@@ -253,7 +226,7 @@ func TestParseRepoIndex_MultipleVersions(t *testing.T) {
 	for i, vi := range idx.QtVersions {
 		versions[i] = vi.Version
 	}
-	assert.ElementsMatch(t, []string{"6.8.3", "6.10.0", "5.15.18"}, versions)
+	assert.ElementsMatch(t, []string{"6.8.3", "6.10.0"}, versions)
 }
 
 // Tool packages are parsed into ToolInfo entries.
@@ -438,7 +411,6 @@ func TestParseDirectoryListing_IsPreviewNotSet(t *testing.T) {
 		<a href="qt6_6110/">qt6_6110/</a>
 		<a href="qt6_683/">qt6_683/</a>
 		<a href="qt6_6100/">qt6_6100/</a>
-		<a href="qt5_51518/">qt5_51518/</a>
 	</body></html>`
 
 	versions := parseDirectoryListing([]byte(html))
@@ -452,7 +424,6 @@ func TestParseDirectoryListing_IsPreviewNotSet(t *testing.T) {
 	assert.False(t, byVersion["6.11.0"], "IsPreview should not be set by parseDirectoryListing")
 	assert.False(t, byVersion["6.8.3"])
 	assert.False(t, byVersion["6.10.0"])
-	assert.False(t, byVersion["5.15.18"])
 }
 
 // --- probePreviewVersions with mock server ---
@@ -480,10 +451,9 @@ func TestProbePreviewVersions(t *testing.T) {
 	fetcher := NewMetadataFetcher(client, cache, mirrors)
 
 	versions := []QtVersionInfo{
-		{Version: "6.11.0", Major: 6},  // preview (404)
-		{Version: "6.10.0", Major: 6},  // released (200)
-		{Version: "6.8.3", Major: 6},   // released (200)
-		{Version: "5.15.18", Major: 5}, // pre-6.8, always not preview
+		{Version: "6.11.0", Major: 6}, // preview (404)
+		{Version: "6.10.0", Major: 6}, // released (200)
+		{Version: "6.8.3", Major: 6},  // released (200)
 	}
 
 	fetcher.probePreviewVersions(context.Background(), versions)
@@ -491,36 +461,6 @@ func TestProbePreviewVersions(t *testing.T) {
 	assert.True(t, versions[0].IsPreview, "6.11.0 should be detected as preview")
 	assert.False(t, versions[1].IsPreview, "6.10.0 should not be preview")
 	assert.False(t, versions[2].IsPreview, "6.8.3 should not be preview")
-	assert.False(t, versions[3].IsPreview, "5.15.18 should not be preview (pre-6.8)")
-}
-
-// Qt 5 real-world naming: no "addons" segment in package names.
-// Meta-packages are 4-part (qt.qt5.XXXX.moduleName), target packages are
-// 5-part virtual (qt.qt5.XXXX.moduleName.arch).
-func TestParseRepoIndex_Qt5RealWorldModules(t *testing.T) {
-	xml := packagesXML([]struct{ name, virtual, archives string }{
-		{"qt.qt5.5152.win64_msvc2019_64", "false", "qtbase-Windows-msvc.7z"},
-		// 4-part module meta-packages (non-virtual, no archives).
-		{"qt.qt5.5152.qtcharts", "false", ""},
-		{"qt.qt5.5152.qtwebengine", "false", ""},
-		// 5-part virtual target packages (have archives).
-		{"qt.qt5.5152.qtcharts.win64_msvc2019_64", "true", "qtcharts-Windows-msvc.7z"},
-		{"qt.qt5.5152.qtwebengine.win64_msvc2019_64", "true", "qtwebengine-Windows-msvc.7z"},
-	})
-
-	idx, err := parseRepoIndex(xml, "")
-	require.NoError(t, err)
-	require.Len(t, idx.QtVersions, 1)
-
-	vi := idx.QtVersions[0]
-	assert.Equal(t, "5.15.2", vi.Version)
-
-	// Modules should be discovered from the 4-part meta-packages.
-	assert.ElementsMatch(t, []string{"qtcharts", "qtwebengine"}, addonModuleNames(vi.Modules))
-
-	// Archives should be stored from the 5-part virtual packages.
-	assert.NotEmpty(t, vi.PackageArchives["qt.qt5.5152.qtcharts.win64_msvc2019_64"])
-	assert.NotEmpty(t, vi.PackageArchives["qt.qt5.5152.qtwebengine.win64_msvc2019_64"])
 }
 
 // --- cacheKeyFromURL ---
@@ -839,24 +779,6 @@ func TestFetchSrcDocExamples_PreQt68(t *testing.T) {
 	assert.True(t, vi.HasDocs)
 	docArcs := vi.PackageArchives["qt.qt6.673.doc.qtcharts"]
 	require.Len(t, docArcs, 1)
-}
-
-func TestFetchSrcDocExamples_SkipsQt5(t *testing.T) {
-	vi := &QtVersionInfo{
-		Version: "5.15.18",
-		Major:   5,
-	}
-
-	client := NewClient(10)
-	mirrors := NewMirrorList("https://example.com/", nil, "windows_x86")
-	cache := &Cache{dir: t.TempDir()}
-	fetcher := NewMetadataFetcher(client, cache, mirrors)
-
-	// Should be a no-op for Qt 5.
-	fetcher.fetchSrcDocExamples(context.Background(), vi)
-	assert.False(t, vi.HasDocs)
-	assert.False(t, vi.HasExamples)
-	assert.False(t, vi.HasSources)
 }
 
 func TestFetchSrcDocExamples_GracefulOnError(t *testing.T) {

@@ -85,7 +85,6 @@ func (m *MirrorList) ToolURLsFor(toolName string) []string {
 // Earlier versions use a single-level structure:
 //
 //	.../qt6_690/Updates.xml   (Qt 6 < 6.8)
-//	.../qt5_5150/Updates.xml  (Qt 5)
 func buildURL(base, host, version string, major int) string {
 	verStr := versionToRepoStr(version, major)
 	folder := fmt.Sprintf("qt%d_%s", major, verStr)
@@ -139,7 +138,7 @@ func (m *MirrorList) DirectoryURLs() []string {
 }
 
 // versionToRepoStr converts a version string to the compact form used in Qt repo folder names.
-// e.g. "6.10.0" -> "6100", "5.15.18" -> "51518", "5.9.0" -> "59" (patch omitted for 5.9.0).
+// e.g. "6.10.0" -> "6100", "6.8.3" -> "683".
 func versionToRepoStr(version string, major int) string {
 	parts := strings.SplitN(version, ".", 3)
 	if len(parts) < 3 {
@@ -148,18 +147,7 @@ func versionToRepoStr(version string, major int) string {
 	}
 	minor := parts[1]
 	patch := parts[2]
-	// Qt 5.9.0 special case: patch omitted.
-	if major == 5 && minor == "9" && patch == "0" {
-		return majorMinor(major, minor)
-	}
-	// Qt 5 with patch 0: patch omitted (e.g. 5.12.0 -> "5120", but 5.12.3 -> "5123").
-	// aqtinstall omits patch only for prerelease; for stable releases patch is always included
-	// except for the Qt 5.9.0 special case above.
 	return fmt.Sprintf("%d%s%s", major, minor, patch)
-}
-
-func majorMinor(major int, minor string) string {
-	return fmt.Sprintf("%d%s", major, minor)
 }
 
 // ExtensionModuleNames returns the list of known Qt extension modules.
@@ -215,12 +203,7 @@ func extensionArchSubdir(arch string) string {
 // Pre-6.8 Qt 6 versions used per-platform directories:
 //
 //	{base}online/qtsdkrepository/{host}/desktop/qt6_{ver}_src_doc_examples/Updates.xml
-//
-// Returns nil for Qt 5 (not supported).
 func (m *MirrorList) SrcDocExURLsFor(version string, major int) []string {
-	if major < 6 {
-		return nil
-	}
 	verStr := versionToRepoStr(version, major)
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))

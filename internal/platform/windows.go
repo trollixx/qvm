@@ -24,10 +24,6 @@ func (w *Windows) DefaultArch(qtVersion string) string {
 	if v.GTE(qtmeta.MustParseVersion(qt66)) {
 		return archWin64MSVC2022
 	}
-	if v.Major() < 6 {
-		// Qt 5 only ships msvc2019 archives.
-		return archWin64MSVC2019
-	}
 	// Qt 6.0-6.5: both msvc2019 and msvc2022 exist; prefer what's installed.
 	if hasMSVC("2019") {
 		return archWin64MSVC2019

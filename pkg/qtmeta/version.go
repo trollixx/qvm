@@ -14,7 +14,7 @@ type Version struct {
 	major, minor, patch int
 }
 
-// ParseVersion parses a Qt version string like "6.10.0" or "5.15.18".
+// ParseVersion parses a Qt version string like "6.10.0".
 // Requires exactly three dot-separated numeric components.
 func ParseVersion(s string) (Version, error) {
 	parts := strings.Split(s, ".")
@@ -168,12 +168,9 @@ func (vf VersionFilter) String() string {
 // IsLTS reports whether a version is a known LTS release.
 func IsLTS(s string) bool {
 	ltsVersions := map[string]bool{
-		"5.9":  true,
-		"5.12": true,
-		"5.15": true,
-		"6.2":  true,
-		"6.5":  true,
-		"6.8":  true,
+		"6.2": true,
+		"6.5": true,
+		"6.8": true,
 	}
 	v, err := ParseVersion(s)
 	if err != nil {

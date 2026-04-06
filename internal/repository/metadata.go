@@ -62,6 +62,9 @@ func (f *MetadataFetcher) FetchQtVersion(ctx context.Context, version string) (*
 	if major == 0 {
 		return nil, fmt.Errorf("invalid version %q", version)
 	}
+	if major < 6 {
+		return nil, fmt.Errorf("qt %d is not supported; only Qt 6 and later are supported", major)
+	}
 	urls := f.mirrors.URLsFor(version, major)
 	idx, err := f.fetchFromURLs(ctx, urls)
 	if err != nil {
@@ -155,7 +158,7 @@ func parseDirectoryListing(body []byte) []QtVersionInfo {
 	var versions []QtVersionInfo
 
 	// Extract href values from <a href="..."> links.
-	// We look for folders named qt5_NNN or qt6_NNN (top-level version folders).
+	// We look for folders named qt6_NNN (top-level version folders).
 	for _, folder := range extractFolderNames(html) {
 		vi, ok := folderToVersionInfo(folder)
 		if ok {
@@ -194,18 +197,13 @@ func extractFolderNames(html string) []string {
 // folderToVersionInfo converts a repository folder name like "qt6_680" into a QtVersionInfo.
 // Returns (info, true) on success; (_, false) for non-Qt-version folders (e.g. tools_*).
 func folderToVersionInfo(folder string) (QtVersionInfo, bool) {
-	// Accept: qt5_NNN or qt6_NNN (but not qt5_NNN_src_doc_examples etc.)
-	var major int
-	switch {
-	case strings.HasPrefix(folder, "qt6_"):
-		major = 6
-	case strings.HasPrefix(folder, "qt5_"):
-		major = 5
-	default:
+	// Accept: qt6_NNN (but not qt6_NNN_src_doc_examples etc.)
+	if !strings.HasPrefix(folder, "qt6_") {
 		return QtVersionInfo{}, false
 	}
 
-	suffix := folder[4:] // strip "qt5_" or "qt6_"
+	const major = 6
+	suffix := folder[4:] // strip "qt6_"
 
 	// Reject extended folders like "qt6_680_wasm_singlethread".
 	if strings.Contains(suffix, "_") {
@@ -361,9 +359,6 @@ func extensionDisplayName(name string) string {
 // Pre-6.8 Qt 6 versions also have a separate _src_doc_examples repository.
 // Errors are silently ignored (non-fatal, like extensions).
 func (f *MetadataFetcher) fetchSrcDocExamples(ctx context.Context, vi *QtVersionInfo) {
-	if vi.Major < 6 {
-		return
-	}
 	urls := f.mirrors.SrcDocExURLsFor(vi.Version, vi.Major)
 	if len(urls) == 0 {
 		return
@@ -542,7 +537,7 @@ func classifyPackage(name string) pkgClass {
 	if len(parts) < 2 {
 		return pkgClassOther
 	}
-	if parts[0] == "qt" && (strings.HasPrefix(parts[1], "qt5") || strings.HasPrefix(parts[1], "qt6")) {
+	if parts[0] == "qt" && strings.HasPrefix(parts[1], "qt6") {
 		return pkgClassQt
 	}
 	if parts[0] == "qt" && parts[1] == "tools" {
@@ -559,15 +554,10 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 		return
 	}
 	// Extract version from parts[1]: "qt6" -> 6, parts[2]: "6100" -> "6.10.0"
-	var major int
-	switch {
-	case strings.HasPrefix(parts[1], "qt6"):
-		major = 6
-	case strings.HasPrefix(parts[1], "qt5"):
-		major = 5
-	default:
+	if !strings.HasPrefix(parts[1], "qt6") {
 		return
 	}
+	const major = 6
 
 	verStr := repoSuffixToVersion(parts[2], major)
 	if verStr == "" {
@@ -600,9 +590,8 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 		return
 	}
 
-	// Register addon module. Two naming schemes exist:
-	//   Qt 6:  qt.qt6.683.addons.qt3d          (5-part, module at parts[4])
-	//   Qt 5:  qt.qt5.5152.qtcharts             (4-part, module at parts[3])
+	// Register addon module.
+	//   qt.qt6.683.addons.qt3d          (5-part, module at parts[4])
 	// This must happen before the arch check so module-only packages are not skipped.
 	var moduleName string
 	if len(parts) >= 5 && parts[3] == "addons" {
@@ -803,7 +792,7 @@ func buildArchiveRefs(pkg packageXML, baseURL string) []ArchiveRef {
 	return refs
 }
 
-// repoSuffixToVersion converts "6100" -> "6.10.0", "51518" -> "5.15.18".
+// repoSuffixToVersion converts "6100" -> "6.10.0".
 func repoSuffixToVersion(suffix string, major int) string {
 	// suffix is compact version with no dots: e.g. "6100" for 6.10.0, "51518" for 5.15.18
 	majorStr := strconv.Itoa(major)
