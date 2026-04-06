@@ -90,9 +90,20 @@ func isQt68Plus(version string) bool {
 	return v.GTE(qtmeta.MustParseVersion("6.8.0"))
 }
 
-// ProbeURL returns the combined Updates.xml URL used to detect whether a
-// version is released or preview. Released Qt 6.8+ versions have a combined
-// Updates.xml at qt6_XXXX/qt6_XXXX/Updates.xml; preview versions do not.
+// isQt611Plus reports whether version is Qt 6.11.0 or later.
+// Starting with Qt 6.11, some platforms (windows_x86) use per-arch subfolders
+// instead of a combined Updates.xml.
+func isQt611Plus(version string) bool {
+	v, err := qtmeta.ParseVersion(version)
+	if err != nil {
+		return false
+	}
+	return v.GTE(qtmeta.MustParseVersion("6.11.0"))
+}
+
+// ProbeURL returns a URL used to detect whether a version is released or
+// preview. For Qt 6.11+ it probes the version directory listing (which exists
+// for released versions); for Qt 6.8-6.10 it probes the combined Updates.xml.
 // Returns "" for pre-6.8 versions.
 func (m *MirrorList) ProbeURL(version string, major int) string {
 	if !isQt68Plus(version) {
@@ -101,7 +112,39 @@ func (m *MirrorList) ProbeURL(version string, major int) string {
 	host := m.host
 	verStr := versionToRepoStr(version, major)
 	folder := fmt.Sprintf("qt%d_%s", major, verStr)
+	if isQt611Plus(version) {
+		// Qt 6.11+: probe the version directory listing.
+		return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/", m.primary, host, folder)
+	}
 	return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/%s/Updates.xml", m.primary, host, folder, folder)
+}
+
+// VersionDirURLs returns URLs for the version directory listing.
+// Used to discover per-arch subfolders for Qt 6.11+ on platforms that use them.
+func (m *MirrorList) VersionDirURLs(version string, major int) []string {
+	host := m.host
+	verStr := versionToRepoStr(version, major)
+	folder := fmt.Sprintf("qt%d_%s", major, verStr)
+	all := append([]string{m.primary}, m.fallbacks...)
+	urls := make([]string, 0, len(all))
+	for _, base := range all {
+		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/", base, host, folder))
+	}
+	return urls
+}
+
+// PerArchURL returns the Updates.xml URL for a specific arch subfolder.
+func (m *MirrorList) PerArchURL(version string, major int, archFolder string) []string {
+	host := m.host
+	verStr := versionToRepoStr(version, major)
+	folder := fmt.Sprintf("qt%d_%s", major, verStr)
+	all := append([]string{m.primary}, m.fallbacks...)
+	urls := make([]string, 0, len(all))
+	for _, base := range all {
+		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/%s/Updates.xml",
+			base, host, folder, archFolder))
+	}
+	return urls
 }
 
 // DirectoryURL returns the HTML directory listing URL for discovering available versions.

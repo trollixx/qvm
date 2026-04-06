@@ -57,6 +57,7 @@ func NewMetadataFetcher(client *Client, cache *Cache, mirrors *MirrorList) *Meta
 // FetchQtVersion fetches metadata for a specific Qt version.
 // For Qt 6.8+, it also fetches extension modules (qtwebengine, qtpdf) and
 // merges them into the result as regular add-on modules.
+// Returns an error for preview versions that have no published metadata.
 func (f *MetadataFetcher) FetchQtVersion(ctx context.Context, version string) (*RepoIndex, error) {
 	major := qtmeta.MajorVersion(version)
 	if major == 0 {
@@ -65,8 +66,20 @@ func (f *MetadataFetcher) FetchQtVersion(ctx context.Context, version string) (*
 	if major < 6 {
 		return nil, fmt.Errorf("qt %d is not supported; only Qt 6 and later are supported", major)
 	}
+
+	// Preview versions (Qt 6.8+) have no metadata yet — detect early.
+	if isQt68Plus(version) && f.isPreviewVersion(ctx, version, major) {
+		return nil, fmt.Errorf("Qt %s is a preview version and is not yet available for installation", version)
+	}
+
+	// Try the combined Updates.xml first (works for all platforms and Qt < 6.11).
 	urls := f.mirrors.URLsFor(version, major)
 	idx, err := f.fetchFromURLs(ctx, urls)
+	if err != nil && isQt611Plus(version) {
+		// Qt 6.11+ on some platforms (windows_x86) uses per-arch subfolders
+		// instead of a combined Updates.xml. Discover and fetch them.
+		idx, err = f.fetchPerArchMetadata(ctx, version, major)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +90,120 @@ func (f *MetadataFetcher) FetchQtVersion(ctx context.Context, version string) (*
 		f.fetchSrcDocExamples(ctx, &idx.QtVersions[i])
 	}
 	return idx, nil
+}
+
+// fetchPerArchMetadata handles the Qt 6.11+ per-arch repository layout where
+// each arch has its own Updates.xml in a subfolder (e.g. qt6_6110_msvc2022_64/).
+// It discovers arch subfolders from the version directory listing, fetches each
+// Updates.xml, and merges results into a single RepoIndex.
+func (f *MetadataFetcher) fetchPerArchMetadata(ctx context.Context, version string, major int) (*RepoIndex, error) {
+	// Fetch the version directory listing to discover arch subfolders.
+	dirURLs := f.mirrors.VersionDirURLs(version, major)
+	body, _, err := f.fetchRaw(ctx, dirURLs)
+	if err != nil {
+		return nil, fmt.Errorf("fetching version directory for Qt %s: %w", version, err)
+	}
+
+	verStr := versionToRepoStr(version, major)
+	prefix := fmt.Sprintf("qt%d_%s_", major, verStr)
+	archFolders := parseArchFolders(string(body), prefix)
+	if len(archFolders) == 0 {
+		return nil, fmt.Errorf("no arch subfolders found for Qt %s", version)
+	}
+
+	// Fetch and merge each arch's Updates.xml.
+	merged := &RepoIndex{}
+	for _, archFolder := range archFolders {
+		archURLs := f.mirrors.PerArchURL(version, major, archFolder)
+		archIdx, archErr := f.fetchFromURLs(ctx, archURLs)
+		if archErr != nil {
+			// Non-fatal: skip arches that fail.
+			fmt.Fprintf(os.Stderr, "warning: fetching %s: %v\n", archFolder, archErr)
+			continue
+		}
+		mergeRepoIndex(merged, archIdx)
+	}
+
+	if len(merged.QtVersions) == 0 {
+		return nil, fmt.Errorf("no metadata found for Qt %s", version)
+	}
+	return merged, nil
+}
+
+// parseArchFolders extracts arch subfolder names from an HTML directory listing.
+// It looks for folders matching the prefix (e.g. "qt6_6110_") and returns them.
+func parseArchFolders(html, prefix string) []string {
+	var folders []string
+	for _, name := range extractFolderNames(html) {
+		if strings.HasPrefix(name, prefix) {
+			folders = append(folders, name)
+		}
+	}
+	return folders
+}
+
+// mergeRepoIndex merges src into dst, combining QtVersions with the same version string.
+func mergeRepoIndex(dst, src *RepoIndex) {
+	for _, sv := range src.QtVersions {
+		found := false
+		for i := range dst.QtVersions {
+			if dst.QtVersions[i].Version == sv.Version {
+				mergeVersionInfo(&dst.QtVersions[i], &sv)
+				found = true
+				break
+			}
+		}
+		if !found {
+			dst.QtVersions = append(dst.QtVersions, sv)
+		}
+	}
+}
+
+// mergeVersionInfo merges src into dst, combining archs, modules, and package archives.
+func mergeVersionInfo(dst, src *QtVersionInfo) {
+	// Merge archs.
+	for _, sa := range src.Archs {
+		found := false
+		for j := range dst.Archs {
+			if dst.Archs[j].Name == sa.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			dst.Archs = append(dst.Archs, sa)
+		}
+	}
+
+	// Merge modules.
+	for _, sm := range src.Modules {
+		found := false
+		for _, dm := range dst.Modules {
+			if dm.Name == sm.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			dst.Modules = append(dst.Modules, sm)
+		}
+	}
+
+	// Merge package archives.
+	if dst.PackageArchives == nil {
+		dst.PackageArchives = make(map[string][]ArchiveRef)
+	}
+	for k, v := range src.PackageArchives {
+		if _, exists := dst.PackageArchives[k]; !exists {
+			dst.PackageArchives[k] = v
+		}
+	}
+
+	// Merge feature flags.
+	dst.HasDocs = dst.HasDocs || src.HasDocs
+	dst.HasExamples = dst.HasExamples || src.HasExamples
+	dst.HasSources = dst.HasSources || src.HasSources
+	dst.HasDebugInfo = dst.HasDebugInfo || src.HasDebugInfo
 }
 
 // FetchAllQtVersions fetches the list of available Qt versions by parsing
