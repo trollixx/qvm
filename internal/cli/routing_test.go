@@ -45,15 +45,9 @@ func TestInstall_QtNoVersion(t *testing.T) {
 // -- list ----------------------------------------------------------------------
 
 func TestList_NoArg(t *testing.T) {
-	// Bare `qvm list` now shows installed versions (no error).
+	// Bare `qvm list` shows installed versions (no error).
 	err := run(t, "list")
 	assert.NoError(t, err)
-}
-
-func TestList_UnknownTarget(t *testing.T) {
-	// Non-numeric args that can't be parsed as a version filter are rejected.
-	err := run(t, "list", "notavalidthing")
-	assertErrContains(t, err, "invalid version")
 }
 
 // -- uninstall -----------------------------------------------------------------

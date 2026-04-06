@@ -20,71 +20,35 @@ func (a *app) newListCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "list",
 		Aliases:         []string{"ls"},
-		Usage:           "List installed or available Qt versions",
-		ArgsUsage:       "[<major>[.<minor>[.<patch>]]]",
+		Usage:           "List installed Qt versions",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "all",
-				Usage: "show all available versions, not just installed",
-			},
 			newFormatFlag(),
-			newHostFlag(),
 		},
 		Action: a.runList,
 	}
 }
 
-func (a *app) runList(ctx context.Context, cmd *cli.Command) error {
-	arg := cmd.Args().Get(0)
-	showAll := cmd.Bool("all")
-	format := cmd.String("format")
-	host := cmd.String("host")
-
-	version := arg
-
-	// Version filter: "6", "6.8", "6.8.3" -> detail or filtered view.
-	if version != "" {
-		vf, err := qtmeta.ParseVersionFilter(version)
-		if err != nil {
-			return fmt.Errorf("invalid version %q: %w", version, err)
-		}
-
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("loading config: %w", err)
-		}
-		fetcher, err := buildFetcher(cfg, host)
-		if err != nil {
-			return fmt.Errorf("initializing fetcher: %w", err)
-		}
-
-		// Full version (e.g. "6.8.3") -> detail view.
-		// Partial version (e.g. "6" or "6.9") -> filtered list view.
-		if vf.IsFullVersion() {
-			return a.runListQtVersion(ctx, fetcher, version, format)
-		}
-
-		registry, err := storage.NewRegistryManager()
-		if err != nil {
-			return fmt.Errorf("opening registry: %w", err)
-		}
-		reg, err := registry.Load()
-		if err != nil {
-			return fmt.Errorf("loading registry: %w", err)
-		}
-		return a.runListQtFiltered(ctx, fetcher, reg, vf, format)
+func (a *app) newListRemoteCommand() *cli.Command {
+	return &cli.Command{
+		Name:            "list-remote",
+		Aliases:         []string{"ls-remote"},
+		Usage:           "List available Qt versions from the repository",
+		ArgsUsage:       "[<major>[.<minor>[.<patch>]]]",
+		CommandNotFound: showHelpOnNotFound,
+		Flags: []cli.Flag{
+			newFormatFlag(),
+			newHostFlag(),
+		},
+		Action: a.runListRemote,
 	}
-
-	if showAll {
-		return a.runListAll(ctx, arg, format, host)
-	}
-	return a.runListInstalled(arg, format)
 }
 
-// --- Installed-only views (default) ---
+// --- list (installed) ---
 
-func (a *app) runListInstalled(_, format string) error {
+func (a *app) runList(_ context.Context, cmd *cli.Command) error {
+	format := cmd.String("format")
+
 	registry, err := storage.NewRegistryManager()
 	if err != nil {
 		return fmt.Errorf("opening registry: %w", err)
@@ -108,8 +72,8 @@ func (a *app) printInstalledQt(reg *storage.Registry) {
 	if len(reg.Qt) == 0 {
 		fmt.Fprintln(a.streams.Out, "  (none)")
 		fmt.Fprintln(a.streams.Out)
-		fmt.Fprintln(a.streams.Out, "  Install one with: qvm install<version>")
-		fmt.Fprintln(a.streams.Out, "  Run 'qvm list --all' to see available versions.")
+		fmt.Fprintln(a.streams.Out, "  Install one with: qvm install <version>")
+		fmt.Fprintln(a.streams.Out, "  Run 'qvm list-remote' to see available versions.")
 		return
 	}
 
@@ -150,9 +114,13 @@ func buildExtrasLine(extras storage.InstalledExtras) string {
 	return strings.Join(parts, ", ")
 }
 
-// --- All-available views (with installed markers) ---
+// --- list-remote (available) ---
 
-func (a *app) runListAll(ctx context.Context, _, format, host string) error {
+func (a *app) runListRemote(ctx context.Context, cmd *cli.Command) error {
+	arg := cmd.Args().Get(0)
+	format := cmd.String("format")
+	host := cmd.String("host")
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -160,6 +128,42 @@ func (a *app) runListAll(ctx context.Context, _, format, host string) error {
 	fetcher, err := buildFetcher(cfg, host)
 	if err != nil {
 		return fmt.Errorf("initializing fetcher: %w", err)
+	}
+
+	if arg == "" {
+		return a.runListRemoteAll(ctx, fetcher, format)
+	}
+
+	vf, err := qtmeta.ParseVersionFilter(arg)
+	if err != nil {
+		return fmt.Errorf("invalid version %q: %w", arg, err)
+	}
+
+	// Full version (e.g. "6.8.3") -> detail view.
+	if vf.IsFullVersion() {
+		return a.runListRemoteVersion(ctx, fetcher, arg, format)
+	}
+
+	// Partial version (e.g. "6" or "6.9") -> filtered list view.
+	registry, err := storage.NewRegistryManager()
+	if err != nil {
+		return fmt.Errorf("opening registry: %w", err)
+	}
+	reg, err := registry.Load()
+	if err != nil {
+		return fmt.Errorf("loading registry: %w", err)
+	}
+	return a.runListRemoteFiltered(ctx, fetcher, reg, vf, format)
+}
+
+func (a *app) runListRemoteAll(
+	ctx context.Context,
+	fetcher *repository.MetadataFetcher,
+	format string,
+) error {
+	versions, err := fetcher.FetchAllQtVersions(ctx)
+	if err != nil {
+		return fmt.Errorf("fetching Qt versions: %w", err)
 	}
 
 	// Load registry for installed markers.
@@ -170,20 +174,6 @@ func (a *app) runListAll(ctx context.Context, _, format, host string) error {
 	reg, err := registry.Load()
 	if err != nil {
 		return fmt.Errorf("loading registry: %w", err)
-	}
-
-	return a.runListAllQt(ctx, fetcher, reg, format)
-}
-
-func (a *app) runListAllQt(
-	ctx context.Context,
-	fetcher *repository.MetadataFetcher,
-	reg *storage.Registry,
-	format string,
-) error {
-	versions, err := fetcher.FetchAllQtVersions(ctx)
-	if err != nil {
-		return fmt.Errorf("fetching Qt versions: %w", err)
 	}
 
 	if format == formatJSON {
@@ -233,11 +223,11 @@ func (a *app) runListAllQt(
 		}
 	}
 
-	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list<version>' to see available targets and modules.")
+	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list-remote <version>' to see available targets and modules.")
 	return nil
 }
 
-func (a *app) runListQtFiltered(
+func (a *app) runListRemoteFiltered(
 	ctx context.Context,
 	fetcher *repository.MetadataFetcher,
 	reg *storage.Registry,
@@ -259,7 +249,7 @@ func (a *app) runListQtFiltered(
 	if len(filtered) == 0 {
 		return withHint(
 			fmt.Errorf("no Qt versions matching %q found", vf.String()),
-			"Run 'qvm list --all' to see all available versions.",
+			"Run 'qvm list-remote' to see all available versions.",
 		)
 	}
 
@@ -289,13 +279,13 @@ func (a *app) runListQtFiltered(
 		a.printVersionRow(v, label, installedVersions, recommendedVersion)
 	}
 
-	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list<version>' to see available targets and modules.")
+	fmt.Fprintln(a.streams.Out, "\nRun 'qvm list-remote <version>' to see available targets and modules.")
 	return nil
 }
 
 // --- Version detail view ---
 
-func (a *app) runListQtVersion(ctx context.Context, fetcher *repository.MetadataFetcher, version, format string) error {
+func (a *app) runListRemoteVersion(ctx context.Context, fetcher *repository.MetadataFetcher, version, format string) error {
 	idx, err := fetcher.FetchQtVersion(ctx, version)
 	if err != nil {
 		return fmt.Errorf("fetching metadata for Qt %s: %w", version, err)
@@ -311,7 +301,7 @@ func (a *app) runListQtVersion(ctx context.Context, fetcher *repository.Metadata
 	if vi == nil {
 		return withHint(
 			fmt.Errorf("Qt version %s not found in repository", version),
-			"Run 'qvm list --all' to see available versions.",
+			"Run 'qvm list-remote' to see available versions.",
 		)
 	}
 
@@ -371,6 +361,8 @@ func (a *app) runListQtVersion(ctx context.Context, fetcher *repository.Metadata
 
 	return nil
 }
+
+// --- helpers ---
 
 func sortVersionsDesc(vers []repository.QtVersionInfo) {
 	sort.Slice(vers, func(i, j int) bool {

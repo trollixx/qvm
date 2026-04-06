@@ -63,11 +63,11 @@ func SuggestVersion(bad string, available []string) *QvmError {
 	if len(suggestions) > 0 {
 		cmds := make([]string, len(suggestions))
 		for i, s := range suggestions {
-			cmds[i] = fmt.Sprintf("  qvm install qt@%s", s)
+			cmds[i] = fmt.Sprintf("  qvm install %s", s)
 		}
 		err.Message += "\n\nDid you mean:\n" + joinLines(cmds)
 	} else {
-		err.Message += "\n\nRun 'qvm list --all' to see available versions."
+		err.Message += "\n\nRun 'qvm list-remote' to see available versions."
 	}
 	return err
 }
