@@ -1,6 +1,6 @@
 # qvm — Qt Version Manager
 
-A single-binary CLI tool for installing and managing Qt SDK versions and tools on Windows.
+A single-binary CLI tool for installing and managing Qt SDK versions on Windows.
 
 Linux and macOS are not currently supported despite occasional references.
 
@@ -8,29 +8,29 @@ Linux and macOS are not currently supported despite occasional references.
 > This tool is mostly AI generated for my own needs. The code has not been thoroughly reviewed. Use at your own risk! The interface will most likely change too.
 
 ```shell
-qvm install qt@6.8.3
+qvm install 6.8.3
 Resolving archives for Qt 6.8.3 (win64_msvc2022_64)...
 Downloading [1/12] qtbase-windows-x86_64.7z  124 MB/s  34%
 ...
 Qt 6.8.3 (win64_msvc2022_64) installed to C:\Qt\6.8.3\win64_msvc2022_64
 
-qvm path qt@6.8.3
+qvm prefix 6.8.3
 C:\Qt\6.8.3\win64_msvc2022_64
 
-$Env:Qt6_DIR=$(qvm path qt@6.8.3)
+$Env:Qt6_DIR=$(qvm prefix 6.8.3)
 ```
 
 ## Features
 
-- Install any Qt version (5.x / 6.x) with a single command.
+- Install any Qt 6.x version with a single command (Qt 5 is not supported).
 - Install Qt add-on modules, documentation, examples, sources, and debug symbols.
-- Install Qt tools (Qt Creator).
-- Parallel downloads with retry and progress reporting.
+- Parallel downloads with retry, resumable interrupted transfers, and progress reporting.
 - Auto-detect the best compiler/ABI for the current machine.
-- Mirror management - auto-probe and switch to the fastest Qt mirror.
-- Fuzzy search for module and tool names.
+- Mirror management — auto-probe and switch to the fastest Qt mirror.
+- Fuzzy search for module names.
 - JSON output for scripting and automation.
 - Metadata caching to minimize network requests.
+- Concurrent-install safe (registry file locking).
 
 ## Installation
 
@@ -48,22 +48,19 @@ Download from the [Releases](https://github.com/trollixx/qvm/releases) page.
 
 ```shell
 # List available Qt versions
-qvm list --all qt
+qvm list-remote
 
 # Install Qt 6.8.3 (auto-detects compiler/ABI)
-qvm install qt@6.8.3
+qvm install 6.8.3
 
 # Install with specific modules
-qvm install qt@6.8.3 --modules qtcharts,qtwebengine
-
-# Install Qt Creator
-qvm install qtcreator@15.0.0
+qvm install 6.8.3 --modules qtcharts,qtwebengine
 
 # Show what is installed
 qvm list
 
 # Get the install path (useful with CMake)
-qvm path qt@6.8.3
+qvm prefix 6.8.3
 
 # Run health checks
 qvm doctor
@@ -73,11 +70,10 @@ qvm doctor
 
 ### `install` (`i`)
 
-Install a Qt version or tool.
+Install a Qt version.
 
 ```shell
-qvm install qt@<version> [flags]
-qvm install <tool>[@<version>] [flags]
+qvm install <version> [flags]
 ```
 
 #### Flags
@@ -94,98 +90,110 @@ qvm install <tool>[@<version>] [flags]
 | `--host` | Host platform override (e.g. `windows_arm64`, `linux_arm64`). Auto-detected if omitted. |
 | `--force` | Re-install even if already present |
 | `--dir` | Override Qt installation directory |
-| `--dry-run` | Resolve and print archives without downloading |
+| `--dry-run` | Resolve and print archives (with sizes) without downloading |
 | `--quiet`, `-q` | Suppress progress output |
+
+If a Qt version is already installed, qvm will only download and install the
+delta — any new modules or extras you have added — unless `--force` is given.
 
 #### Examples
 
 ```shell
 # Base Qt only
-qvm install qt@6.8.3
+qvm install 6.8.3
 
 # With modules and docs
-qvm install qt@6.8.3 --modules qtcharts,qtmultimedia --docs
+qvm install 6.8.3 --modules qtcharts,qtmultimedia --docs
 
 # Specific ABI
-qvm install qt@6.8.3 --arch win64_mingw
+qvm install 6.8.3 --arch win64_mingw
 
 # Android target
-qvm install qt@6.8.3 --target android
+qvm install 6.8.3 --target android
 
 # WASM build with all extras
-qvm install qt@6.8.3 --target wasm --modules qtcharts --docs --examples --sources
-
-# Tool install
-qvm install qtcreator@15.0.0
+qvm install 6.8.3 --target wasm --modules qtcharts --docs --examples --sources
 ```
 
 ---
 
 ### `list` (`ls`)
 
-List installed Qt versions and tools, or browse what is available remotely.
+List installed Qt versions. Fast and offline (no network access).
 
 ```shell
-qvm list [qt|tools] [qt@<version>] [flags]
+qvm list [flags]
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--all` | Show available (remote) versions instead of installed |
 | `--format`, `-f` | Output format: `text` (default) or `json` |
 
+---
+
+### `list-remote` (`ls-remote`)
+
+List Qt versions available in the repository, with installed versions marked.
+
 ```shell
-qvm list                     # all installed
-qvm list qt                  # installed Qt only
-qvm list tools               # installed tools only
-qvm list qt@6.8.3            # details for a specific version
-qvm list --all               # all available in the repository
-qvm list --all qt            # all available Qt versions
-qvm list --format json       # JSON output for scripting
+qvm list-remote [<version-filter>] [flags]
+```
+
+| Flag | Description |
+| --- | --- |
+| `--format`, `-f` | Output format: `text` (default) or `json` |
+| `--host` | Host platform override (e.g. `windows_arm64`, `linux_arm64`) |
+
+```shell
+qvm list-remote                # all available, grouped by major
+qvm list-remote 6              # all 6.x versions
+qvm list-remote 6.8            # all 6.8.x versions
+qvm list-remote 6.8.3          # detailed view: archs, modules, extras
+qvm list-remote --format json  # machine-readable output
 ```
 
 ---
 
 ### `uninstall` (`remove`)
 
-Uninstall a Qt version or tool.
+Uninstall a Qt version.
 
 ```shell
-qvm uninstall qt@<version> [flags]
-qvm uninstall <tool>@<version> [flags]
+qvm uninstall <version> [flags]
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--arch`, `-a` | Remove only a specific ABI (for multi-arch Qt installations) |
+| `--arch`, `-a` | Remove only a specific ABI (for multi-arch installations) |
 | `--yes`, `-y` | Skip confirmation prompt |
 
 ---
 
-### `path`
+### `prefix`
 
-Print the installation directory for a Qt version or tool.
+Print the installation directory for a Qt version.
 
 ```shell
-qvm path qt@<version> [--arch <arch>]
-qvm path <tool>[@<version>]
+qvm prefix <version> [--arch <arch>]
 ```
 
 Ideal for use in build scripts:
 
 ```shell
-cmake -DCMAKE_PREFIX_PATH=$(qvm path qt@6.8.3) ..
+cmake -DCMAKE_PREFIX_PATH=$(qvm prefix 6.8.3) ..
 ```
+
+If multiple ABIs are installed for the same version, qvm picks the host's
+default arch automatically; use `--arch` to disambiguate explicitly.
 
 ---
 
 ### `info` (`show`)
 
-Show detailed information about an installed version or tool.
+Show detailed information about an installed Qt version.
 
 ```shell
-qvm info qt@<version> [flags]
-qvm info <tool>[@<version>] [flags]
+qvm info <version> [flags]
 ```
 
 | Flag | Description |
@@ -197,16 +205,16 @@ qvm info <tool>[@<version>] [flags]
 
 ### `search` (`s`)
 
-Fuzzy-search available module and tool names.
+Fuzzy-search available add-on module names.
 
 ```shell
 qvm search <query>
 ```
 
 ```shell
-qvm search charts      # finds qtcharts
-qvm search crtea       # finds qtcreator
-qvm search --format json webengine
+qvm search charts                  # finds qtcharts
+qvm search webengine
+qvm search --format json multimedia
 ```
 
 ---
@@ -219,7 +227,9 @@ Run environment health checks.
 qvm doctor
 ```
 
-Checks include config readability, metadata cache freshness, disk space, Qt and tool installation integrity, and compiler availability (MSVC on Windows, clang on macOS, GCC on Linux).
+Checks include config readability, metadata cache freshness, disk space, Qt
+installation integrity (qmake works), and compiler availability (MSVC on
+Windows).
 
 ---
 
@@ -239,7 +249,6 @@ qvm config path
 | Key | Default | Description |
 | --- | --- | --- |
 | `install.dir` | `C:\Qt` / `~/Qt` | Qt installation root |
-| `install.tools_dir` | `{install.dir}/Tools` | Tools installation directory |
 | `repository.url` | `https://download.qt.io/` | Primary Qt mirror |
 | `repository.mirrors` | - | Fallback mirror URLs (comma-separated) |
 | `repository.blacklist` | - | Mirrors to exclude (comma-separated) |
@@ -283,16 +292,16 @@ qvm mirror select --auto
 qvm mirror select <url>
 ```
 
-- **`list`** - Probe all cached mirrors and display latency. Marks the current primary (`*`) and fastest (`←`).
-- **`refresh`** - Fetch the latest mirror list from Qt.
-- **`select --auto`** - Probe all mirrors and switch to the fastest reachable one.
-- **`select <url>`** - Test a specific URL and switch to it if reachable.
+- **`list`** — Probe all cached mirrors and display latency. Marks the current primary (`*`) and fastest (`←`).
+- **`refresh`** — Fetch the latest mirror list from Qt.
+- **`select --auto`** — Probe all mirrors and switch to the fastest reachable one.
+- **`select <url>`** — Test a specific URL and switch to it if reachable.
 
 ## Platform Support
 
 | OS | Architectures | Default ABI |
 | --- | --- | --- |
-| Windows | x86_64, x86 | `win64_msvc2022_64` |
+| Windows | x86_64 | `win64_msvc2022_64` |
 | Linux | x86_64, aarch64 | `gcc_64` |
 | macOS | x86_64, arm64 | `macos` |
 
@@ -303,11 +312,10 @@ qvm mirror select <url>
 | Windows | `win64_msvc2022_64` | MSVC 2022 64-bit |
 | Windows | `win64_msvc2019_64` | MSVC 2019 64-bit |
 | Windows | `win64_mingw` | MinGW-w64 64-bit |
-| Windows | `win32_msvc2022` | MSVC 2022 32-bit |
+| Windows | `win64_llvm_mingw` | LLVM/Clang MinGW 64-bit |
 | Linux | `gcc_64` | GCC x86_64 |
-| Linux | `gcc_arm64` | GCC AArch64 |
+| Linux | `linux_gcc_arm64` | GCC AArch64 |
 | macOS | `macos` | Clang (universal / x86_64) |
-| macOS | `macos_arm64` | Clang ARM64 |
 
 The `install` command auto-detects the recommended ABI for the current machine. Use `--arch` to override.
 
