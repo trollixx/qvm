@@ -142,5 +142,4 @@ func TestConfigList_RequiredValuesPresent(t *testing.T) {
 	for _, key := range required {
 		assert.NotEmpty(t, byKey[key], "value for required key %q should not be empty", key)
 	}
-
 }

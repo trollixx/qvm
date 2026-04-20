@@ -281,4 +281,3 @@ func archiveModuleName(filename string) string {
 	}
 	return ""
 }
-

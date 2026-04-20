@@ -31,7 +31,6 @@ type InstalledQt struct {
 	SizeBytes   int64           `json:"size_bytes,omitempty"`
 }
 
-
 // Registry is the root of the registry file.
 type Registry struct {
 	Version int           `json:"version"`
@@ -157,4 +156,3 @@ func (m *RegistryManager) RemoveQt(version, arch string) error {
 	r.Qt = filtered
 	return m.Save(r)
 }
-

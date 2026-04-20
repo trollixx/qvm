@@ -262,7 +262,10 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	patchErr := PatchQtConf(installDir)
 	if patchErr != nil {
 		// Non-fatal; surface as a warning through the progress channel.
-		sendProgress(progressCh, ProgressEvent{Phase: "warning", Warning: "patching qt.conf failed: " + patchErr.Error()})
+		sendProgress(
+			progressCh,
+			ProgressEvent{Phase: "warning", Warning: "patching qt.conf failed: " + patchErr.Error()},
+		)
 	}
 
 	// Calculate installed size.

@@ -34,9 +34,9 @@ type Downloader struct {
 
 // DownloadCacheDir returns the centralized cache directory used to store
 // in-progress (.part) and completed archive files across runs.
-// On Windows: %LOCALAPPDATA%\qvm\downloads
-// On Linux:   ~/.cache/qvm/downloads
-// On macOS:   ~/Library/Caches/qvm/downloads
+// On Windows: %LOCALAPPDATA%\qvm\downloads.
+// On Linux:   ~/.cache/qvm/downloads.
+// On macOS:   ~/Library/Caches/qvm/downloads.
 func DownloadCacheDir() (string, error) {
 	base, err := os.UserCacheDir()
 	if err != nil {

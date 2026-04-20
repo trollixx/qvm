@@ -93,4 +93,3 @@ func (a *app) prefixQt(reg *storage.Registry, version, arch string) error {
 		)
 	}
 }
-

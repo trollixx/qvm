@@ -52,4 +52,3 @@ func Cleanup(reg *RegistryManager, version, arch, expectedRoot string) error {
 
 	return reg.RemoveQt(version, arch)
 }
-

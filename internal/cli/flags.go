@@ -13,7 +13,6 @@ import (
 
 const formatJSON = "json"
 
-
 // showHelpOnNotFound is a CommandNotFound handler that shows the command's help
 // instead of printing "No help topic for ...". This is needed because positional
 // args (e.g. "6.8.3") are mistaken for subcommands when --help is used.

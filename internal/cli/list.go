@@ -285,7 +285,11 @@ func (a *app) runListRemoteFiltered(
 
 // --- Version detail view ---
 
-func (a *app) runListRemoteVersion(ctx context.Context, fetcher *repository.MetadataFetcher, version, format string) error {
+func (a *app) runListRemoteVersion(
+	ctx context.Context,
+	fetcher *repository.MetadataFetcher,
+	version, format string,
+) error {
 	idx, err := fetcher.FetchQtVersion(ctx, version)
 	if err != nil {
 		return fmt.Errorf("fetching metadata for Qt %s: %w", version, err)

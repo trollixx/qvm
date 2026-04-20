@@ -161,4 +161,3 @@ func TestCleanup_RejectsUnsafePath(t *testing.T) {
 	_, statErr := os.Stat(outsideDir)
 	assert.NoError(t, statErr, "directory outside root must not be deleted")
 }
-

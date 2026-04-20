@@ -9,7 +9,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-
 	"github.com/trollixx/qvm/internal/storage"
 )
 
