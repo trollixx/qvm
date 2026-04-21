@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -155,23 +154,14 @@ func TestExtractTar_PathTraversalBlocked(t *testing.T) {
 	destDir := filepath.Join(dir, "output")
 	err := extractTar(archivePath, destDir, "evil.tar.gz", nil)
 
-	if runtime.GOOS == "windows" {
-		// On Windows, filepath.Clean("/" + "../../evil.txt") resolves to
-		// "\evil.txt", so filepath.Join places it safely inside destDir.
-		// The traversal is neutralized by Go's filepath handling.
-		require.NoError(t, err)
-		// File should exist inside destDir, not outside.
-		_, err = os.Stat(filepath.Join(destDir, "evil.txt"))
-		require.NoError(t, err, "file should be safely extracted inside destDir")
-		_, err = os.Stat(filepath.Join(dir, "evil.txt"))
-		assert.True(t, os.IsNotExist(err), "file should not exist outside destDir")
-	} else {
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "path traversal blocked")
-		// Ensure the evil file was not created outside destDir.
-		_, err = os.Stat(filepath.Join(dir, "evil.txt"))
-		assert.True(t, os.IsNotExist(err), "evil file should not exist outside destDir")
-	}
+	// filepath.Clean("/" + "../../evil.txt") resolves to "/evil.txt" on all
+	// platforms, so filepath.Join places the entry safely inside destDir —
+	// the traversal is neutralized by Go's filepath handling.
+	require.NoError(t, err)
+	_, err = os.Stat(filepath.Join(destDir, "evil.txt"))
+	require.NoError(t, err, "file should be safely extracted inside destDir")
+	_, err = os.Stat(filepath.Join(dir, "evil.txt"))
+	assert.True(t, os.IsNotExist(err), "file should not exist outside destDir")
 }
 
 func TestExtractTar_NilEventChannel(t *testing.T) {
