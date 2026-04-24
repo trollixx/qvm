@@ -615,6 +615,43 @@ func isQtPackage(name string) bool {
 	return len(parts) >= 2 && parts[0] == "qt" && strings.HasPrefix(parts[1], "qt6")
 }
 
+// extractModuleName parses the addon module name from a Qt package name's dotted parts, or "" if none.
+//
+//	qt.qt6.683.addons.qt3d  (5-part, module at parts[4])
+//	qt.qt6.683.qtcharts     (4-part, no arch — module at parts[3])
+func extractModuleName(parts []string) string {
+	if len(parts) >= 5 && parts[3] == "addons" {
+		return parts[4]
+	}
+	if len(parts) != 4 || extractTarget(parts) != "" {
+		return ""
+	}
+	candidate := parts[3]
+	skip := map[string]bool{"doc": true, "examples": true, "sources": true, "debug_info": true, "addons": true}
+	if skip[candidate] {
+		return ""
+	}
+	return candidate
+}
+
+func registerModule(vi *QtVersionInfo, moduleName, pkgDisplayName string) {
+	displayName := pkgDisplayName
+	if displayName == "" {
+		displayName = moduleName
+	}
+	for i, m := range vi.Modules {
+		if m.Name != moduleName {
+			continue
+		}
+		// Update DisplayName if it was previously set to the fallback (raw name).
+		if vi.Modules[i].DisplayName == moduleName && displayName != moduleName {
+			vi.Modules[i].DisplayName = displayName
+		}
+		return
+	}
+	vi.Modules = append(vi.Modules, Module{Name: moduleName, DisplayName: displayName})
+}
+
 func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, baseURL string, virtual bool) {
 	// Name format: qt.qt6.6100.win64_msvc2022_64
 	// or:          qt.qt6.6100.addons.qtcharts.win64_msvc2022_64
@@ -659,38 +696,9 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 		return
 	}
 
-	// Register addon module.
-	//   qt.qt6.683.addons.qt3d          (5-part, module at parts[4])
-	// This must happen before the arch check so module-only packages are not skipped.
-	var moduleName string
-	if len(parts) >= 5 && parts[3] == "addons" {
-		moduleName = parts[4]
-	} else if len(parts) == 4 && extractTarget(parts) == "" {
-		candidate := parts[3]
-		skip := map[string]bool{"doc": true, "examples": true, "sources": true, "debug_info": true, "addons": true}
-		if !skip[candidate] {
-			moduleName = candidate
-		}
-	}
-	if moduleName != "" {
-		displayName := pkg.DisplayName
-		if displayName == "" {
-			displayName = moduleName
-		}
-		foundM := false
-		for i, m := range vi.Modules {
-			if m.Name == moduleName {
-				foundM = true
-				// Update DisplayName if it was previously set to the fallback (raw name).
-				if vi.Modules[i].DisplayName == moduleName && displayName != moduleName {
-					vi.Modules[i].DisplayName = displayName
-				}
-				break
-			}
-		}
-		if !foundM {
-			vi.Modules = append(vi.Modules, Module{Name: moduleName, DisplayName: displayName})
-		}
+	// Register addon module before the arch check so module-only packages are not skipped.
+	if moduleName := extractModuleName(parts); moduleName != "" {
+		registerModule(vi, moduleName, pkg.DisplayName)
 	}
 
 	// Determine arch (last part after version/addons).

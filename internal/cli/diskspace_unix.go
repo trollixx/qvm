@@ -12,8 +12,9 @@ func diskSpace(path string) (uint64, uint64, error) {
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return 0, 0, err
 	}
-	// stat.Bsize may be int32 (Darwin) or int64 (Linux); cast safely.
-	bsize := uint64(stat.Bsize)
+	// stat.Bsize may be int32 (Darwin) or int64 (Linux); the kernel-provided
+	// block size is always non-negative, so the conversion is safe.
+	bsize := uint64(stat.Bsize) //nolint:gosec // kernel block size is non-negative
 	free := stat.Bavail * bsize
 	total := stat.Blocks * bsize
 	return free, total, nil

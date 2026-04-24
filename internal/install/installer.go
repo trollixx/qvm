@@ -30,6 +30,7 @@ func randSuffix() string {
 	if _, err := rand.Read(b[:]); err != nil {
 		// Fallback: use current time if OS entropy source is unavailable.
 		t := time.Now().UnixNano()
+		//nolint:gosec // intentional low-byte truncation for entropy fallback
 		b[0], b[1], b[2], b[3] = byte(t), byte(t>>8), byte(t>>16), byte(t>>24)
 	}
 	return hex.EncodeToString(b[:])
@@ -75,54 +76,197 @@ func NewInstaller(resolver *repository.Resolver, registry *storage.RegistryManag
 	return &Installer{resolver: resolver, registry: registry}
 }
 
+// findExisting returns the registered install matching opts, or nil if not found or --force.
+func (inst *Installer) findExisting(opts Options) *storage.InstalledQt {
+	if opts.Force {
+		return nil
+	}
+	reg, err := inst.registry.Load()
+	if err != nil {
+		return nil
+	}
+	for i := range reg.Qt {
+		if reg.Qt[i].Version == opts.Version && reg.Qt[i].Arch == opts.Arch {
+			return &reg.Qt[i]
+		}
+	}
+	return nil
+}
+
+// buildResolveOptions computes resolver options for a fresh install or a delta over existingQt.
+// The bool return is true when the delta is empty (nothing to do).
+func buildResolveOptions(
+	opts Options, existingQt *storage.InstalledQt, modules []string,
+) (repository.ResolveOptions, bool) {
+	ro := repository.ResolveOptions{Version: opts.Version, Arch: opts.Arch}
+	if existingQt == nil {
+		ro.Modules = modules
+		ro.Docs = opts.Docs
+		ro.Examples = opts.Examples
+		ro.Sources = opts.Sources
+		ro.DebugInfo = opts.DebugInfo
+		return ro, false
+	}
+	ro.SkipEssentials = true
+	ro.Modules = diffSlices(modules, existingQt.Modules)
+	ro.AllModules = mergeSlices(existingQt.Modules, modules)
+	ro.Docs = opts.Docs && !existingQt.Extras.Docs
+	ro.Examples = opts.Examples && !existingQt.Extras.Examples
+	ro.Sources = opts.Sources && !existingQt.Extras.Sources
+	ro.DebugInfo = opts.DebugInfo && !existingQt.Extras.DebugInfo
+	upToDate := len(ro.Modules) == 0 && !ro.Docs && !ro.Examples && !ro.Sources && !ro.DebugInfo
+	return ro, upToDate
+}
+
+// runDryRun emits dryrun progress events for each resolved archive without downloading.
+func runDryRun(archives []repository.ResolvedArchive, progressCh chan<- ProgressEvent) {
+	sendProgress(progressCh, ProgressEvent{Phase: "dryrun", ArchiveTotal: len(archives)})
+	for _, a := range archives {
+		sendProgress(progressCh, ProgressEvent{
+			Phase:      "dryrun",
+			Archive:    a.Ref.Filename,
+			BytesTotal: a.Ref.Size,
+		})
+	}
+}
+
+// runDownload executes the download phase: emits progress, starts the forwarder, and calls DownloadAll.
+func runDownload(
+	ctx context.Context, opts Options, refs []repository.ArchiveRef, dlDir string, progressCh chan<- ProgressEvent,
+) ([]string, error) {
+	archiveTotal := len(refs)
+	sendProgress(progressCh, ProgressEvent{Phase: "downloading", ArchiveTotal: archiveTotal})
+	concurrency := opts.Concurrency
+	if concurrency <= 0 {
+		concurrency = defaultConcurrency
+	}
+	timeout := opts.Timeout
+	if timeout <= 0 {
+		timeout = defaultTimeoutSeconds
+	}
+	downloader := NewDownloader(concurrency, timeout, dlDir)
+	dlCh := make(chan DownloadEvent, 256)
+	go forwardDownloadProgress(dlCh, progressCh, archiveTotal)
+	localPaths, err := downloader.DownloadAll(ctx, refs, dlCh)
+	close(dlCh)
+	if err != nil {
+		return nil, fmt.Errorf("downloading: %w", err)
+	}
+	return localPaths, nil
+}
+
+// runExtract executes the extraction phase: starts the forwarder and calls ExtractAll.
+func runExtract(localPaths []string, extractDir string, progressCh chan<- ProgressEvent) error {
+	sendProgress(progressCh, ProgressEvent{Phase: "extracting"})
+	exCh := make(chan ExtractionEvent, 256)
+	go forwardExtractionProgress(exCh, progressCh)
+	err := ExtractAll(localPaths, extractDir, exCh)
+	close(exCh)
+	if err != nil {
+		return fmt.Errorf("extracting: %w", err)
+	}
+	return nil
+}
+
+// forwardDownloadProgress consumes dlCh and re-emits events on progressCh with aggregated counts.
+// Returns when dlCh is closed.
+func forwardDownloadProgress(dlCh <-chan DownloadEvent, progressCh chan<- ProgressEvent, archiveTotal int) {
+	completed := 0
+	for ev := range dlCh {
+		if ev.Err != nil {
+			return
+		}
+		if ev.Done {
+			completed++
+		}
+		sendProgress(progressCh, ProgressEvent{
+			Phase:        "downloading",
+			Archive:      ev.Filename,
+			BytesDone:    ev.BytesDone,
+			BytesTotal:   ev.BytesTotal,
+			Speed:        ev.Speed,
+			ArchiveIndex: completed,
+			ArchiveTotal: archiveTotal,
+		})
+	}
+}
+
+// forwardExtractionProgress consumes exCh and re-emits events on progressCh with computed percent.
+// Returns when exCh is closed.
+func forwardExtractionProgress(exCh <-chan ExtractionEvent, progressCh chan<- ProgressEvent) {
+	for ev := range exCh {
+		pct := float64(0)
+		if ev.BytesTotal > 0 {
+			pct = float64(ev.BytesDone) / float64(ev.BytesTotal) * 100
+		}
+		sendProgress(progressCh, ProgressEvent{
+			Phase:      "extracting",
+			Archive:    ev.Archive,
+			BytesDone:  ev.BytesDone,
+			BytesTotal: ev.BytesTotal,
+			Percent:    pct,
+		})
+	}
+}
+
+// verifyDownloads checks the SHA-1 of each downloaded archive whose ref has a non-empty SHA1.
+func verifyDownloads(paths []string, refs []repository.ArchiveRef, progressCh chan<- ProgressEvent) error {
+	for i, path := range paths {
+		if refs[i].SHA1 == "" {
+			continue
+		}
+		sendProgress(progressCh, ProgressEvent{Phase: "verifying", Archive: refs[i].Filename})
+		err := VerifyFile(path, refs[i].SHA1)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// buildRegistryEntry assembles the storage entry for a fresh install or a delta merge.
+func buildRegistryEntry(
+	opts Options, existingQt *storage.InstalledQt, installDir string, totalSize int64,
+) storage.InstalledQt {
+	entry := storage.InstalledQt{
+		Version:     opts.Version,
+		Arch:        opts.Arch,
+		InstallDir:  installDir,
+		InstalledAt: time.Now(),
+	}
+	if existingQt == nil {
+		entry.Modules = opts.Modules
+		entry.Extras = storage.InstalledExtras{
+			Docs:      opts.Docs,
+			Examples:  opts.Examples,
+			Sources:   opts.Sources,
+			DebugInfo: opts.DebugInfo,
+		}
+		entry.SizeBytes = totalSize
+		return entry
+	}
+	entry.InstalledAt = existingQt.InstalledAt
+	entry.Modules = mergeSlices(existingQt.Modules, opts.Modules)
+	entry.Extras = storage.InstalledExtras{
+		Docs:      existingQt.Extras.Docs || opts.Docs,
+		Examples:  existingQt.Extras.Examples || opts.Examples,
+		Sources:   existingQt.Extras.Sources || opts.Sources,
+		DebugInfo: existingQt.Extras.DebugInfo || opts.DebugInfo,
+	}
+	entry.SizeBytes = existingQt.SizeBytes + totalSize
+	return entry
+}
+
 // Install performs a full Qt SDK installation.
 // The caller owns progressCh and is responsible for closing it after Install returns.
 // Install only sends on the channel; it never closes it.
+//
+//nolint:funlen // orchestration pipeline; phases are each extracted to their own helper
 func (inst *Installer) Install(ctx context.Context, opts Options, progressCh chan<- ProgressEvent) error {
-	// Check for an existing installation and compute the delta unless --force.
-	var existingQt *storage.InstalledQt
-	if !opts.Force {
-		reg, err := inst.registry.Load()
-		if err == nil {
-			for i := range reg.Qt {
-				if reg.Qt[i].Version == opts.Version && reg.Qt[i].Arch == opts.Arch {
-					existingQt = &reg.Qt[i]
-					break
-				}
-			}
-		}
-	}
-
-	resolveOpts := repository.ResolveOptions{
-		Version: opts.Version,
-		Arch:    opts.Arch,
-	}
-
-	normalizedModules := normalizeModuleNames(opts.Modules)
-
-	if existingQt != nil {
-		// Delta: only resolve what is not already installed.
-		resolveOpts.SkipEssentials = true
-		resolveOpts.Modules = diffSlices(normalizedModules, existingQt.Modules)
-		resolveOpts.AllModules = mergeSlices(existingQt.Modules, normalizedModules)
-		resolveOpts.Docs = opts.Docs && !existingQt.Extras.Docs
-		resolveOpts.Examples = opts.Examples && !existingQt.Extras.Examples
-		resolveOpts.Sources = opts.Sources && !existingQt.Extras.Sources
-		resolveOpts.DebugInfo = opts.DebugInfo && !existingQt.Extras.DebugInfo
-
-		if len(resolveOpts.Modules) == 0 &&
-			!resolveOpts.Docs &&
-			!resolveOpts.Examples &&
-			!resolveOpts.Sources &&
-			!resolveOpts.DebugInfo {
-			return ErrUpToDate
-		}
-	} else {
-		resolveOpts.Modules = normalizedModules
-		resolveOpts.Docs = opts.Docs
-		resolveOpts.Examples = opts.Examples
-		resolveOpts.Sources = opts.Sources
-		resolveOpts.DebugInfo = opts.DebugInfo
+	existingQt := inst.findExisting(opts)
+	resolveOpts, upToDate := buildResolveOptions(opts, existingQt, normalizeModuleNames(opts.Modules))
+	if upToDate {
+		return ErrUpToDate
 	}
 
 	// Resolve archives.
@@ -132,16 +276,8 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		return fmt.Errorf("resolving archives: %w", err)
 	}
 
-	// Dry run: report what would be downloaded and stop.
 	if opts.DryRun {
-		sendProgress(progressCh, ProgressEvent{Phase: "dryrun", ArchiveTotal: len(archives)})
-		for _, a := range archives {
-			sendProgress(progressCh, ProgressEvent{
-				Phase:      "dryrun",
-				Archive:    a.Ref.Filename,
-				BytesTotal: a.Ref.Size,
-			})
-		}
+		runDryRun(archives, progressCh)
 		return nil
 	}
 
@@ -168,84 +304,21 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		refs[i] = a.Ref
 	}
 
-	// Download.
-	archiveTotal := len(refs)
-	sendProgress(progressCh, ProgressEvent{Phase: "downloading", ArchiveTotal: archiveTotal})
-	dlCh := make(chan DownloadEvent, 256)
-	concurrency := opts.Concurrency
-	if concurrency <= 0 {
-		concurrency = defaultConcurrency
-	}
-	timeout := opts.Timeout
-	if timeout <= 0 {
-		timeout = defaultTimeoutSeconds
-	}
-	downloader := NewDownloader(concurrency, timeout, dlDir)
-
-	// Collect download events and forward to progress channel.
-	go func() {
-		completed := 0
-		for ev := range dlCh {
-			if ev.Err != nil {
-				return
-			}
-			if ev.Done {
-				completed++
-			}
-			sendProgress(progressCh, ProgressEvent{
-				Phase:        "downloading",
-				Archive:      ev.Filename,
-				BytesDone:    ev.BytesDone,
-				BytesTotal:   ev.BytesTotal,
-				Speed:        ev.Speed,
-				ArchiveIndex: completed,
-				ArchiveTotal: archiveTotal,
-			})
-		}
-	}()
-
-	localPaths, err := downloader.DownloadAll(ctx, refs, dlCh)
-	close(dlCh)
+	localPaths, err := runDownload(ctx, opts, refs, dlDir, progressCh)
 	if err != nil {
-		return fmt.Errorf("downloading: %w", err)
+		return err
 	}
 
-	// Verify checksums.
-	for i, path := range localPaths {
-		if refs[i].SHA1 != "" {
-			sendProgress(progressCh, ProgressEvent{Phase: "verifying", Archive: refs[i].Filename})
-			err = VerifyFile(path, refs[i].SHA1)
-			if err != nil {
-				return err
-			}
-		}
+	err = verifyDownloads(localPaths, refs, progressCh)
+	if err != nil {
+		return err
 	}
 
-	// Extract into temp extraction dir.
 	extractDir := filepath.Join(extractTmp, "extracted")
-	sendProgress(progressCh, ProgressEvent{Phase: "extracting"})
-	exCh := make(chan ExtractionEvent, 256)
-	go func() {
-		for ev := range exCh {
-			pct := float64(0)
-			if ev.BytesTotal > 0 {
-				pct = float64(ev.BytesDone) / float64(ev.BytesTotal) * 100
-			}
-			sendProgress(progressCh, ProgressEvent{
-				Phase:      "extracting",
-				Archive:    ev.Archive,
-				BytesDone:  ev.BytesDone,
-				BytesTotal: ev.BytesTotal,
-				Percent:    pct,
-			})
-		}
-	}()
-	err = ExtractAll(localPaths, extractDir, exCh)
+	err = runExtract(localPaths, extractDir, progressCh)
 	if err != nil {
-		close(exCh)
-		return fmt.Errorf("extracting: %w", err)
+		return err
 	}
-	close(exCh)
 
 	// Move extracted content to final install dir.
 	err = os.MkdirAll(filepath.Dir(installDir), 0o755) //nolint:gosec // 0755 for Qt SDK
@@ -274,35 +347,8 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		totalSize += a.Ref.Size
 	}
 
-	// Register - merge with existing entry when doing a delta install.
 	sendProgress(progressCh, ProgressEvent{Phase: "registering"})
-	entry := storage.InstalledQt{
-		Version:     opts.Version,
-		Arch:        opts.Arch,
-		InstallDir:  installDir,
-		InstalledAt: time.Now(),
-	}
-	if existingQt != nil {
-		entry.InstalledAt = existingQt.InstalledAt
-		entry.Modules = mergeSlices(existingQt.Modules, opts.Modules)
-		entry.Extras = storage.InstalledExtras{
-			Docs:      existingQt.Extras.Docs || opts.Docs,
-			Examples:  existingQt.Extras.Examples || opts.Examples,
-			Sources:   existingQt.Extras.Sources || opts.Sources,
-			DebugInfo: existingQt.Extras.DebugInfo || opts.DebugInfo,
-		}
-		entry.SizeBytes = existingQt.SizeBytes + totalSize
-	} else {
-		entry.Modules = opts.Modules
-		entry.Extras = storage.InstalledExtras{
-			Docs:      opts.Docs,
-			Examples:  opts.Examples,
-			Sources:   opts.Sources,
-			DebugInfo: opts.DebugInfo,
-		}
-		entry.SizeBytes = totalSize
-	}
-	err = inst.registry.AddQt(entry)
+	err = inst.registry.AddQt(buildRegistryEntry(opts, existingQt, installDir, totalSize))
 	if err != nil {
 		return fmt.Errorf("registering installation: %w", err)
 	}

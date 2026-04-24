@@ -29,12 +29,9 @@ func ProbeURLs(ctx context.Context, urls []string, timeoutSeconds int, host stri
 	results := make([]ProbeResult, len(urls))
 	var wg sync.WaitGroup
 	for i, base := range urls {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			results[i] = probeOne(ctx, client, base, host)
-		}()
+		})
 	}
 	wg.Wait()
 

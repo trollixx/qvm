@@ -67,6 +67,66 @@ func extract7z(src, destDir, name string, eventCh chan<- ExtractionEvent) error 
 	return archive.Extract(src, destDir, progress)
 }
 
+// openTarDecompressor returns a decompressed reader for src based on its filename suffix.
+// The caller is responsible for invoking the returned close function when done.
+func openTarDecompressor(src string, f io.Reader) (io.Reader, func() error, error) {
+	lower := strings.ToLower(src)
+	switch {
+	case strings.HasSuffix(lower, ".tar.xz"):
+		r, err := xz.NewReader(f)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating xz reader for %s: %w", src, err)
+		}
+		return r, func() error { return nil }, nil
+	case strings.HasSuffix(lower, ".tar.gz"):
+		r, err := gzip.NewReader(f)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating gzip reader for %s: %w", src, err)
+		}
+		return r, r.Close, nil
+	default:
+		return nil, nil, fmt.Errorf("unsupported tar compression: %s", src)
+	}
+}
+
+// extractTarEntry writes a single tar entry (dir/regular/symlink) to target.
+// Returns the number of bytes written for regular files; zero for other types.
+func extractTarEntry(tr *tar.Reader, header *tar.Header, target string) (int64, error) {
+	switch header.Typeflag {
+	case tar.TypeDir:
+		err := os.MkdirAll(target, 0o755) //nolint:gosec // 0755 for Qt SDK
+		if err != nil {
+			return 0, fmt.Errorf("creating directory %s: %w", target, err)
+		}
+		return 0, nil
+	case tar.TypeReg:
+		err := os.MkdirAll(filepath.Dir(target), 0o755) //nolint:gosec // 0755 for Qt SDK
+		if err != nil {
+			return 0, fmt.Errorf("creating parent directory for %s: %w", target, err)
+		}
+		out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode&0o777))
+		if err != nil {
+			return 0, fmt.Errorf("creating %s: %w", target, err)
+		}
+		n, copyErr := io.Copy(out, io.LimitReader(tr, maxExtractedFileSize))
+		closeErr := out.Close()
+		if copyErr != nil {
+			return 0, fmt.Errorf("extracting %s: %w", header.Name, copyErr)
+		}
+		if closeErr != nil {
+			return 0, fmt.Errorf("closing %s: %w", target, closeErr)
+		}
+		return n, nil
+	case tar.TypeSymlink:
+		err := os.Symlink(header.Linkname, target)
+		if err != nil {
+			return 0, fmt.Errorf("creating symlink %s: %w", target, err)
+		}
+		return 0, nil
+	}
+	return 0, nil
+}
+
 func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error {
 	err := os.MkdirAll(destDir, 0o755) //nolint:gosec // 0755 for Qt SDK
 	if err != nil {
@@ -79,25 +139,11 @@ func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error
 	}
 	defer f.Close()
 
-	var reader io.Reader
-	lower := strings.ToLower(src)
-	switch {
-	case strings.HasSuffix(lower, ".tar.xz"):
-		xzReader, xzErr := xz.NewReader(f)
-		if xzErr != nil {
-			return fmt.Errorf("creating xz reader for %s: %w", src, xzErr)
-		}
-		reader = xzReader
-	case strings.HasSuffix(lower, ".tar.gz"):
-		gzReader, gzErr := gzip.NewReader(f)
-		if gzErr != nil {
-			return fmt.Errorf("creating gzip reader for %s: %w", src, gzErr)
-		}
-		defer gzReader.Close()
-		reader = gzReader
-	default:
-		return fmt.Errorf("unsupported tar compression: %s", src)
+	reader, closeReader, err := openTarDecompressor(src, f)
+	if err != nil {
+		return err
 	}
+	defer func() { _ = closeReader() }()
 
 	tr := tar.NewReader(reader)
 	cleanDest := filepath.Clean(destDir) + string(os.PathSeparator)
@@ -121,41 +167,17 @@ func extractTar(src, destDir, name string, eventCh chan<- ExtractionEvent) error
 			return fmt.Errorf("path traversal blocked: %s", header.Name)
 		}
 
-		switch header.Typeflag {
-		case tar.TypeDir:
-			err = os.MkdirAll(target, 0o755) //nolint:gosec // 0755 for Qt SDK
-			if err != nil {
-				return fmt.Errorf("creating directory %s: %w", target, err)
-			}
-		case tar.TypeReg:
-			err = os.MkdirAll(filepath.Dir(target), 0o755) //nolint:gosec // 0755 for Qt SDK
-			if err != nil {
-				return fmt.Errorf("creating parent directory for %s: %w", target, err)
-			}
-			var out *os.File
-			out, err = os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode&0o777))
-			if err != nil {
-				return fmt.Errorf("creating %s: %w", target, err)
-			}
-			n, copyErr := io.Copy(out, io.LimitReader(tr, maxExtractedFileSize))
-			closeErr := out.Close()
-			if copyErr != nil {
-				return fmt.Errorf("extracting %s: %w", header.Name, copyErr)
-			}
-			if closeErr != nil {
-				return fmt.Errorf("closing %s: %w", target, closeErr)
-			}
+		n, entryErr := extractTarEntry(tr, header, target)
+		if entryErr != nil {
+			return entryErr
+		}
+		if header.Typeflag == tar.TypeReg {
 			bytesWritten += n
 			if eventCh != nil {
 				select {
 				case eventCh <- ExtractionEvent{Archive: name, BytesDone: bytesWritten, BytesTotal: 0}:
 				default:
 				}
-			}
-		case tar.TypeSymlink:
-			err = os.Symlink(header.Linkname, target)
-			if err != nil {
-				return fmt.Errorf("creating symlink %s: %w", target, err)
 			}
 		}
 	}

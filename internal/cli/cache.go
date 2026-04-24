@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,6 +96,108 @@ func (a *app) runCacheList(_ context.Context, _ *cli.Command) error {
 	return nil
 }
 
+type cleanCandidate struct {
+	path string
+	size int64
+}
+
+func collectMetadataCandidates() ([]cleanCandidate, error) {
+	cache, err := repository.NewCache()
+	if err != nil {
+		return nil, fmt.Errorf("opening metadata cache: %w", err)
+	}
+	entries, err := os.ReadDir(cache.Dir())
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("reading metadata cache dir: %w", err)
+	}
+	var candidates []cleanCandidate
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		info, _ := e.Info()
+		var size int64
+		if info != nil {
+			size = info.Size()
+		}
+		candidates = append(candidates, cleanCandidate{
+			path: filepath.Join(cache.Dir(), e.Name()),
+			size: size,
+		})
+	}
+	return candidates, nil
+}
+
+func removeCandidates(candidates []cleanCandidate, errOut io.Writer) (int, int64) {
+	var removed int
+	var freed int64
+	for _, c := range candidates {
+		err := os.Remove(c.path)
+		if err != nil {
+			fmt.Fprintf(errOut, "warning: removing %s: %v\n", filepath.Base(c.path), err)
+			continue
+		}
+		removed++
+		freed += c.size
+	}
+	return removed, freed
+}
+
+func collectDownloadCandidates(incompleteOnly bool) ([]cleanCandidate, int, error) {
+	dlDir, err := install.DownloadCacheDir()
+	if err != nil {
+		return nil, 0, err
+	}
+	entries, err := os.ReadDir(dlDir)
+	if err != nil {
+		return nil, 0, fmt.Errorf("reading cache dir: %w", err)
+	}
+	var candidates []cleanCandidate
+	var skipped int
+	for _, e := range entries {
+		if e.Name() == ".keep" {
+			continue
+		}
+		isPart := strings.HasSuffix(e.Name(), ".part")
+		if incompleteOnly && !isPart {
+			skipped++
+			continue
+		}
+		info, _ := e.Info()
+		var size int64
+		if info != nil {
+			size = info.Size()
+		}
+		candidates = append(candidates, cleanCandidate{
+			path: filepath.Join(dlDir, e.Name()),
+			size: size,
+		})
+	}
+	return candidates, skipped, nil
+}
+
+func (a *app) confirmClean(dlCandidates, metaCandidates []cleanCandidate, incompleteOnly bool) bool {
+	if len(dlCandidates) > 0 {
+		var dlBytes int64
+		for _, c := range dlCandidates {
+			dlBytes += c.size
+		}
+		label := "download archive(s)"
+		if incompleteOnly {
+			label = "partial download file(s)"
+		}
+		fmt.Fprintf(a.streams.Out, "  %d %s (%s)\n", len(dlCandidates), label, formatSize(dlBytes))
+	}
+	if len(metaCandidates) > 0 {
+		var metaBytes int64
+		for _, c := range metaCandidates {
+			metaBytes += c.size
+		}
+		fmt.Fprintf(a.streams.Out, "  %d metadata file(s) (%s)\n", len(metaCandidates), formatSize(metaBytes))
+	}
+	return a.confirm("Remove the above?")
+}
+
 func (a *app) runCacheClean(_ context.Context, cmd *cli.Command) error {
 	metadataFlag := cmd.Bool("metadata")
 	incompleteFlag := cmd.Bool("incomplete")
@@ -107,68 +210,22 @@ func (a *app) runCacheClean(_ context.Context, cmd *cli.Command) error {
 	incompleteOnly := incompleteFlag && !allFlag
 	cleanMetadata := metadataFlag || allFlag
 
-	type candidate struct {
-		path string
-		size int64
-	}
-
-	// Collect download cache candidates.
-	var dlCandidates []candidate
+	var dlCandidates []cleanCandidate
 	var dlSkipped int
 	if cleanDownloads {
-		dlDir, err := install.DownloadCacheDir()
+		var err error
+		dlCandidates, dlSkipped, err = collectDownloadCandidates(incompleteOnly)
 		if err != nil {
 			return err
 		}
-		entries, err := os.ReadDir(dlDir)
-		if err != nil {
-			return fmt.Errorf("reading cache dir: %w", err)
-		}
-		for _, e := range entries {
-			if e.Name() == ".keep" {
-				continue
-			}
-			isPart := strings.HasSuffix(e.Name(), ".part")
-			if incompleteOnly && !isPart {
-				dlSkipped++
-				continue
-			}
-			info, _ := e.Info()
-			var size int64
-			if info != nil {
-				size = info.Size()
-			}
-			dlCandidates = append(dlCandidates, candidate{
-				path: filepath.Join(dlDir, e.Name()),
-				size: size,
-			})
-		}
 	}
 
-	// Collect metadata cache candidates.
-	var metaCandidates []candidate
+	var metaCandidates []cleanCandidate
 	if cleanMetadata {
-		cache, err := repository.NewCache()
+		var err error
+		metaCandidates, err = collectMetadataCandidates()
 		if err != nil {
-			return fmt.Errorf("opening metadata cache: %w", err)
-		}
-		entries, err := os.ReadDir(cache.Dir())
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("reading metadata cache dir: %w", err)
-		}
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			info, _ := e.Info()
-			var size int64
-			if info != nil {
-				size = info.Size()
-			}
-			metaCandidates = append(metaCandidates, candidate{
-				path: filepath.Join(cache.Dir(), e.Name()),
-				size: size,
-			})
+			return err
 		}
 	}
 
@@ -182,57 +239,13 @@ func (a *app) runCacheClean(_ context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	// Show confirmation.
-	if !autoYes {
-		if len(dlCandidates) > 0 {
-			var dlBytes int64
-			for _, c := range dlCandidates {
-				dlBytes += c.size
-			}
-			label := "download archive(s)"
-			if incompleteOnly {
-				label = "partial download file(s)"
-			}
-			fmt.Fprintf(a.streams.Out, "  %d %s (%s)\n", len(dlCandidates), label, formatSize(dlBytes))
-		}
-		if len(metaCandidates) > 0 {
-			var metaBytes int64
-			for _, c := range metaCandidates {
-				metaBytes += c.size
-			}
-			fmt.Fprintf(a.streams.Out, "  %d metadata file(s) (%s)\n", len(metaCandidates), formatSize(metaBytes))
-		}
-		if !a.confirm("Remove the above?") {
-			fmt.Fprintln(a.streams.Out, "Aborted.")
-			return nil
-		}
+	if !autoYes && !a.confirmClean(dlCandidates, metaCandidates, incompleteOnly) {
+		fmt.Fprintln(a.streams.Out, "Aborted.")
+		return nil
 	}
 
-	// Remove download cache files.
-	var dlRemoved int
-	var dlFreed int64
-	for _, c := range dlCandidates {
-		err := os.Remove(c.path)
-		if err != nil {
-			fmt.Fprintf(a.streams.ErrOut, "warning: removing %s: %v\n", filepath.Base(c.path), err)
-			continue
-		}
-		dlRemoved++
-		dlFreed += c.size
-	}
-
-	// Remove metadata cache files.
-	var metaRemoved int
-	var metaFreed int64
-	for _, c := range metaCandidates {
-		err := os.Remove(c.path)
-		if err != nil {
-			fmt.Fprintf(a.streams.ErrOut, "warning: removing %s: %v\n", filepath.Base(c.path), err)
-			continue
-		}
-		metaRemoved++
-		metaFreed += c.size
-	}
+	dlRemoved, dlFreed := removeCandidates(dlCandidates, a.streams.ErrOut)
+	metaRemoved, metaFreed := removeCandidates(metaCandidates, a.streams.ErrOut)
 
 	// Summary.
 	if dlRemoved > 0 {

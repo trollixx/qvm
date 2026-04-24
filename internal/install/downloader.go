@@ -2,6 +2,7 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -75,17 +76,14 @@ func (d *Downloader) DownloadAll(
 	var wg sync.WaitGroup
 
 	for i, arch := range archives {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
 			path, err := d.downloadOne(ctx, arch, eventCh)
 			paths[i] = path
 			errs[i] = err
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -105,29 +103,10 @@ func (d *Downloader) downloadOne(
 	dest := filepath.Join(d.destDir, arch.Filename)
 	part := dest + ".part"
 
-	// Already fully downloaded from a previous run - verify and skip.
-	_, statErr := os.Stat(dest)
-	if statErr == nil {
-		if VerifyFile(dest, arch.SHA1) == nil {
-			sendEvent(eventCh, DownloadEvent{Filename: arch.Filename, Done: true})
-			return dest, nil
-		}
-		// Cached file is corrupt - re-download.
-		_ = os.Remove(dest)
+	if checkCachedDownload(dest, arch, eventCh) {
+		return dest, nil
 	}
-
-	// Check for a partial download to resume.
-	var rangeStart int64
-	fi, statErr2 := os.Stat(part)
-	if statErr2 == nil {
-		partSize := fi.Size()
-		// If the part file is larger than expected, it's corrupt - start fresh.
-		if arch.Size > 0 && partSize > arch.Size {
-			_ = os.Remove(part)
-		} else {
-			rangeStart = partSize
-		}
-	}
+	rangeStart := resumeOffset(part, arch.Size)
 
 	req, err := retryablehttp.NewRequest(http.MethodGet, arch.URL, nil)
 	if err != nil {
@@ -171,45 +150,15 @@ func (d *Downloader) downloadOne(
 	}
 
 	total := resp.ContentLength + rangeStart
-	done := rangeStart
-	start := time.Now()
-
-	buf := make([]byte, 32*1024)
-	var writeErr error
-	for {
-		n, readErr := resp.Body.Read(buf)
-		if n > 0 {
-			_, werr := f.Write(buf[:n])
-			if werr != nil {
-				writeErr = werr
-				break
-			}
-			done += int64(n)
-			elapsed := time.Since(start).Seconds()
-			speed := float64(done-rangeStart) / elapsed
-			sendEvent(eventCh, DownloadEvent{
-				Filename:   arch.Filename,
-				BytesDone:  done,
-				BytesTotal: total,
-				Speed:      speed,
-			})
-		}
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			writeErr = readErr
-			break
-		}
-	}
+	done, copyErr := copyWithProgress(f, resp.Body, arch.Filename, rangeStart, total, eventCh)
 
 	// Close before rename - required on Windows.
 	cerr := f.Close()
-	if cerr != nil && writeErr == nil {
-		writeErr = cerr
+	if copyErr == nil {
+		copyErr = cerr
 	}
-	if writeErr != nil {
-		return "", writeErr
+	if copyErr != nil {
+		return "", copyErr
 	}
 
 	err = os.Rename(part, dest)
@@ -219,6 +168,69 @@ func (d *Downloader) downloadOne(
 
 	sendEvent(eventCh, DownloadEvent{Filename: arch.Filename, Done: true, BytesDone: done, BytesTotal: total})
 	return dest, nil
+}
+
+// checkCachedDownload returns true if dest already matches arch.SHA1. Corrupt cached files are removed.
+func checkCachedDownload(dest string, arch repository.ArchiveRef, eventCh chan<- DownloadEvent) bool {
+	if _, err := os.Stat(dest); err != nil {
+		return false
+	}
+	if VerifyFile(dest, arch.SHA1) == nil {
+		sendEvent(eventCh, DownloadEvent{Filename: arch.Filename, Done: true})
+		return true
+	}
+	_ = os.Remove(dest)
+	return false
+}
+
+// resumeOffset returns the size of an existing .part file if it is a valid resume target, else 0.
+// A part file larger than expectedSize is treated as corrupt and removed.
+func resumeOffset(part string, expectedSize int64) int64 {
+	fi, err := os.Stat(part)
+	if err != nil {
+		return 0
+	}
+	partSize := fi.Size()
+	if expectedSize > 0 && partSize > expectedSize {
+		_ = os.Remove(part)
+		return 0
+	}
+	return partSize
+}
+
+// copyWithProgress streams body into f in 32 KiB chunks, emitting progress events.
+// rangeStart is the offset within the logical file where writing begins (for resume).
+// Returns the total bytes written through this call plus rangeStart (i.e. the cumulative offset).
+func copyWithProgress(
+	f io.Writer, body io.Reader, filename string, rangeStart, total int64, eventCh chan<- DownloadEvent,
+) (int64, error) {
+	done := rangeStart
+	start := time.Now()
+	buf := make([]byte, 32*1024)
+	for {
+		n, readErr := body.Read(buf)
+		if n > 0 {
+			_, werr := f.Write(buf[:n])
+			if werr != nil {
+				return done, werr
+			}
+			done += int64(n)
+			elapsed := time.Since(start).Seconds()
+			speed := float64(done-rangeStart) / elapsed
+			sendEvent(eventCh, DownloadEvent{
+				Filename:   filename,
+				BytesDone:  done,
+				BytesTotal: total,
+				Speed:      speed,
+			})
+		}
+		if errors.Is(readErr, io.EOF) {
+			return done, nil
+		}
+		if readErr != nil {
+			return done, readErr
+		}
+	}
 }
 
 func sendEvent(ch chan<- DownloadEvent, ev DownloadEvent) {

@@ -13,13 +13,22 @@ type Mirror struct {
 	URL string
 }
 
+// Recognized host platform identifiers for Qt repositories.
+const (
+	HostWindowsX86   = "windows_x86"
+	HostWindowsARM64 = "windows_arm64"
+	HostLinuxX64     = "linux_x64"
+	HostLinuxARM64   = "linux_arm64"
+	HostMacX64       = "mac_x64"
+)
+
 // ValidHosts lists the recognized host platform identifiers for Qt repositories.
 var ValidHosts = []string{ //nolint:gochecknoglobals // exported package-level data used by callers
-	"windows_x86",
-	"windows_arm64",
-	"linux_x64",
-	"linux_arm64",
-	"mac_x64",
+	HostWindowsX86,
+	HostWindowsARM64,
+	HostLinuxX64,
+	HostLinuxARM64,
+	HostMacX64,
 }
 
 // MirrorList manages the ordered list of mirrors to try.
@@ -248,17 +257,17 @@ func PlatformHost() string {
 	switch runtime.GOOS {
 	case "windows":
 		if runtime.GOARCH == "arm64" {
-			return "windows_arm64"
+			return HostWindowsARM64
 		}
-		return "windows_x86"
+		return HostWindowsX86
 	case "darwin":
-		return "mac_x64"
+		return HostMacX64
 	case "linux":
 		if runtime.GOARCH == "arm64" {
-			return "linux_arm64"
+			return HostLinuxARM64
 		}
-		return "linux_x64"
+		return HostLinuxX64
 	default:
-		return "linux_x64"
+		return HostLinuxX64
 	}
 }

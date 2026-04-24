@@ -157,6 +157,7 @@ func configSet(cfg *config.Config, key, value string) error {
 		return fmt.Errorf("config field %q is not settable", key)
 	}
 
+	//nolint:exhaustive // only the listed reflect.Kinds are valid config field types
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(value)
