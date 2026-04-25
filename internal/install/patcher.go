@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// qtConfMode is the file mode used for qt.conf (world-readable).
+const qtConfMode os.FileMode = 0o644
+
 // PatchQtConf writes (or rewrites) the qt.conf file in the installed Qt
 // directory so that the Prefix points to the actual installation path.
 // Qt archives do not ship a qt.conf; this step creates it.
@@ -37,20 +40,39 @@ func PatchQtConf(installDir string) error {
 		return fmt.Errorf("creating bin dir for qt.conf: %w", err)
 	}
 	content := "[Paths]\nPrefix=" + prefix + "\n"
-	err = os.WriteFile(qtConfPath, []byte(content), 0o644) //nolint:gosec // 0644 ok
+	err = atomicWriteFile(qtConfPath, []byte(content))
 	if err != nil {
 		return fmt.Errorf("writing qt.conf: %w", err)
 	}
 	return nil
 }
 
+// isPrefixLine reports whether line is a Qt-conf "Prefix=..." entry.
+// It deliberately rejects look-alikes such as "PrefixOptions=" by requiring
+// the trimmed line to start with "Prefix" followed by either '=' or whitespace.
+func isPrefixLine(line string) bool {
+	t := strings.TrimSpace(line)
+	if !strings.HasPrefix(t, "Prefix") {
+		return false
+	}
+	rest := t[len("Prefix"):]
+	if rest == "" {
+		return true
+	}
+	switch rest[0] {
+	case '=', ' ', '\t':
+		return true
+	}
+	return false
+}
+
 // updateQtConf rewrites the Prefix line in an existing qt.conf, preserving all other settings.
 func updateQtConf(data []byte, prefix, path string) error {
 	lines := strings.Split(string(data), "\n")
 	for i, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "Prefix") {
+		if isPrefixLine(line) {
 			lines[i] = "Prefix=" + prefix
-			return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644) //nolint:gosec // 0644 ok for Qt SDK
+			return atomicWriteFile(path, []byte(strings.Join(lines, "\n")))
 		}
 	}
 	// No Prefix line — insert one after [Paths].
@@ -59,10 +81,26 @@ func updateQtConf(data []byte, prefix, path string) error {
 			tail := make([]string, len(lines)-i-1)
 			copy(tail, lines[i+1:])
 			lines = append(lines[:i+1], append([]string{"Prefix=" + prefix}, tail...)...)
-			return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644) //nolint:gosec // 0644 ok for Qt SDK
+			return atomicWriteFile(path, []byte(strings.Join(lines, "\n")))
 		}
 	}
 	// No [Paths] section — prepend one.
 	lines = append([]string{"[Paths]", "Prefix=" + prefix, ""}, lines...)
-	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644) //nolint:gosec // 0644 ok for Qt SDK
+	return atomicWriteFile(path, []byte(strings.Join(lines, "\n")))
+}
+
+// atomicWriteFile writes data to path via a temp-file + rename so a crash mid-write
+// cannot corrupt the destination. Files are written with qtConfMode (0o644).
+func atomicWriteFile(path string, data []byte) error {
+	tmp := path + ".tmp"
+	err := os.WriteFile(tmp, data, qtConfMode) //nolint:gosec // qtConfMode is 0o644 by design
+	if err != nil {
+		return err
+	}
+	err = os.Rename(tmp, path)
+	if err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }

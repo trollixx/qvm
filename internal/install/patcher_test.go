@@ -131,3 +131,45 @@ func TestPatchQtConf_PrefixUsesForwardSlashes(t *testing.T) {
 func strPtr(s string) *string {
 	return &s
 }
+
+func TestIsPrefixLine(t *testing.T) {
+	tests := []struct {
+		line string
+		want bool
+	}{
+		{"Prefix=/foo", true},
+		{"  Prefix=/foo  ", true},
+		{"Prefix = /foo", true},
+		{"Prefix\t/foo", true},
+		{"Prefix", true},
+		{"PrefixOptions=value", false}, // must not match: hypothetical future Qt key
+		{"PrefixedKey=value", false},
+		{"# Prefix=...", false}, // comment
+		{"Translations=foo", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.line, func(t *testing.T) {
+			assert.Equal(t, tt.want, isPrefixLine(tt.line))
+		})
+	}
+}
+
+func TestPatchQtConf_DoesNotMatchPrefixOptions(t *testing.T) {
+	installDir := t.TempDir()
+	binDir := filepath.Join(installDir, "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0o755))
+	qtConfPath := filepath.Join(binDir, "qt.conf")
+	// Hypothetical Qt config with a "PrefixOptions=" key alongside "Prefix=".
+	require.NoError(t, os.WriteFile(qtConfPath,
+		[]byte("[Paths]\nPrefixOptions=keep-me\nPrefix=/old\n"), 0o644))
+
+	require.NoError(t, PatchQtConf(installDir))
+
+	data, err := os.ReadFile(qtConfPath)
+	require.NoError(t, err)
+	content := string(data)
+	assert.Contains(t, content, "PrefixOptions=keep-me", "PrefixOptions= line must be preserved")
+	assert.NotContains(t, content, "Prefix=/old")
+	assert.Contains(t, content, "Prefix="+filepath.ToSlash(installDir))
+}
