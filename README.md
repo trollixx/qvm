@@ -30,7 +30,7 @@ $Env:Qt6_DIR=$(qvm prefix 6.8.3)
 - Fuzzy search for module names.
 - JSON output for scripting and automation.
 - Metadata caching to minimize network requests.
-- Concurrent-install safe (registry file locking).
+- Concurrent-install safe: a per-install-dir lock serializes parallel `qvm install` runs targeting the same version+arch; parallel installs to different version+arch combinations proceed independently.
 
 ## Installation
 
@@ -81,7 +81,7 @@ qvm install <version> [flags]
 | Flag | Description |
 | --- | --- |
 | `--arch`, `-a` | Compiler/ABI target (e.g. `win64_msvc2022_64`, `gcc_64`, `macos`). Auto-detected if omitted. |
-| `--target` | Qt platform: `desktop` (default), `android`, `wasm`, `ios`, `winrt` |
+| `--target` | Qt platform: `desktop` (default), `android`, `ios`, `wasm`. WASM resolves under `desktop/`; pick a `--arch` like `wasm_singlethread`. WinRT is not supported (removed in Qt 6). |
 | `--modules`, `-m` | Comma-separated add-on modules (e.g. `qtcharts,qtwebengine`). The `qt` prefix is optional (`charts` and `qtcharts` both work). |
 | `--docs` | Install documentation for all selected modules |
 | `--examples` | Install examples for all selected modules |
@@ -110,10 +110,13 @@ qvm install 6.8.3 --arch win64_mingw
 
 # Android target
 qvm install 6.8.3 --target android
-
-# WASM build with all extras
-qvm install 6.8.3 --target wasm --modules qtcharts --docs --examples --sources
 ```
+
+> Desktop is the most thoroughly exercised target. Android and iOS resolve under
+> their own repository paths but the rest of the pipeline is shared, so any
+> archive Qt publishes for the chosen target will install. WASM packages live
+> under `desktop/` as separate arch variants; current qvm releases do not yet
+> auto-discover them.
 
 ---
 
@@ -325,10 +328,10 @@ qvm follows XDG Base Directory conventions on Linux and macOS, and standard Wind
 
 | File | Windows | Linux / macOS |
 | --- | --- | --- |
-| Config | `%APPDATA%\qvm\config.toml` | `~/.config/qvm/config.toml` |
+| Config | `%LOCALAPPDATA%\qvm\config.toml` | `~/.config/qvm/config.toml` |
 | Registry | `%LOCALAPPDATA%\qvm\registry.json` | `~/.local/state/qvm/registry.json` |
-| Download cache | `%LOCALAPPDATA%\qvm\cache\downloads\` | `~/.cache/qvm/downloads/` |
-| Metadata cache | `%LOCALAPPDATA%\qvm\cache\metadata\` | `~/.cache/qvm/metadata/` |
+| Download cache | `%LOCALAPPDATA%\qvm\downloads\` | `~/.cache/qvm/downloads/` |
+| Metadata cache | `%LOCALAPPDATA%\qvm\metadata\` | `~/.cache/qvm/metadata/` |
 
 ## Building from Source
 
