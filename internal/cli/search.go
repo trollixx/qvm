@@ -53,7 +53,7 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	fetcher, err := buildFetcher(cfg, cmd.String("host"))
+	fetcher, err := buildFetcher(cfg, cmd.String("host"), "")
 	if err != nil {
 		return fmt.Errorf("initializing fetcher: %w", err)
 	}

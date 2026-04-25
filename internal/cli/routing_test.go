@@ -108,3 +108,10 @@ func TestConfigSet_InvalidInt_ViaApp(t *testing.T) {
 	assertErrContains(t, err, "invalid integer value")
 	assertErrContains(t, err, "notanumber")
 }
+
+// -- --target ------------------------------------------------------------------
+
+func TestInstall_RejectsUnknownTarget(t *testing.T) {
+	err := run(t, "install", "6.10.2", "--target", "winrt")
+	assertErrContains(t, err, "unknown target")
+}

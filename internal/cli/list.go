@@ -125,7 +125,7 @@ func (a *app) runListRemote(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	fetcher, err := buildFetcher(cfg, host)
+	fetcher, err := buildFetcher(cfg, host, "")
 	if err != nil {
 		return fmt.Errorf("initializing fetcher: %w", err)
 	}

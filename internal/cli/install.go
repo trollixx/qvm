@@ -11,6 +11,7 @@ import (
 	"github.com/trollixx/qvm/internal/config"
 	"github.com/trollixx/qvm/internal/install"
 	"github.com/trollixx/qvm/internal/platform"
+	"github.com/trollixx/qvm/internal/repository"
 )
 
 func (a *app) newInstallCommand() *cli.Command {
@@ -68,55 +69,73 @@ func (a *app) runInstall(ctx context.Context, cmd *cli.Command) error {
 	return a.runInstallQt(ctx, cmd, arg)
 }
 
-func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
-	force := cmd.Bool("force")
-	host := cmd.String("host")
+// resolveInstallArch determines the arch to install. It honors an explicit --arch,
+// otherwise auto-detects (desktop only). For non-desktop targets without an
+// explicit --arch it returns an error pointing the user at list-remote.
+func resolveInstallArch(cmd *cli.Command, version, host, target string) (string, error) {
+	arch := cmd.String("arch")
+	if arch != "" {
+		return arch, nil
+	}
+	if target != "" && target != repository.TargetDesktop {
+		return "", newHintError(
+			fmt.Sprintf("--arch is required when --target=%s", target),
+			fmt.Sprintf("Run 'qvm list-remote %s' to see available arches for this target.", version),
+		)
+	}
+	if host != "" {
+		arch = platform.DefaultArchForHost(host, version)
+	}
+	if arch == "" {
+		arch = platform.Current().DefaultArch(version)
+	}
+	return arch, nil
+}
 
-	modules := cmd.StringSlice("modules")
-	sources := cmd.Bool("sources")
-	debugInfo := cmd.Bool("debug-symbols")
+// buildInstallOptions converts CLI flags into an install.Options.
+func buildInstallOptions(cmd *cli.Command, cfg *config.Config, version, arch string) install.Options {
+	installRoot := cmd.String("dir")
+	if installRoot == "" {
+		installRoot = cfg.Install.Dir
+	}
+	return install.Options{
+		Version:     version,
+		Arch:        arch,
+		Modules:     cmd.StringSlice("modules"),
+		Docs:        cmd.Bool("docs"),
+		Examples:    cmd.Bool("examples"),
+		Sources:     cmd.Bool("sources"),
+		DebugInfo:   cmd.Bool("debug-symbols"),
+		InstallRoot: installRoot,
+		Concurrency: cfg.Download.Concurrency,
+		Timeout:     cfg.Download.TimeoutSeconds,
+		Force:       cmd.Bool("force"),
+		DryRun:      cmd.Bool("dry-run"),
+	}
+}
+
+func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
+	host := cmd.String("host")
+	target := cmd.String("target")
 
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	installer, err := buildDeps(cfg, host)
+	installer, err := buildDeps(cfg, host, target)
 	if err != nil {
 		return fmt.Errorf("initializing dependencies: %w", err)
 	}
 
-	// Determine arch.
-	arch := cmd.String("arch")
-	if arch == "" {
-		if host != "" {
-			arch = platform.DefaultArchForHost(host, version)
-		}
-		if arch == "" {
-			arch = platform.Current().DefaultArch(version)
-		}
+	arch, err := resolveInstallArch(cmd, version, host, target)
+	if err != nil {
+		return err
 	}
 
-	installRoot := cmd.String("dir")
-	if installRoot == "" {
-		installRoot = cfg.Install.Dir
-	}
-
-	dryRun := cmd.Bool("dry-run")
-	opts := install.Options{
-		Version:     version,
-		Arch:        arch,
-		Modules:     modules,
-		Docs:        cmd.Bool("docs"),
-		Examples:    cmd.Bool("examples"),
-		Sources:     sources,
-		DebugInfo:   debugInfo,
-		InstallRoot: installRoot,
-		Concurrency: cfg.Download.Concurrency,
-		Timeout:     cfg.Download.TimeoutSeconds,
-		Force:       force,
-		DryRun:      dryRun,
-	}
+	opts := buildInstallOptions(cmd, cfg, version, arch)
+	dryRun := opts.DryRun
+	modules := opts.Modules
 
 	quiet := cmd.Bool("quiet")
 	progressCh := make(chan install.ProgressEvent, 256)

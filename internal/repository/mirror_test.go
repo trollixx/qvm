@@ -36,7 +36,7 @@ func TestBuildURL_Qt68Plus_TwoLevel(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.version, func(t *testing.T) {
-			assert.Equal(t, tc.want, buildURL(base, host, tc.version, tc.major))
+			assert.Equal(t, tc.want, buildURL(base, host, "desktop", tc.version, tc.major))
 		})
 	}
 }
@@ -65,9 +65,74 @@ func TestBuildURL_Qt6Pre68_SingleLevel(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.version, func(t *testing.T) {
-			assert.Equal(t, tc.want, buildURL(base, host, tc.version, tc.major))
+			assert.Equal(t, tc.want, buildURL(base, host, "desktop", tc.version, tc.major))
 		})
 	}
+}
+
+func TestBuildURL_Targets(t *testing.T) {
+	base := "https://download.qt.io/"
+	host := "windows_x86"
+
+	tests := []struct {
+		name       string
+		targetPath string
+		want       string
+	}{
+		{
+			"android",
+			"android",
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/android/qt6_683/qt6_683/Updates.xml",
+		},
+		{
+			"ios",
+			"ios",
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/ios/qt6_683/qt6_683/Updates.xml",
+		},
+		{
+			"desktop",
+			"desktop",
+			"https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_683/qt6_683/Updates.xml",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, buildURL(base, host, tc.targetPath, "6.8.3", 6))
+		})
+	}
+}
+
+func TestTargetURLPath(t *testing.T) {
+	tests := []struct {
+		target string
+		want   string
+	}{
+		{"desktop", "desktop"},
+		{"android", "android"},
+		{"ios", "ios"},
+		{"wasm", "desktop"}, // wasm lives under desktop/
+		{"", "desktop"},     // default
+		{"unknown", "desktop"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.target, func(t *testing.T) {
+			assert.Equal(t, tc.want, targetURLPath(tc.target))
+		})
+	}
+}
+
+func TestMirrorList_URLsFor_Android(t *testing.T) {
+	m := NewMirrorList(
+		"https://download.qt.io/",
+		nil,
+		"windows_x86",
+		TargetAndroid,
+	)
+	urls := m.URLsFor("6.8.3", 6)
+	require.Len(t, urls, 1)
+	assert.Equal(t,
+		"https://download.qt.io/online/qtsdkrepository/windows_x86/android/qt6_683/qt6_683/Updates.xml",
+		urls[0])
 }
 
 func TestIsQt68Plus(t *testing.T) {
@@ -104,6 +169,7 @@ func TestMirrorList_URLsFor_TwoMirrors(t *testing.T) {
 		"https://primary.example.com/",
 		[]string{"https://mirror1.example.com/"},
 		"windows_x86",
+		TargetDesktop,
 	)
 	urls := m.URLsFor("6.8.3", 6)
 
@@ -197,6 +263,7 @@ func TestExtensionURLsFor(t *testing.T) {
 		"https://download.qt.io/",
 		[]string{"https://mirror.example.com/"},
 		"windows_x86",
+		TargetDesktop,
 	)
 
 	t.Run("Qt 6.10.2", func(t *testing.T) {
@@ -231,6 +298,7 @@ func TestSrcDocExURLsFor(t *testing.T) {
 		"https://download.qt.io/",
 		[]string{"https://mirror.example.com/"},
 		"windows_x86",
+		TargetDesktop,
 	)
 
 	t.Run("Qt 6.10.2 uses all_os", func(t *testing.T) {

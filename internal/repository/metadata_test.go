@@ -415,7 +415,7 @@ func TestProbePreviewVersions(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(10)
-	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86", TargetDesktop)
 	cache := &Cache{dir: t.TempDir()}
 	fetcher := NewMetadataFetcher(client, cache, mirrors)
 
@@ -566,7 +566,7 @@ func TestFetchExtensions_Integration(t *testing.T) {
 	}
 
 	client := NewClient(10)
-	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86", TargetDesktop)
 	cache := &Cache{dir: t.TempDir()}
 	fetcher := NewMetadataFetcher(client, cache, mirrors)
 
@@ -605,7 +605,7 @@ func TestFetchExtensions_SkipsPreQt68(t *testing.T) {
 	}
 
 	client := NewClient(10)
-	mirrors := NewMirrorList("https://example.com/", nil, "windows_x86")
+	mirrors := NewMirrorList("https://example.com/", nil, "windows_x86", TargetDesktop)
 	cache := &Cache{dir: t.TempDir()}
 	fetcher := NewMetadataFetcher(client, cache, mirrors)
 
@@ -679,7 +679,7 @@ func TestFetchSrcDocExamples_Qt68Plus(t *testing.T) {
 	}
 
 	client := NewClient(10)
-	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86", TargetDesktop)
 	cache := &Cache{dir: t.TempDir()}
 	fetcher := NewMetadataFetcher(client, cache, mirrors)
 
@@ -739,7 +739,7 @@ func TestFetchSrcDocExamples_PreQt68(t *testing.T) {
 	}
 
 	client := NewClient(10)
-	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86", TargetDesktop)
 	cache := &Cache{dir: t.TempDir()}
 	fetcher := NewMetadataFetcher(client, cache, mirrors)
 
@@ -763,7 +763,7 @@ func TestFetchSrcDocExamples_GracefulOnError(t *testing.T) {
 	}
 
 	client := NewClient(10)
-	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86", TargetDesktop)
 	cache := &Cache{dir: t.TempDir()}
 	fetcher := NewMetadataFetcher(client, cache, mirrors)
 
@@ -788,7 +788,7 @@ func TestFetchExtensions_GracefulOnMissingExtension(t *testing.T) {
 	}
 
 	client := NewClient(10)
-	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86")
+	mirrors := NewMirrorList(srv.URL+"/", nil, "windows_x86", TargetDesktop)
 	cache := &Cache{dir: t.TempDir()}
 	fetcher := NewMetadataFetcher(client, cache, mirrors)
 

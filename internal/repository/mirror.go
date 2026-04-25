@@ -31,16 +31,56 @@ var ValidHosts = []string{ //nolint:gochecknoglobals // exported package-level d
 	HostMacX64,
 }
 
-// MirrorList manages the ordered list of mirrors to try.
-type MirrorList struct {
-	primary   string
-	fallbacks []string
-	host      string
+// Recognized Qt target platform identifiers.
+const (
+	TargetDesktop = "desktop"
+	TargetAndroid = "android"
+	TargetIOS     = "ios"
+	TargetWASM    = "wasm"
+)
+
+// ValidTargets lists the recognized Qt target platform identifiers.
+// WinRT is intentionally absent: it was removed from Qt 6.
+var ValidTargets = []string{ //nolint:gochecknoglobals // exported package-level data used by callers
+	TargetDesktop,
+	TargetAndroid,
+	TargetIOS,
+	TargetWASM,
 }
 
-// NewMirrorList creates a MirrorList from a primary URL, fallbacks, and host platform.
-func NewMirrorList(primary string, fallbacks []string, host string) *MirrorList {
-	return &MirrorList{primary: primary, fallbacks: fallbacks, host: host}
+// targetURLPath maps a user-facing target to its repository URL path component.
+// WASM is hosted under desktop/ as arch variants (qt6_NNN_wasm_singlethread, etc.),
+// so it shares the desktop URL.
+func targetURLPath(target string) string {
+	switch target {
+	case TargetAndroid:
+		return "android"
+	case TargetIOS:
+		return "ios"
+	case TargetWASM, TargetDesktop, "":
+		return "desktop"
+	default:
+		return "desktop"
+	}
+}
+
+// MirrorList manages the ordered list of mirrors to try.
+type MirrorList struct {
+	primary    string
+	fallbacks  []string
+	host       string
+	targetPath string
+}
+
+// NewMirrorList creates a MirrorList from a primary URL, fallbacks, host, and target platform.
+// An empty target defaults to desktop.
+func NewMirrorList(primary string, fallbacks []string, host, target string) *MirrorList {
+	return &MirrorList{
+		primary:    primary,
+		fallbacks:  fallbacks,
+		host:       host,
+		targetPath: targetURLPath(target),
+	}
 }
 
 // URLsFor returns an ordered list of URLs to try for the given Qt SDK parameters.
@@ -50,11 +90,11 @@ func (m *MirrorList) URLsFor(version string, major int) []string {
 	var urls []string
 
 	// Primary mirror first.
-	urls = append(urls, buildURL(m.primary, host, version, major))
+	urls = append(urls, buildURL(m.primary, host, m.targetPath, version, major))
 
 	// Fallback mirrors.
 	for _, fb := range m.fallbacks {
-		urls = append(urls, buildURL(fb, host, version, major))
+		urls = append(urls, buildURL(fb, host, m.targetPath, version, major))
 	}
 	return urls
 }
@@ -66,13 +106,14 @@ func (m *MirrorList) URLsForMasterList() []string {
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))
 	for _, base := range all {
-		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/Updates.xml", base, host))
+		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/%s/Updates.xml", base, host, m.targetPath))
 	}
 	return urls
 }
 
 // buildURL constructs a Qt SDK repository Updates.xml URL.
 // base is the mirror root (e.g. "https://download.qt.io/"); online/qtsdkrepository/ is inserted automatically.
+// targetPath is the URL path component for the Qt target ("desktop", "android", "ios").
 // Qt 6.8+ uses a two-level folder structure:
 //
 //	.../qt6_680/qt6_680/Updates.xml
@@ -80,14 +121,14 @@ func (m *MirrorList) URLsForMasterList() []string {
 // Earlier versions use a single-level structure:
 //
 //	.../qt6_690/Updates.xml   (Qt 6 < 6.8)
-func buildURL(base, host, version string, major int) string {
+func buildURL(base, host, targetPath, version string, major int) string {
 	verStr := versionToRepoStr(version, major)
 	folder := fmt.Sprintf("qt%d_%s", major, verStr)
 	if isQt68Plus(version) {
 		// Two-level: qt6_680/qt6_680/Updates.xml
-		return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/%s/Updates.xml", base, host, folder, folder)
+		return fmt.Sprintf("%sonline/qtsdkrepository/%s/%s/%s/%s/Updates.xml", base, host, targetPath, folder, folder)
 	}
-	return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/Updates.xml", base, host, folder)
+	return fmt.Sprintf("%sonline/qtsdkrepository/%s/%s/%s/Updates.xml", base, host, targetPath, folder)
 }
 
 // isQt68Plus reports whether version is Qt 6.8.0 or later.
@@ -123,9 +164,10 @@ func (m *MirrorList) ProbeURL(version string, major int) string {
 	folder := fmt.Sprintf("qt%d_%s", major, verStr)
 	if isQt611Plus(version) {
 		// Qt 6.11+: probe the version directory listing.
-		return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/", m.primary, host, folder)
+		return fmt.Sprintf("%sonline/qtsdkrepository/%s/%s/%s/", m.primary, host, m.targetPath, folder)
 	}
-	return fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/%s/Updates.xml", m.primary, host, folder, folder)
+	return fmt.Sprintf("%sonline/qtsdkrepository/%s/%s/%s/%s/Updates.xml",
+		m.primary, host, m.targetPath, folder, folder)
 }
 
 // VersionDirURLs returns URLs for the version directory listing.
@@ -137,7 +179,7 @@ func (m *MirrorList) VersionDirURLs(version string, major int) []string {
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))
 	for _, base := range all {
-		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/", base, host, folder))
+		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/%s/%s/", base, host, m.targetPath, folder))
 	}
 	return urls
 }
@@ -150,8 +192,8 @@ func (m *MirrorList) PerArchURL(version string, major int, archFolder string) []
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))
 	for _, base := range all {
-		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/%s/%s/Updates.xml",
-			base, host, folder, archFolder))
+		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/%s/%s/%s/Updates.xml",
+			base, host, m.targetPath, folder, archFolder))
 	}
 	return urls
 }
@@ -162,7 +204,7 @@ func (m *MirrorList) DirectoryURLs() []string {
 	all := append([]string{m.primary}, m.fallbacks...)
 	urls := make([]string, 0, len(all))
 	for _, base := range all {
-		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/desktop/", base, host))
+		urls = append(urls, fmt.Sprintf("%sonline/qtsdkrepository/%s/%s/", base, host, m.targetPath))
 	}
 	return urls
 }

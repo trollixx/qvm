@@ -10,10 +10,11 @@ import (
 )
 
 // ResolveOptions configures what archives to resolve for a Qt install.
+// The target platform (desktop/android/ios/wasm) is configured on the underlying
+// MetadataFetcher's MirrorList, not here, since it only affects URL construction.
 type ResolveOptions struct {
 	Version        string
 	Arch           string   // e.g. "win64_msvc2022_64"
-	TargetPlatform string   // e.g. "desktop", "android", "wasm"; defaults to "desktop"
 	Modules        []string // add-on module names to install (delta - only new ones)
 	AllModules     []string // all module names (existing + new) for scoping docs/examples
 	Docs           bool

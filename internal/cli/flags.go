@@ -53,10 +53,23 @@ func newArchFlag() *cli.StringFlag {
 
 func newTargetFlag() *cli.StringFlag {
 	return &cli.StringFlag{
-		Name:  "target",
-		Value: "desktop",
-		Usage: "Qt target platform: desktop, android, wasm, ios, winrt",
+		Name:      "target",
+		Value:     repository.TargetDesktop,
+		Usage:     "Qt target platform: " + strings.Join(repository.ValidTargets, ", "),
+		Validator: validateTarget,
 	}
+}
+
+// validateTarget returns an error if target is non-empty and not in ValidTargets.
+func validateTarget(target string) error {
+	if target == "" {
+		return nil
+	}
+	if slices.Contains(repository.ValidTargets, target) {
+		return nil
+	}
+	return fmt.Errorf("unknown target %q: valid targets are %s",
+		target, strings.Join(repository.ValidTargets, ", "))
 }
 
 func newDirFlag() *cli.StringFlag {
