@@ -18,18 +18,33 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
-      - name: Build
-        run: go build ./...
+      - name: Build (with version stamp)
+        shell: bash
+        run: |
+          # --always falls back to a commit SHA when no tags are reachable,
+          # so this command always succeeds and never returns empty.
+          VERSION=$(git describe --tags --always --dirty)
+          echo "Building qvm $VERSION"
+          go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=$VERSION" ./...
 
       - name: Test
         # Space-separated flag value (not -coverprofile=coverage.txt) so PowerShell
         # on Windows doesn't split the dotted filename into a separate argument.
         run: go test -coverprofile coverage.txt ./...
+
+      - name: Race-detector test
+        # Race detector requires cgo, which is reliably available on ubuntu-latest.
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          CGO_ENABLED: "1"
+        run: go test -race ./...
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
