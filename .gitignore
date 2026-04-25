@@ -6,3 +6,6 @@
 
 # Visual Studio Code
 .vscode/
+
+# Local notes / scratch (never committed)
+docs/
