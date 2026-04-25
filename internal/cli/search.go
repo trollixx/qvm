@@ -10,6 +10,8 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/trollixx/qvm/internal/config"
+	"github.com/trollixx/qvm/internal/repository"
+	"github.com/trollixx/qvm/pkg/qtmeta"
 )
 
 // searchResult is the exported form of searchItem for JSON serialization.
@@ -58,35 +60,18 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("initializing fetcher: %w", err)
 	}
 
-	var items []searchItem
-	var names []string
-
-	// Fetch Qt versions for modules.
-	versions, err := fetcher.FetchAllQtVersions(ctx)
+	items, err := collectSearchItems(ctx, fetcher, a.streams.ErrOut)
 	if err != nil {
-		fmt.Fprintf(a.streams.ErrOut, "warning: could not fetch Qt version index: %v\n", err)
-	} else {
-		// Collect unique module names across all versions.
-		seenModules := map[string]bool{}
-		for _, v := range versions {
-			for _, m := range v.Modules {
-				if seenModules[m.Name] {
-					continue
-				}
-				seenModules[m.Name] = true
-				item := searchItem{
-					name:    m.Name,
-					display: m.DisplayName,
-				}
-				items = append(items, item)
-				names = append(names, m.Name)
-			}
-		}
+		return err
 	}
-
-	if len(names) == 0 {
+	if len(items) == 0 {
 		fmt.Fprintln(a.streams.Out, "No items available to search.")
 		return nil
+	}
+
+	names := make([]string, len(items))
+	for i, it := range items {
+		names[i] = it.name
 	}
 
 	results := fuzzy.Find(query, names)
@@ -95,7 +80,6 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	// Deduplicate results.
 	seen := map[string]bool{}
 	var matched []searchItem
 	for _, r := range results {
@@ -130,4 +114,65 @@ func (a *app) runSearch(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return nil
+}
+
+// collectSearchItems fetches add-on module names from the latest released Qt version.
+// FetchAllQtVersions only returns version stubs, so we drill into the newest released
+// version's metadata to enumerate modules. Preview versions are skipped.
+func collectSearchItems(
+	ctx context.Context,
+	fetcher *repository.MetadataFetcher,
+	errOut interface {
+		Write([]byte) (int, error)
+	},
+) ([]searchItem, error) {
+	versions, err := fetcher.FetchAllQtVersions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetching Qt version index: %w", err)
+	}
+
+	// Find the highest released (non-preview) version.
+	var newest *repository.QtVersionInfo
+	var newestParsed qtmeta.Version
+	for i := range versions {
+		v := &versions[i]
+		if v.IsPreview {
+			continue
+		}
+		parsed, perr := qtmeta.ParseVersion(v.Version)
+		if perr != nil {
+			continue
+		}
+		if newest == nil || parsed.GTE(newestParsed) {
+			newest = v
+			newestParsed = parsed
+		}
+	}
+	if newest == nil {
+		fmt.Fprintln(errOut, "warning: no released Qt versions found")
+		return nil, nil
+	}
+
+	idx, err := fetcher.FetchQtVersion(ctx, newest.Version)
+	if err != nil {
+		return nil, fmt.Errorf("fetching metadata for Qt %s: %w", newest.Version, err)
+	}
+
+	// Find the matching version inside the index.
+	var vi *repository.QtVersionInfo
+	for i := range idx.QtVersions {
+		if idx.QtVersions[i].Version == newest.Version {
+			vi = &idx.QtVersions[i]
+			break
+		}
+	}
+	if vi == nil {
+		return nil, nil
+	}
+
+	items := make([]searchItem, 0, len(vi.Modules))
+	for _, m := range vi.Modules {
+		items = append(items, searchItem{name: m.Name, display: m.DisplayName})
+	}
+	return items, nil
 }
