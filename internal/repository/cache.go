@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+// MaxCacheAge is the maximum age of cached metadata that may be served when
+// all mirrors are unreachable. Older cached copies are refused to avoid
+// silently installing stale Qt versions.
+const MaxCacheAge = 30 * 24 * time.Hour
+
 // Cache manages on-disk gzip-compressed XML metadata files.
 type Cache struct {
 	dir string
@@ -101,6 +106,16 @@ func (c *Cache) IsStale(key string, maxAge time.Duration) bool {
 		return true
 	}
 	return time.Since(info.ModTime()) > maxAge
+}
+
+// Age returns the age of the cached entry for key, or 0 if no entry exists.
+func (c *Cache) Age(key string) time.Duration {
+	fn := c.keyToFilename(key)
+	info, err := os.Stat(fn)
+	if err != nil {
+		return 0
+	}
+	return time.Since(info.ModTime())
 }
 
 // LoadStale returns the cached XML body regardless of staleness.

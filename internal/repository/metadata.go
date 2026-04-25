@@ -537,17 +537,45 @@ func (f *MetadataFetcher) fetchRaw(ctx context.Context, urls []string) ([]byte, 
 		}
 	}
 
-	// All mirrors failed - try stale cache.
+	// All mirrors failed - try stale cache, but refuse data older than the TTL.
 	stale, cacheErr := f.cache.LoadStale(cacheKey)
-	if cacheErr == nil && stale != nil {
-		fmt.Fprintf(os.Stderr, "warning: serving stale cached metadata (network unavailable)\n")
+	if cacheErr == nil && stale != nil && !f.cache.IsStale(cacheKey, MaxCacheAge) {
+		age := f.cache.Age(cacheKey)
+		fmt.Fprintf(os.Stderr,
+			"warning: serving cached metadata (network unavailable, cache age %s)\n",
+			formatCacheAge(age))
 		return stale, urls[0], nil
 	}
 
-	if lastErr != nil {
-		return nil, "", fmt.Errorf("all mirrors failed (last error: %w)\n\nURLs tried:\n%s", lastErr, urlList(urls))
+	staleHint := ""
+	if cacheErr == nil && stale != nil {
+		staleHint = fmt.Sprintf(
+			"\n\nA cached copy exists but is older than %s; refusing to use it. "+
+				"Run 'qvm cache clean --metadata' and retry once you are online.",
+			MaxCacheAge,
+		)
 	}
-	return nil, "", fmt.Errorf("all mirrors failed and no cached data available\n\nURLs tried:\n%s", urlList(urls))
+
+	if lastErr != nil {
+		return nil, "", fmt.Errorf("all mirrors failed (last error: %w)%s\n\nURLs tried:\n%s",
+			lastErr, staleHint, urlList(urls))
+	}
+	return nil, "", fmt.Errorf("all mirrors failed and no cached data available%s\n\nURLs tried:\n%s",
+		staleHint, urlList(urls))
+}
+
+// formatCacheAge formats d as a coarse human-readable age (e.g. "2h", "5d").
+func formatCacheAge(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd", int(d.Hours()/24))
+	}
 }
 
 // cacheKeyFromURL strips the mirror base URL, returning the mirror-independent
