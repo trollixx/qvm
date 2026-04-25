@@ -223,9 +223,14 @@ func forwardExtractionProgress(exCh <-chan ExtractionEvent, progressCh chan<- Pr
 }
 
 // verifyDownloads checks the SHA-1 of each downloaded archive whose ref has a non-empty SHA1.
+// Archives without a SHA-1 in upstream metadata are tallied and surfaced via a
+// single "warning" progress event so the operator knows which downloads were
+// not integrity-checked.
 func verifyDownloads(paths []string, refs []repository.ArchiveRef, progressCh chan<- ProgressEvent) error {
+	var unverified int
 	for i, path := range paths {
 		if refs[i].SHA1 == "" {
+			unverified++
 			continue
 		}
 		sendProgress(progressCh, ProgressEvent{Phase: "verifying", Archive: refs[i].Filename})
@@ -233,6 +238,14 @@ func verifyDownloads(paths []string, refs []repository.ArchiveRef, progressCh ch
 		if err != nil {
 			return err
 		}
+	}
+	if unverified > 0 {
+		sendProgress(progressCh, ProgressEvent{
+			Phase: "warning",
+			Warning: fmt.Sprintf(
+				"%d archive(s) had no SHA-1 in upstream metadata; downloads were not integrity-checked",
+				unverified),
+		})
 	}
 	return nil
 }
