@@ -109,6 +109,60 @@ func TestConfigSet_InvalidInt_ViaApp(t *testing.T) {
 	assertErrContains(t, err, "notanumber")
 }
 
+// -- prefix --------------------------------------------------------------------
+
+func TestPrefix_NoArg(t *testing.T) {
+	assertErrContains(t, run(t, "prefix"), "missing argument")
+}
+
+func TestPrefix_NotInstalled(t *testing.T) {
+	err := run(t, "prefix", "6.99.99")
+	assertErrContains(t, err, "is not installed")
+}
+
+func TestPrefix_NotInstalledWithArch(t *testing.T) {
+	err := run(t, "prefix", "6.99.99", "--arch", "win64_msvc2022_64")
+	assertErrContains(t, err, "is not installed")
+}
+
+// -- cache ---------------------------------------------------------------------
+
+func TestCache_List(t *testing.T) {
+	// Listing the cache must not error even when the cache is empty.
+	assert.NoError(t, run(t, "cache", "list"))
+}
+
+func TestCache_CleanIncompleteEmpty(t *testing.T) {
+	// Cleaning incomplete files in an empty cache must not error.
+	assert.NoError(t, run(t, "cache", "clean", "--incomplete", "--yes"))
+}
+
+// -- mirror --------------------------------------------------------------------
+
+func TestMirror_SelectNoArg(t *testing.T) {
+	assertErrContains(t, run(t, "mirror", "select"), "specify --auto or a URL")
+}
+
+func TestMirror_SelectAutoAndURLConflict(t *testing.T) {
+	assertErrContains(t, run(t, "mirror", "select", "--auto", "https://example.com/"),
+		"cannot combine --auto with a URL")
+}
+
+// -- list-remote ---------------------------------------------------------------
+
+func TestListRemote_InvalidVersionFilter(t *testing.T) {
+	// "abc" is not a valid version.
+	err := run(t, "list-remote", "abc")
+	assertErrContains(t, err, "invalid version")
+}
+
+// -- doctor --------------------------------------------------------------------
+
+func TestDoctor_Runs(t *testing.T) {
+	// Doctor should run without error in a clean environment (no installs).
+	assert.NoError(t, run(t, "doctor"))
+}
+
 // -- --target ------------------------------------------------------------------
 
 func TestInstall_RejectsUnknownTarget(t *testing.T) {
