@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/trollixx/qvm/internal/storage"
 )
 
 func TestDiffSlices(t *testing.T) {
@@ -172,6 +174,33 @@ func TestDiffSlices_NormalizedWithNewModule(t *testing.T) {
 	installed := []string{"qtwebengine"}
 	got := diffSlices(requested, installed)
 	assert.Equal(t, []string{"qtcharts"}, got)
+}
+
+func TestBuildRegistryEntry_NormalizesModules(t *testing.T) {
+	t.Run("fresh install canonicalizes raw module names", func(t *testing.T) {
+		opts := Options{
+			Version: "6.8.3",
+			Arch:    "win64_msvc2022_64",
+			Modules: []string{"webengine", "imageformats"},
+		}
+		entry := buildRegistryEntry(opts, nil, "C:\\Qt\\6.8.3\\win64_msvc2022_64", 0)
+		assert.Equal(t, []string{"qtwebengine", "qtimageformats"}, entry.Modules)
+	})
+
+	t.Run("delta install canonicalizes new module names without re-adding existing", func(t *testing.T) {
+		existing := &storage.InstalledQt{
+			Version: "6.8.3",
+			Arch:    "win64_msvc2022_64",
+			Modules: []string{"qtwebengine"},
+		}
+		opts := Options{
+			Version: "6.8.3",
+			Arch:    "win64_msvc2022_64",
+			Modules: []string{"webengine", "charts"}, // raw user input
+		}
+		entry := buildRegistryEntry(opts, existing, "C:\\Qt\\6.8.3\\win64_msvc2022_64", 0)
+		assert.Equal(t, []string{"qtwebengine", "qtcharts"}, entry.Modules)
+	})
 }
 
 func TestSendProgress(t *testing.T) {

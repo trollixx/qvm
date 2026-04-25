@@ -225,6 +225,8 @@ func verifyDownloads(paths []string, refs []repository.ArchiveRef, progressCh ch
 }
 
 // buildRegistryEntry assembles the storage entry for a fresh install or a delta merge.
+// Module names are stored in their canonical (qt-prefixed) form so that subsequent
+// installs can correctly diff against them regardless of how the user spelled them.
 func buildRegistryEntry(
 	opts Options, existingQt *storage.InstalledQt, installDir string, totalSize int64,
 ) storage.InstalledQt {
@@ -234,8 +236,9 @@ func buildRegistryEntry(
 		InstallDir:  installDir,
 		InstalledAt: time.Now(),
 	}
+	canonicalModules := normalizeModuleNames(opts.Modules)
 	if existingQt == nil {
-		entry.Modules = opts.Modules
+		entry.Modules = canonicalModules
 		entry.Extras = storage.InstalledExtras{
 			Docs:      opts.Docs,
 			Examples:  opts.Examples,
@@ -246,7 +249,7 @@ func buildRegistryEntry(
 		return entry
 	}
 	entry.InstalledAt = existingQt.InstalledAt
-	entry.Modules = mergeSlices(existingQt.Modules, opts.Modules)
+	entry.Modules = mergeSlices(existingQt.Modules, canonicalModules)
 	entry.Extras = storage.InstalledExtras{
 		Docs:      existingQt.Extras.Docs || opts.Docs,
 		Examples:  existingQt.Extras.Examples || opts.Examples,
