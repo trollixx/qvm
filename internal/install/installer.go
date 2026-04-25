@@ -264,8 +264,39 @@ func buildRegistryEntry(
 // The caller owns progressCh and is responsible for closing it after Install returns.
 // Install only sends on the channel; it never closes it.
 //
+// A per-install-directory lock is held for the entire pipeline so that two
+// concurrent qvm processes targeting the same version+arch serialize their
+// download/extract/register steps and never clobber each other's files.
+// Parallel installs to *different* version+arch combinations are unaffected.
+//
 //nolint:funlen // orchestration pipeline; phases are each extracted to their own helper
 func (inst *Installer) Install(ctx context.Context, opts Options, progressCh chan<- ProgressEvent) error {
+	installDir := storage.InstallDir(opts.InstallRoot, opts.Version, opts.Arch)
+
+	// Dry-run is read-only and side-effect-free; no lock needed.
+	if opts.DryRun {
+		resolveOpts, upToDate := buildResolveOptions(opts, inst.findExisting(opts), normalizeModuleNames(opts.Modules))
+		if upToDate {
+			return ErrUpToDate
+		}
+		sendProgress(progressCh, ProgressEvent{Phase: "resolving"})
+		archives, err := inst.resolver.Resolve(ctx, resolveOpts)
+		if err != nil {
+			return fmt.Errorf("resolving archives: %w", err)
+		}
+		runDryRun(archives, progressCh)
+		return nil
+	}
+
+	// Hold a process-level lock on the install dir for the whole pipeline.
+	unlock, err := storage.LockFile(installDir)
+	if err != nil {
+		return fmt.Errorf("acquiring install lock: %w", err)
+	}
+	defer unlock()
+
+	// Compute existing state and diff *after* acquiring the lock so a parallel
+	// install that completed while we were waiting is reflected.
 	existingQt := inst.findExisting(opts)
 	resolveOpts, upToDate := buildResolveOptions(opts, existingQt, normalizeModuleNames(opts.Modules))
 	if upToDate {
@@ -278,13 +309,6 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	if err != nil {
 		return fmt.Errorf("resolving archives: %w", err)
 	}
-
-	if opts.DryRun {
-		runDryRun(archives, progressCh)
-		return nil
-	}
-
-	installDir := storage.InstallDir(opts.InstallRoot, opts.Version, opts.Arch)
 
 	// Stable cache dir: survives interruption so downloads can be resumed.
 	dlDir, err := DownloadCacheDir()

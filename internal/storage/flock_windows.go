@@ -8,8 +8,15 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// lockFile acquires an exclusive advisory lock on a .lock file next to path.
-// Returns an unlock function that must be called to release the lock.
+// LockFile acquires an exclusive advisory lock on a .lock file next to path.
+// Blocks until the lock can be acquired. Returns an unlock function that must
+// be called to release the lock. On Windows the .lock file is left behind:
+// Windows cannot delete a held lock, and a stale lock file is harmless.
+func LockFile(path string) (func(), error) {
+	return lockFile(path)
+}
+
+// lockFile is the internal implementation of LockFile.
 func lockFile(path string) (func(), error) {
 	lockPath := filepath.Clean(path) + ".lock"
 	err := os.MkdirAll(filepath.Dir(lockPath), 0o750)
