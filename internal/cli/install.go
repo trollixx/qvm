@@ -157,6 +157,12 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 	<-doneCh
 
 	if dryRun {
+		// "Already up to date" is the dry-run answer, not an error.
+		if errors.Is(installErr, install.ErrUpToDate) {
+			fmt.Fprintf(a.streams.Out,
+				"Dry run - Qt %s (%s) is already installed; nothing to download.\n", version, arch)
+			return nil
+		}
 		return installErr
 	}
 
@@ -180,16 +186,26 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 }
 
 func (a *app) printDryRun(ev install.ProgressEvent) {
-	if ev.Archive == "" {
-		// Header event - emitted once with ArchiveTotal set.
-		fmt.Fprintf(a.streams.Out, "Dry run - would download %d archive(s):\n", ev.ArchiveTotal)
-		return
+	switch {
+	case ev.Archive == "" && ev.ArchiveTotal > 0:
+		// Header.
+		total := ""
+		if ev.BytesTotal > 0 {
+			total = " (" + formatSize(ev.BytesTotal) + " total)"
+		}
+		fmt.Fprintf(a.streams.Out, "Dry run - would download %d archive(s)%s:\n", ev.ArchiveTotal, total)
+	case ev.Archive == "":
+		// Footer.
+		if ev.BytesTotal > 0 {
+			fmt.Fprintf(a.streams.Out, "\nTotal: %s\n", formatSize(ev.BytesTotal))
+		}
+	default:
+		size := ""
+		if ev.BytesTotal > 0 {
+			size = "  " + formatSize(ev.BytesTotal)
+		}
+		fmt.Fprintf(a.streams.Out, "  %s%s\n", ev.Archive, size)
 	}
-	size := ""
-	if ev.BytesTotal > 0 {
-		size = "  " + formatSize(ev.BytesTotal)
-	}
-	fmt.Fprintf(a.streams.Out, "  %s%s\n", ev.Archive, size)
 }
 
 // ProgressPrinter renders install progress events to stderr.

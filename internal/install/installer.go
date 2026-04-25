@@ -119,8 +119,19 @@ func buildResolveOptions(
 }
 
 // runDryRun emits dryrun progress events for each resolved archive without downloading.
+// The header event (Archive == "") carries ArchiveTotal and BytesTotal (the grand total).
+// A footer event (Archive == "" and ArchiveTotal == 0 and Percent == 100) marks the end
+// so the printer can render a totals summary.
 func runDryRun(archives []repository.ResolvedArchive, progressCh chan<- ProgressEvent) {
-	sendProgress(progressCh, ProgressEvent{Phase: "dryrun", ArchiveTotal: len(archives)})
+	var totalBytes int64
+	for _, a := range archives {
+		totalBytes += a.Ref.Size
+	}
+	sendProgress(progressCh, ProgressEvent{
+		Phase:        "dryrun",
+		ArchiveTotal: len(archives),
+		BytesTotal:   totalBytes,
+	})
 	for _, a := range archives {
 		sendProgress(progressCh, ProgressEvent{
 			Phase:      "dryrun",
@@ -128,6 +139,8 @@ func runDryRun(archives []repository.ResolvedArchive, progressCh chan<- Progress
 			BytesTotal: a.Ref.Size,
 		})
 	}
+	// Footer marker: Archive empty, ArchiveTotal zero, Percent set.
+	sendProgress(progressCh, ProgressEvent{Phase: "dryrun", Percent: 100, BytesTotal: totalBytes})
 }
 
 // runDownload executes the download phase: emits progress, starts the forwarder, and calls DownloadAll.
