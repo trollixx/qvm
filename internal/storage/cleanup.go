@@ -48,6 +48,13 @@ func Cleanup(reg *RegistryManager, version, arch, expectedRoot string) error {
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("removing %s: %w", q.InstallDir, err)
 		}
+		// Best-effort: remove the now-empty version directory (e.g. C:\Qt\6.8.3)
+		// if no other archs of this version remain. os.Remove only succeeds when
+		// the directory is empty, so this is safe.
+		parent := filepath.Dir(q.InstallDir)
+		if isSafePath(parent, expectedRoot) && parent != filepath.Clean(expectedRoot) {
+			_ = os.Remove(parent)
+		}
 	}
 
 	return reg.RemoveQt(version, arch)

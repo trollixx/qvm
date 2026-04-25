@@ -124,6 +124,60 @@ func TestCleanup(t *testing.T) {
 	assert.Empty(t, reg.Qt)
 }
 
+func TestCleanup_RemovesEmptyVersionParent(t *testing.T) {
+	tmpRoot := t.TempDir()
+	versionDir := filepath.Join(tmpRoot, "6.7.0")
+	installDir := filepath.Join(versionDir, "msvc2022_64")
+	require.NoError(t, os.MkdirAll(installDir, 0o755))
+
+	mgr := NewRegistryManagerAt(filepath.Join(tmpRoot, "registry.json"))
+	require.NoError(t, mgr.AddQt(InstalledQt{
+		Version:     "6.7.0",
+		Arch:        "win64_msvc2022_64",
+		InstallDir:  installDir,
+		InstalledAt: time.Now().UTC(),
+	}))
+
+	require.NoError(t, Cleanup(mgr, "6.7.0", "win64_msvc2022_64", tmpRoot))
+
+	// Empty parent (the "6.7.0" dir) should also be removed.
+	_, err := os.Stat(versionDir)
+	assert.True(t, os.IsNotExist(err), "empty version directory should be removed")
+
+	// But the install root must remain.
+	_, err = os.Stat(tmpRoot)
+	require.NoError(t, err, "install root must be preserved")
+}
+
+func TestCleanup_KeepsParentWhenNotEmpty(t *testing.T) {
+	tmpRoot := t.TempDir()
+	versionDir := filepath.Join(tmpRoot, "6.7.0")
+	installA := filepath.Join(versionDir, "msvc2022_64")
+	installB := filepath.Join(versionDir, "mingw")
+	require.NoError(t, os.MkdirAll(installA, 0o755))
+	require.NoError(t, os.MkdirAll(installB, 0o755))
+
+	mgr := NewRegistryManagerAt(filepath.Join(tmpRoot, "registry.json"))
+	require.NoError(t, mgr.AddQt(InstalledQt{
+		Version:    "6.7.0",
+		Arch:       "win64_msvc2022_64",
+		InstallDir: installA,
+	}))
+	require.NoError(t, mgr.AddQt(InstalledQt{
+		Version:    "6.7.0",
+		Arch:       "win64_mingw",
+		InstallDir: installB,
+	}))
+
+	require.NoError(t, Cleanup(mgr, "6.7.0", "win64_msvc2022_64", tmpRoot))
+
+	// Sibling arch dir still on disk → version dir must remain.
+	_, err := os.Stat(versionDir)
+	require.NoError(t, err, "version dir must remain because a sibling arch is still present")
+	_, err = os.Stat(installB)
+	require.NoError(t, err)
+}
+
 func TestCleanup_NotRegistered(t *testing.T) {
 	tmpRoot := t.TempDir()
 	mgr := NewRegistryManagerAt(filepath.Join(tmpRoot, "registry.json"))
