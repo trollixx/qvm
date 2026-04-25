@@ -167,18 +167,24 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 	}
 
 	if errors.Is(installErr, install.ErrUpToDate) {
-		fmt.Fprintf(a.streams.Out, "Qt %s (%s) is already installed. Use --force to reinstall.\n", version, arch)
+		if !quiet {
+			fmt.Fprintf(a.streams.Out, "Qt %s (%s) is already installed. Use --force to reinstall.\n", version, arch)
+		}
 		return nil
 	}
 	if installErr != nil {
 		return withHint(fmt.Errorf("installation failed: %w", installErr), "Run 'qvm doctor' to diagnose issues.")
 	}
 
+	if quiet {
+		return nil
+	}
+
 	fmt.Fprintf(a.streams.Out, "\nQt %s (%s) installed successfully.\n", version, arch)
 
-	if !quiet && len(modules) == 0 {
+	if len(modules) == 0 {
 		fmt.Fprintf(a.streams.Out, "\nTip: Add-on modules are available (charts, webengine, multimedia, ...).\n")
-		fmt.Fprintf(a.streams.Out, "  Run 'qvm list %s' to see them, or reinstall with:\n", version)
+		fmt.Fprintf(a.streams.Out, "  Run 'qvm list-remote %s' to see them, or reinstall with:\n", version)
 		fmt.Fprintf(a.streams.Out, "  qvm install %s -m <module1>,<module2>\n", version)
 	}
 

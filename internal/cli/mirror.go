@@ -271,12 +271,15 @@ func normalizeURL(u string) string {
 }
 
 // dedupURLs returns primary followed by fallbacks with duplicates removed.
+// URLs are compared after trailing-slash normalization, so "https://x.example/"
+// and "https://x.example" are treated as the same mirror.
 func dedupURLs(primary string, fallbacks []string) []string {
-	seen := map[string]bool{primary: true}
+	seen := map[string]bool{normalizeURL(primary): true}
 	out := []string{primary}
 	for _, u := range fallbacks {
-		if !seen[u] {
-			seen[u] = true
+		key := normalizeURL(u)
+		if !seen[key] {
+			seen[key] = true
 			out = append(out, u)
 		}
 	}

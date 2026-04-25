@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
@@ -19,6 +20,9 @@ func (l *Linux) DefaultInstallDir() string {
 }
 
 func (l *Linux) DefaultArch(_ string) string {
+	if runtime.GOARCH == "arm64" {
+		return "linux_gcc_arm64"
+	}
 	return "gcc_64"
 }
 

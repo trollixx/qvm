@@ -150,7 +150,7 @@ func (d *Downloader) downloadOne(
 	}
 
 	total := resp.ContentLength + rangeStart
-	done, copyErr := copyWithProgress(f, resp.Body, arch.Filename, rangeStart, total, eventCh)
+	done, copyErr := copyWithProgress(ctx, f, resp.Body, arch.Filename, rangeStart, total, eventCh)
 
 	// Close before rename - required on Windows.
 	cerr := f.Close()
@@ -201,13 +201,23 @@ func resumeOffset(part string, expectedSize int64) int64 {
 // copyWithProgress streams body into f in 32 KiB chunks, emitting progress events.
 // rangeStart is the offset within the logical file where writing begins (for resume).
 // Returns the total bytes written through this call plus rangeStart (i.e. the cumulative offset).
+// Honors ctx cancellation between chunk reads.
 func copyWithProgress(
-	f io.Writer, body io.Reader, filename string, rangeStart, total int64, eventCh chan<- DownloadEvent,
+	ctx context.Context, f io.Writer, body io.Reader, filename string,
+	rangeStart, total int64, eventCh chan<- DownloadEvent,
 ) (int64, error) {
 	done := rangeStart
 	start := time.Now()
 	buf := make([]byte, 32*1024)
 	for {
+		// Cooperative cancellation. The HTTP request context already cancels
+		// the underlying connection on Done, but a fast non-blocking check
+		// here means we abort before the next read syscall.
+		select {
+		case <-ctx.Done():
+			return done, ctx.Err()
+		default:
+		}
 		n, readErr := body.Read(buf)
 		if n > 0 {
 			_, werr := f.Write(buf[:n])

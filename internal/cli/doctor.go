@@ -91,7 +91,7 @@ func (a *app) checkMetadataCache() {
 	cacheDir := cache.Dir()
 	entries, err := os.ReadDir(cacheDir)
 	if err != nil || len(entries) == 0 {
-		a.printCheck(checkWarn, "Metadata cache", "empty (run 'qvm list qt' to populate)")
+		a.printCheck(checkWarn, "Metadata cache", "empty (run 'qvm list-remote' to populate)")
 		return
 	}
 
