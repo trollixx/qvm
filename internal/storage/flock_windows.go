@@ -10,8 +10,12 @@ import (
 
 // LockFile acquires an exclusive advisory lock on a .lock file next to path.
 // Blocks until the lock can be acquired. Returns an unlock function that must
-// be called to release the lock. On Windows the .lock file is left behind:
-// Windows cannot delete a held lock, and a stale lock file is harmless.
+// be called to release the lock.
+//
+// On Windows the .lock file is removed at unlock time on a best-effort basis.
+// The handle is opened without FILE_SHARE_DELETE, so any concurrent holder
+// blocks our [os.Remove] harmlessly; the file is only deleted when no other
+// process has it open.
 func LockFile(path string) (func(), error) {
 	return lockFile(path)
 }
@@ -40,5 +44,9 @@ func lockFile(path string) (func(), error) {
 		ol2 := new(windows.Overlapped)
 		_ = windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, ol2)
 		_ = f.Close()
+		// Best-effort cleanup. Fails if another process already reopened the
+		// file (sharing rules forbid the delete), which is harmless: that
+		// process or the next unlock will clean up.
+		_ = os.Remove(lockPath)
 	}, nil
 }
