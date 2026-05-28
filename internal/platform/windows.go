@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/trollixx/qvm/pkg/qtmeta"
@@ -17,6 +18,11 @@ func (w *Windows) DefaultInstallDir() string {
 }
 
 func (w *Windows) DefaultArch(qtVersion string) string {
+	// Qt's Windows arm64 builds exist only from 6.8+, but the arch name is
+	// version-independent, mirroring DefaultArchForHost("windows_arm64").
+	if runtime.GOARCH == "arm64" {
+		return "win64_msvc2022_arm64"
+	}
 	v, err := qtmeta.ParseVersion(qtVersion)
 	if err != nil {
 		return archWin64MSVC2019

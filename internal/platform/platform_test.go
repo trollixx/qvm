@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,4 +43,37 @@ func TestDefaultArchForHost(t *testing.T) {
 			assert.Equal(t, tc.want, DefaultArchForHost(tc.host, tc.qtVersion))
 		})
 	}
+}
+
+// TestCurrentDefaultArchMatchesHost exercises the [runtime.GOARCH] auto-detection
+// path: Current().DefaultArch must agree with the explicit --host mapping for
+// the host equivalent to this machine. It is only meaningful when run natively
+// on each arch, so it relies on the arm64 CI runners to cover the arm64 branch.
+func TestCurrentDefaultArchMatchesHost(t *testing.T) {
+	// Qt 6.8+ so both Windows MSVC paths resolve to 2022 without probing for
+	// an installed toolchain, and arm64 builds exist.
+	const version = "6.8.3"
+
+	var host string
+	switch runtime.GOOS {
+	case "windows":
+		host = "windows_x86"
+		if runtime.GOARCH == "arm64" {
+			host = "windows_arm64"
+		}
+	case "linux":
+		host = "linux_x64"
+		if runtime.GOARCH == "arm64" {
+			host = "linux_arm64"
+		}
+	case "darwin":
+		host = "mac_x64"
+	default:
+		t.Skipf("unsupported GOOS %q", runtime.GOOS)
+	}
+
+	want := DefaultArchForHost(host, version)
+	got := Current().DefaultArch(version)
+	assert.Equalf(t, want, got,
+		"auto-detected arch for %s/%s should match --host %s", runtime.GOOS, runtime.GOARCH, host)
 }
