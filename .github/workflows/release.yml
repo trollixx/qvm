@@ -1,0 +1,36 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binaries
+        shell: bash
+        env:
+          GOOS: windows
+          VERSION: ${{ github.ref_name }}
+        run: |
+          GOARCH=amd64 go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=$VERSION" -o qvm-amd64.exe ./cmd/qvm
+          GOARCH=arm64 go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=$VERSION" -o qvm-arm64.exe ./cmd/qvm
+
+      - name: Create release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" qvm-amd64.exe qvm-arm64.exe --generate-notes
