@@ -30,14 +30,12 @@ func lockFile(path string) (func(), error) {
 		return nil, fmt.Errorf("opening lock file: %w", err)
 	}
 
-	//nolint:gosec // f.Fd() is a valid file descriptor that always fits in int
 	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
 		_ = f.Close()
 		return nil, fmt.Errorf("flock: %w", err)
 	}
 
 	return func() {
-		//nolint:gosec // f.Fd() is a valid file descriptor that always fits in int
 		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 		_ = f.Close()
 		// Best-effort cleanup. If another process holds (or is racing for) the
