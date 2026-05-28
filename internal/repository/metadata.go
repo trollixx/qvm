@@ -16,6 +16,9 @@ import (
 	"github.com/trollixx/qvm/pkg/qtmeta"
 )
 
+// addonsCategory is the package-path component marking a Qt add-on module.
+const addonsCategory = "addons"
+
 // updatesXML mirrors the top-level Updates.xml structure.
 type updatesXML struct {
 	XMLName  xml.Name     `xml:"Updates"`
@@ -648,14 +651,14 @@ func isQtPackage(name string) bool {
 //	qt.qt6.683.addons.qt3d  (5-part, module at parts[4])
 //	qt.qt6.683.qtcharts     (4-part, no arch — module at parts[3])
 func extractModuleName(parts []string) string {
-	if len(parts) >= 5 && parts[3] == "addons" {
+	if len(parts) >= 5 && parts[3] == addonsCategory {
 		return parts[4]
 	}
 	if len(parts) != 4 || extractTarget(parts) != "" {
 		return ""
 	}
 	candidate := parts[3]
-	skip := map[string]bool{"doc": true, "examples": true, "sources": true, "debug_info": true, "addons": true}
+	skip := map[string]bool{"doc": true, "examples": true, "sources": true, "debug_info": true, addonsCategory: true}
 	if skip[candidate] {
 		return ""
 	}
@@ -764,7 +767,7 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 	//   "qtbase-Windows-...-X86_64.7z" -> module name = prefix before first "-".
 	// Essential modules are stored per-arch so that MinGW/LLVM archives do not
 	// appear as essentials when an MSVC target is selected.
-	if len(parts) < 5 || parts[3] != "addons" {
+	if len(parts) < 5 || parts[3] != addonsCategory {
 		for archive := range strings.SplitSeq(pkg.DownloadableArchives, ",") {
 			archive = strings.TrimSpace(archive)
 			if archive == "" {
@@ -913,7 +916,7 @@ func extractTarget(parts []string) string {
 	// Target is typically the last component.
 	last := parts[len(parts)-1]
 	// Skip if it's a well-known non-target component.
-	skip := map[string]bool{"doc": true, "examples": true, "sources": true, "debug_info": true, "addons": true}
+	skip := map[string]bool{"doc": true, "examples": true, "sources": true, "debug_info": true, addonsCategory: true}
 	if skip[last] {
 		return ""
 	}
