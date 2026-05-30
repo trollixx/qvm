@@ -42,6 +42,42 @@ func TestResolveArchives_ExactModuleName(t *testing.T) {
 	assert.Contains(t, names, "qt.qt6.6102.addons.qtcharts.win64_msvc2022_64")
 }
 
+func TestResolveArchives_ExcludesBundledDebugSymbols(t *testing.T) {
+	// QtWebEngine's add-on package bundles a debug-symbols archive alongside
+	// the module archive. It must not be downloaded unless requested.
+	const arch = "win64_msvc2022_64"
+	vi := testVersionInfo("qtwebengine")
+	pkg := "qt.qt6.6102.addons.qtwebengine." + arch
+	vi.PackageArchives[pkg] = []ArchiveRef{
+		{URL: "http://x/we.7z", Filename: "6.10.2-0-202601qtwebengine-Windows-ARM64.7z"},
+		{URL: "http://x/we-dbg.7z", Filename: "6.10.2-0-202601qtwebengine-Windows-ARM64-debug-symbols.7z"},
+	}
+
+	filenames := func(archives []ResolvedArchive) []string {
+		var out []string
+		for _, a := range archives {
+			out = append(out, a.Ref.Filename)
+		}
+		return out
+	}
+
+	// Default: debug-symbols excluded.
+	archives, err := resolveArchives(vi, ResolveOptions{
+		Version: "6.10.2", Arch: arch, Modules: []string{"qtwebengine"},
+	})
+	require.NoError(t, err)
+	names := filenames(archives)
+	assert.Contains(t, names, "6.10.2-0-202601qtwebengine-Windows-ARM64.7z")
+	assert.NotContains(t, names, "6.10.2-0-202601qtwebengine-Windows-ARM64-debug-symbols.7z")
+
+	// With --debug-symbols: bundled symbols are kept.
+	archives, err = resolveArchives(vi, ResolveOptions{
+		Version: "6.10.2", Arch: arch, Modules: []string{"qtwebengine"}, DebugInfo: true,
+	})
+	require.NoError(t, err)
+	assert.Contains(t, filenames(archives), "6.10.2-0-202601qtwebengine-Windows-ARM64-debug-symbols.7z")
+}
+
 func TestResolveArchives_AutoPrefixQt(t *testing.T) {
 	vi := testVersionInfo("qtcharts", "qtwebengine", "qtimageformats")
 	archives, err := resolveArchives(vi, ResolveOptions{

@@ -168,24 +168,15 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 		allModules = append(allModules, opts.Modules...)
 	}
 
-	// Documentation - scoped to all installed modules.
-	if opts.Docs {
-		archives = append(archives, resolveModuleScopedArchives(vi, prefix, "doc", allModules)...)
-	}
+	// Docs, examples, sources, and debug info - scoped to all installed modules.
+	archives = append(archives, resolveExtraContent(vi, prefix, opts, allModules)...)
 
-	// Examples - scoped to all installed modules.
-	if opts.Examples {
-		archives = append(archives, resolveModuleScopedArchives(vi, prefix, "examples", allModules)...)
-	}
-
-	// Sources.
-	if opts.Sources {
-		archives = append(archives, resolveSourcesArchives(vi, prefix)...)
-	}
-
-	// Debug info - scoped to all installed modules.
-	if opts.DebugInfo {
-		archives = append(archives, resolveDebugInfoArchives(vi, prefix, opts.Arch, allModules)...)
+	// Some modules (notably QtWebEngine) bundle a debug-symbols archive directly
+	// in their add-on package's DownloadableArchives. Drop those unless the user
+	// explicitly asked for debug symbols, so a plain module install does not pull
+	// gigabytes of unwanted symbols.
+	if !opts.DebugInfo {
+		archives = filterDebugSymbolArchives(archives)
 	}
 
 	if len(archives) == 0 {
@@ -193,6 +184,48 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 	}
 
 	return archives, nil
+}
+
+// resolveExtraContent resolves the optional docs, examples, sources, and
+// debug-info archives requested in opts, scoped to allModules where applicable.
+func resolveExtraContent(vi *QtVersionInfo, prefix string, opts ResolveOptions, allModules []string) []ResolvedArchive {
+	var archives []ResolvedArchive
+	if opts.Docs {
+		archives = append(archives, resolveModuleScopedArchives(vi, prefix, "doc", allModules)...)
+	}
+	if opts.Examples {
+		archives = append(archives, resolveModuleScopedArchives(vi, prefix, "examples", allModules)...)
+	}
+	if opts.Sources {
+		archives = append(archives, resolveSourcesArchives(vi, prefix)...)
+	}
+	if opts.DebugInfo {
+		archives = append(archives, resolveDebugInfoArchives(vi, prefix, opts.Arch, allModules)...)
+	}
+	return archives
+}
+
+// filterDebugSymbolArchives returns archives with debug-symbol payloads removed.
+// It filters on the archive filename so it catches symbols bundled inside a
+// module's own package, not just the dedicated debug_info packages.
+func filterDebugSymbolArchives(archives []ResolvedArchive) []ResolvedArchive {
+	filtered := archives[:0]
+	for _, a := range archives {
+		if isDebugSymbolArchive(a.Ref.Filename) {
+			continue
+		}
+		filtered = append(filtered, a)
+	}
+	return filtered
+}
+
+// isDebugSymbolArchive reports whether an archive filename is a debug-symbols payload,
+// e.g. "...qtwebengine-Windows-...-ARM64-debug-symbols.7z".
+func isDebugSymbolArchive(filename string) bool {
+	f := strings.ToLower(filename)
+	return strings.Contains(f, "debug-symbols") ||
+		strings.Contains(f, "debug_info") ||
+		strings.Contains(f, "debuginfo")
 }
 
 // resolveModuleScopedArchives resolves archives for a given package segment
