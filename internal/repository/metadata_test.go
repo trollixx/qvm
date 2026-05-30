@@ -72,6 +72,34 @@ func TestRepoSuffixToVersion(t *testing.T) {
 	}
 }
 
+func TestParseSHA1Sidecar(t *testing.T) {
+	const digest = "e78e16b31fa82d5c67b9c16304da15b59eb6016b"
+	tests := []struct {
+		name    string
+		body    string
+		want    string
+		wantErr bool
+	}{
+		{name: "bare digest", body: digest, want: digest},
+		{name: "digest with filename", body: digest + "  6.10.2-0-foo.7z\n", want: digest},
+		{name: "uppercase normalized", body: strings.ToUpper(digest), want: digest},
+		{name: "empty", body: "   ", wantErr: true},
+		{name: "too short", body: "abc123", wantErr: true},
+		{name: "not hex", body: "zzzz16b31fa82d5c67b9c16304da15b59eb6016b", wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseSHA1Sidecar([]byte(tc.body))
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 // --- extractTarget ---
 
 func TestExtractTarget(t *testing.T) {

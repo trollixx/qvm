@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"unicode"
 
 	qerr "github.com/trollixx/qvm/internal/errors"
@@ -38,6 +39,34 @@ type Resolver struct {
 // NewResolver creates a Resolver backed by the given MetadataFetcher.
 func NewResolver(fetcher *MetadataFetcher) *Resolver {
 	return &Resolver{fetcher: fetcher}
+}
+
+// checksumFetchConcurrency bounds parallel ".sha1" sidecar fetches.
+const checksumFetchConcurrency = 8
+
+// FetchChecksums populates each archive's Ref.SHA1 from its ".sha1" sidecar file,
+// fetched concurrently. Qt does not embed data-archive digests in Updates.xml, so
+// this is how integrity verification is enabled. Archives whose sidecar is missing
+// or unreadable are left with an empty SHA1 (and will be downloaded unverified).
+func (r *Resolver) FetchChecksums(ctx context.Context, archives []ResolvedArchive) {
+	sem := make(chan struct{}, checksumFetchConcurrency)
+	var wg sync.WaitGroup
+	for i := range archives {
+		if archives[i].Ref.SHA1 != "" {
+			continue
+		}
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			sha, err := r.fetcher.fetchArchiveSHA1(ctx, archives[i].Ref.URL)
+			if err == nil {
+				archives[i].Ref.SHA1 = sha
+			}
+		}(i)
+	}
+	wg.Wait()
 }
 
 // Resolve returns the archives needed for the given options.

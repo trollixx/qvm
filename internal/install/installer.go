@@ -336,6 +336,10 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		return fmt.Errorf("resolving archives: %w", err)
 	}
 
+	// Populate per-archive SHA-1 digests from their ".sha1" sidecars so downloads
+	// can be integrity-checked. Qt does not embed these in Updates.xml.
+	inst.resolver.FetchChecksums(ctx, archives)
+
 	// Stable cache dir: survives interruption so downloads can be resumed.
 	dlDir, err := DownloadCacheDir()
 	if err != nil {

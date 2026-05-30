@@ -1,6 +1,10 @@
 package repository
 
 import (
+	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,6 +44,30 @@ func TestResolveArchives_ExactModuleName(t *testing.T) {
 		names = append(names, a.Name)
 	}
 	assert.Contains(t, names, "qt.qt6.6102.addons.qtcharts.win64_msvc2022_64")
+}
+
+func TestFetchChecksums(t *testing.T) {
+	const digest = "e78e16b31fa82d5c67b9c16304da15b59eb6016b"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/good.7z.sha1" {
+			_, _ = io.WriteString(w, digest+"  good.7z\n")
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	r := NewResolver(NewMetadataFetcher(NewClient(5), nil, nil))
+	archives := []ResolvedArchive{
+		{Name: "good", Ref: ArchiveRef{URL: srv.URL + "/good.7z", Filename: "good.7z"}},
+		{Name: "missing", Ref: ArchiveRef{URL: srv.URL + "/missing.7z", Filename: "missing.7z"}},
+		{Name: "preset", Ref: ArchiveRef{URL: srv.URL + "/preset.7z", Filename: "preset.7z", SHA1: "keepme"}},
+	}
+	r.FetchChecksums(context.Background(), archives)
+
+	assert.Equal(t, digest, archives[0].Ref.SHA1, "sidecar digest should be fetched")
+	assert.Empty(t, archives[1].Ref.SHA1, "missing sidecar should leave SHA1 empty")
+	assert.Equal(t, "keepme", archives[2].Ref.SHA1, "preset SHA1 should be left untouched")
 }
 
 func TestResolveArchives_ExcludesBundledDebugSymbols(t *testing.T) {

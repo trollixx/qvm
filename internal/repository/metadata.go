@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -15,6 +16,9 @@ import (
 
 	"github.com/trollixx/qvm/pkg/qtmeta"
 )
+
+// sha1HexLen is the length of a SHA-1 digest in lowercase hex.
+const sha1HexLen = 40
 
 // addonsCategory is the package-path component marking a Qt add-on module.
 const addonsCategory = "addons"
@@ -32,7 +36,6 @@ type packageXML struct {
 	Version              string          `xml:"Version"`
 	ReleaseDate          string          `xml:"ReleaseDate"`
 	DownloadableArchives string          `xml:"DownloadableArchives"`
-	SHA1                 string          `xml:"ArchiveSHA1"` // Comma-separated SHA1s matching DownloadableArchives
 	Dependencies         string          `xml:"Dependencies"`
 	Virtual              string          `xml:"Virtual"`
 	UpdateFiles          []updateFileXML `xml:"UpdateFile"`
@@ -41,7 +44,6 @@ type packageXML struct {
 type updateFileXML struct {
 	CompressedSize   string `xml:"CompressedSize,attr"`
 	UncompressedSize string `xml:"UncompressedSize,attr"`
-	SHA1             string `xml:"SHA1,attr"`
 	FileName         string `xml:"FileName,attr"`
 }
 
@@ -813,27 +815,26 @@ func setVersionFeatureFlags(vi *QtVersionInfo, pkgName string) {
 //
 // e.g. "6.10.1-0-202511161843qtbase-Windows-...7z"
 // The DownloadableArchives field omits this prefix; pkg.Version supplies it.
+//
+// Per-archive SHA-1 digests are deliberately left empty here: Qt's Updates.xml
+// does not carry them (its <SHA1> element is the metadata archive's digest). They
+// are fetched from the "<archive>.sha1" sidecar files by (*Resolver).FetchChecksums.
 func buildArchiveRefs(pkg packageXML, baseURL string) []ArchiveRef {
 	if pkg.DownloadableArchives == "" {
 		return nil
 	}
 
-	// UpdateFile FileName attributes use the version-prefixed name on disk.
-	sha1ByFile := make(map[string]string)
+	// UpdateFile elements carry the compressed size, keyed by FileName when present.
 	sizeByFile := make(map[string]int64)
 	for _, uf := range pkg.UpdateFiles {
-		sha1ByFile[uf.FileName] = uf.SHA1
 		sz, parseErr := strconv.ParseInt(uf.CompressedSize, 10, 64)
 		if parseErr == nil {
 			sizeByFile[uf.FileName] = sz
 		}
 	}
 
-	// Fallback: parallel ArchiveSHA1 field (comma-separated, same order as DownloadableArchives).
-	sha1Fallback := strings.Split(pkg.SHA1, ",")
-
 	var refs []ArchiveRef
-	for i, raw := range strings.Split(pkg.DownloadableArchives, ",") {
+	for raw := range strings.SplitSeq(pkg.DownloadableArchives, ",") {
 		filename := strings.TrimSpace(raw)
 		if filename == "" {
 			continue
@@ -845,22 +846,37 @@ func buildArchiveRefs(pkg packageXML, baseURL string) []ArchiveRef {
 			diskFilename = pkg.Version + filename
 		}
 
-		sha1 := sha1ByFile[diskFilename]
-		if sha1 == "" {
-			sha1 = sha1ByFile[filename] // fallback for schemas without version prefix
-		}
-		if sha1 == "" && i < len(sha1Fallback) {
-			sha1 = strings.TrimSpace(sha1Fallback[i])
-		}
-
 		refs = append(refs, ArchiveRef{
 			URL:      baseURL + pkg.Name + "/" + diskFilename,
 			Filename: diskFilename,
-			SHA1:     sha1,
 			Size:     sizeByFile[diskFilename],
 		})
 	}
 	return refs
+}
+
+// fetchArchiveSHA1 fetches and parses the ".sha1" sidecar published next to an
+// archive on the Qt mirror, returning the lowercase hex digest.
+func (f *MetadataFetcher) fetchArchiveSHA1(ctx context.Context, archiveURL string) (string, error) {
+	body, err := f.client.FetchBytes(ctx, archiveURL+".sha1")
+	if err != nil {
+		return "", err
+	}
+	return parseSHA1Sidecar(body)
+}
+
+// parseSHA1Sidecar extracts a SHA-1 digest from sidecar content, which is either
+// a bare digest ("<40 hex>") or "<40 hex>  <filename>".
+func parseSHA1Sidecar(body []byte) (string, error) {
+	fields := strings.Fields(string(body))
+	if len(fields) == 0 {
+		return "", errors.New("empty sha1 sidecar")
+	}
+	digest := strings.ToLower(fields[0])
+	if _, err := hex.DecodeString(digest); err != nil || len(digest) != sha1HexLen {
+		return "", fmt.Errorf("invalid sha1 sidecar content: %q", fields[0])
+	}
+	return digest, nil
 }
 
 // repoSuffixToVersion converts "6100" -> "6.10.0".
