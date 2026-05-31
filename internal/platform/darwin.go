@@ -19,7 +19,9 @@ func (d *Darwin) DefaultInstallDir() string {
 }
 
 func (d *Darwin) DefaultArch(_ string) string {
-	return "macos"
+	// Qt 6 ships a single universal (x86_64 + arm64) macOS desktop build under
+	// the "clang_64" ABI; there is no "macos" arch in the repository.
+	return "clang_64"
 }
 
 func (d *Darwin) CheckCompilerPresent(_ string) (bool, string) {

@@ -249,7 +249,7 @@ func TestExtensionArchSubdir(t *testing.T) {
 		{"linux_x64_gcc", "gcc"},
 		{"linux_arm64_gcc_arm64", "gcc_arm64"},
 		{"mac_x64_clang_64", "clang_64"},
-		{"macos", "macos"}, // no prefix match, returned as-is
+		{"noprefix", "noprefix"}, // no host prefix, returned as-is
 	}
 	for _, tc := range tests {
 		t.Run(tc.arch, func(t *testing.T) {

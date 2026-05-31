@@ -937,7 +937,7 @@ func extractTarget(parts []string) string {
 		return ""
 	}
 	// Targets contain underscores and look like "win64_msvc2022_64".
-	if strings.Contains(last, "_") || last == "macos" {
+	if strings.Contains(last, "_") {
 		return last
 	}
 	return ""
