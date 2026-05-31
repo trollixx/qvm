@@ -112,8 +112,7 @@ func TestExtractTarget(t *testing.T) {
 		{[]string{"qt", "qt6", "683", "addons", "qtcharts"}, ""}, // module name, no target
 		{[]string{"qt", "qt6", "683", "addons"}, ""},             // no last target
 		{[]string{"qt", "qt6", "683", "win64_mingw"}, "win64_mingw"},
-		{[]string{"qt", "qt6", "683", "macos"}, "macos"}, // macos special case
-		{[]string{"qt", "qt6", "683", "doc"}, ""},        // skip list
+		{[]string{"qt", "qt6", "683", "doc"}, ""}, // skip list
 		{[]string{"qt", "qt6", "683", "examples"}, ""},
 		{[]string{"qt", "qt6", "683", "sources"}, ""},
 		{[]string{"qt", "qt6", "683", "debug_info"}, ""},

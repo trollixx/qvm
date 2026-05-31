@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -51,6 +52,37 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: coverage.txt
+
+  # Real end-to-end install: download -> extract -> qt.conf patch -> prefix,
+  # then verify qmake reports the installed version. Covers Windows (x64 +
+  # arm64) and macOS arm64; the macOS build is universal, so Intel is exercised
+  # too. Linux is excluded -- qvm does not install Qt there (use distro packages).
+  smoke:
+    name: smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install Qt and verify qmake
+        shell: bash
+        run: |
+          ext=""
+          [[ "$RUNNER_OS" == "Windows" ]] && ext=".exe"
+          go build -o "qvm$ext" ./cmd/qvm
+          "./qvm$ext" install 6.8.3 --dir "$RUNNER_TEMP/Qt"
+          prefix=$("./qvm$ext" prefix 6.8.3)
+          echo "prefix: $prefix"
+          version=$("$prefix/bin/qmake$ext" -query QT_VERSION)
+          echo "qmake QT_VERSION: $version"
+          test "$version" = "6.8.3"
 
   lint:
     runs-on: ubuntu-latest

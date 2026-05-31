@@ -30,8 +30,7 @@ var knownTargetMap = func() map[string]TargetMeta { //nolint:gochecknoglobals //
 		{Name: "gcc_64", DisplayName: "GCC, 64-bit", OS: Linux},
 		{Name: "linux_gcc_64", DisplayName: "GCC, 64-bit", OS: Linux},
 		// macOS
-		{Name: "macos", DisplayName: "macOS (universal)", OS: MacOS},
-		{Name: "clang_64", DisplayName: "Clang, 64-bit", OS: MacOS},
+		{Name: "clang_64", DisplayName: "Clang, 64-bit (universal)", OS: MacOS},
 	}
 	m := make(map[string]TargetMeta, len(targets))
 	for _, t := range targets {

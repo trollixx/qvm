@@ -35,7 +35,7 @@ func DefaultArchForHost(host, qtVersion string) string {
 	case "linux_arm64":
 		return "linux_gcc_arm64"
 	case "mac_x64":
-		return "macos"
+		return "clang_64"
 	default:
 		return ""
 	}

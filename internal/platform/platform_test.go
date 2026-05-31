@@ -29,7 +29,7 @@ func TestDefaultArchForHost(t *testing.T) {
 		// Non-Windows hosts are version-independent.
 		{"linux_x64", "linux_x64", "6.8.3", "gcc_64"},
 		{"linux_arm64", "linux_arm64", "6.8.3", "linux_gcc_arm64"},
-		{"mac_x64", "mac_x64", "6.8.3", "macos"},
+		{"mac_x64", "mac_x64", "6.8.3", "clang_64"},
 
 		// Invalid version falls back to msvc2019.
 		{"bad_version", "windows_x86", "bad", "win64_msvc2019_64"},

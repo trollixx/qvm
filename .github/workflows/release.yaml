@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,16 +21,23 @@ jobs:
           go-version-file: go.mod
 
       - name: Build binaries
-        shell: bash
         env:
-          GOOS: windows
+          CGO_ENABLED: "0"
           VERSION: ${{ github.ref_name }}
         run: |
-          GOARCH=amd64 go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=$VERSION" -o qvm-amd64.exe ./cmd/qvm
-          GOARCH=arm64 go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=$VERSION" -o qvm-arm64.exe ./cmd/qvm
+          ldflags="-X github.com/trollixx/qvm/internal/cli.Version=$VERSION"
+          build() { GOOS=$1 GOARCH=$2 go build -ldflags "$ldflags" -o "$3" ./cmd/qvm; }
+          build windows amd64 qvm-windows-amd64.exe
+          build windows arm64 qvm-windows-arm64.exe
+          build darwin  amd64 qvm-macos-amd64
+          build darwin  arm64 qvm-macos-arm64
 
       - name: Create release
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" qvm-amd64.exe qvm-arm64.exe --generate-notes
+        run: |
+          gh release create "$GITHUB_REF_NAME" --generate-notes \
+            qvm-windows-amd64.exe \
+            qvm-windows-arm64.exe \
+            qvm-macos-amd64 \
+            qvm-macos-arm64

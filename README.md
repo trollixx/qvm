@@ -1,8 +1,8 @@
 # qvm — Qt Version Manager
 
-A single-binary CLI tool for installing and managing Qt SDK versions on Windows.
+A single-binary CLI tool for installing and managing Qt SDK versions on Windows and macOS.
 
-Linux and macOS are not currently supported despite occasional references.
+Linux is not supported — use your distribution's Qt packages instead.
 
 > [!WARNING]
 > This tool is mostly AI generated for my own needs. The code has not been thoroughly reviewed. Use at your own risk! The interface will most likely change too.
@@ -80,14 +80,14 @@ qvm install <version> [flags]
 
 | Flag | Description |
 | --- | --- |
-| `--arch`, `-a` | Compiler/ABI target (e.g. `win64_msvc2022_64`, `gcc_64`, `macos`). Auto-detected if omitted. |
+| `--arch`, `-a` | Compiler/ABI target (e.g. `win64_msvc2022_64`, `clang_64`). Auto-detected if omitted. |
 | `--target` | Qt platform: `desktop` (default), `android`, `ios`, `wasm`. WASM resolves under `desktop/`; pick a `--arch` like `wasm_singlethread`. WinRT is not supported (removed in Qt 6). |
 | `--modules`, `-m` | Comma-separated add-on modules (e.g. `qtcharts,qtwebengine`). The `qt` prefix is optional (`charts` and `qtcharts` both work). |
 | `--docs` | Install documentation for all selected modules |
 | `--examples` | Install examples for all selected modules |
 | `--sources` | Install Qt source code |
 | `--debug-symbols` | Install debug symbol files |
-| `--host` | Host platform override (e.g. `windows_arm64`, `linux_arm64`). Auto-detected if omitted. |
+| `--host` | Host platform override (e.g. `windows_arm64`, `mac_x64`). Auto-detected if omitted. |
 | `--force` | Re-install even if already present |
 | `--dir` | Override Qt installation directory |
 | `--dry-run` | Resolve and print archives (with sizes) without downloading |
@@ -145,7 +145,7 @@ qvm list-remote [<version-filter>] [flags]
 | Flag | Description |
 | --- | --- |
 | `--format`, `-f` | Output format: `text` (default) or `json` |
-| `--host` | Host platform override (e.g. `windows_arm64`, `linux_arm64`) |
+| `--host` | Host platform override (e.g. `windows_arm64`, `mac_x64`) |
 
 ```shell
 qvm list-remote                # all available, grouped by major
@@ -304,9 +304,8 @@ qvm mirror select <url>
 
 | OS | Architectures | Default ABI |
 | --- | --- | --- |
-| Windows | x86_64 | `win64_msvc2022_64` |
-| Linux | x86_64, aarch64 | `gcc_64` |
-| macOS | x86_64, arm64 | `macos` |
+| Windows | x86_64, arm64 | `win64_msvc2022_64` |
+| macOS | x86_64, arm64 (universal) | `clang_64` |
 
 ### Common ABI values
 
@@ -316,22 +315,21 @@ qvm mirror select <url>
 | Windows | `win64_msvc2019_64` | MSVC 2019 64-bit |
 | Windows | `win64_mingw` | MinGW-w64 64-bit |
 | Windows | `win64_llvm_mingw` | LLVM/Clang MinGW 64-bit |
-| Linux | `gcc_64` | GCC x86_64 |
-| Linux | `linux_gcc_arm64` | GCC AArch64 |
-| macOS | `macos` | Clang (universal / x86_64) |
+| macOS | `clang_64` | Clang (universal: x86_64 + arm64) |
 
 The `install` command auto-detects the recommended ABI for the current machine. Use `--arch` to override.
 
 ## File Locations
 
-qvm follows XDG Base Directory conventions on Linux and macOS, and standard Windows app directories on Windows.
+qvm uses standard Windows app directories on Windows, and the macOS Application
+Support / Caches conventions on macOS.
 
-| File | Windows | Linux / macOS |
+| File | Windows | macOS |
 | --- | --- | --- |
-| Config | `%LOCALAPPDATA%\qvm\config.toml` | `~/.config/qvm/config.toml` |
-| Registry | `%LOCALAPPDATA%\qvm\registry.json` | `~/.local/state/qvm/registry.json` |
-| Download cache | `%LOCALAPPDATA%\qvm\downloads\` | `~/.cache/qvm/downloads/` |
-| Metadata cache | `%LOCALAPPDATA%\qvm\metadata\` | `~/.cache/qvm/metadata/` |
+| Config | `%LOCALAPPDATA%\qvm\config.toml` | `~/Library/Application Support/qvm/config.toml` |
+| Registry | `%LOCALAPPDATA%\qvm\registry.json` | `~/Library/Application Support/qvm/registry.json` |
+| Download cache | `%LOCALAPPDATA%\qvm\downloads\` | `~/Library/Caches/qvm/downloads/` |
+| Metadata cache | `%LOCALAPPDATA%\qvm\metadata\` | `~/Library/Caches/qvm/metadata/` |
 
 ## Building from Source
 
