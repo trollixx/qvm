@@ -56,6 +56,7 @@ func newRootCommand(streams *IOStreams) *cli.Command {
 			a.newUninstallCommand(),
 			a.newPrefixCommand(),
 			a.newEnvCommand(),
+			a.newExecCommand(),
 			a.newInfoCommand(),
 			a.newSearchCommand(),
 			a.newDoctorCommand(),
