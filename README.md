@@ -26,6 +26,7 @@ $Env:Qt6_DIR=$(qvm prefix 6.8.3)
 - Install Qt add-on modules, documentation, examples, sources, and debug symbols.
 - Automatic module dependency resolution (e.g. `qthttpserver` pulls in `qtwebsockets`).
 - Parallel downloads with retry, resumable interrupted transfers, and progress reporting.
+- Activate a Qt version in any shell with `qvm env` (PowerShell, cmd, bash, zsh, fish, nu).
 - Auto-detect the best compiler/ABI for the current machine.
 - Mirror management — auto-probe and switch to the fastest Qt mirror.
 - Fuzzy search for module names.
@@ -196,6 +197,45 @@ cmake -DCMAKE_PREFIX_PATH=$(qvm prefix 6.8.3) ..
 
 If multiple ABIs are installed for the same version, qvm picks the host's
 default arch automatically; use `--arch` to disambiguate explicitly.
+
+---
+
+### `env`
+
+Print shell commands that activate a Qt version in the current shell.
+
+```shell
+qvm env <version> [flags]
+```
+
+| Flag | Description |
+| --- | --- |
+| `--arch`, `-a` | Specify ABI for multi-arch installations |
+| `--shell` | Output format: `powershell` (`pwsh`), `cmd` (`bat`), `bash` (`sh`, `zsh`), `fish`, `nu` (`nushell`). Defaults to `powershell` on Windows, `bash` elsewhere. |
+
+Two variables are set: the install prefix is prepended to `CMAKE_PREFIX_PATH`
+and `<prefix>/bin` to `PATH` (so `qmake`, `qtdiag`, `windeployqt`/`macdeployqt`,
+`qmlls`, etc. resolve). Existing values are preserved, never clobbered — Qt
+composes with vcpkg or other prefixes already in your environment.
+
+Evaluate the output in your shell:
+
+```shell
+# PowerShell
+qvm env 6.10.2 | Out-String | Invoke-Expression
+
+# bash / zsh
+eval "$(qvm env 6.10.2 --shell bash)"
+
+# fish
+qvm env 6.10.2 --shell fish | source
+
+# nushell
+load-env (qvm env 6.10.2 --shell nu | from json)
+
+# cmd
+for /f "delims=" %i in ('qvm env 6.10.2 --shell cmd') do @%i
+```
 
 ---
 
