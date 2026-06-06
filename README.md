@@ -27,6 +27,7 @@ $Env:Qt6_DIR=$(qvm prefix 6.8.3)
 - Automatic module dependency resolution (e.g. `qthttpserver` pulls in `qtwebsockets`).
 - Parallel downloads with retry, resumable interrupted transfers, and progress reporting.
 - Activate a Qt version in any shell with `qvm env` (PowerShell, cmd, bash, zsh, fish, nu).
+- Run one-off commands in a Qt environment with `qvm exec` (e.g. `qvm exec 6.8.3 -- qmake`).
 - Auto-detect the best compiler/ABI for the current machine.
 - Mirror management — auto-probe and switch to the fastest Qt mirror.
 - Fuzzy search for module names.
@@ -235,6 +236,33 @@ load-env (qvm env 6.10.2 --shell nu | from json)
 
 # cmd
 for /f "delims=" %i in ('qvm env 6.10.2 --shell cmd') do @%i
+```
+
+---
+
+### `exec`
+
+Run a single command with a Qt version's environment, without modifying the
+current shell.
+
+```shell
+qvm exec <version> [--] <command> [args...]
+```
+
+| Flag | Description |
+| --- | --- |
+| `--arch`, `-a` | Specify ABI for multi-arch installations |
+
+The same variables as `qvm env` are applied, and the command itself is
+resolved against the modified `PATH` — so `qvm exec 6.8.3 qmake` runs that
+Qt's `qmake` even if another Qt is first on your shell's `PATH`. Stdin/stdout
+are passed through untouched and the child's exit code becomes qvm's exit
+code, so it composes with pipes, redirection, and CI scripts.
+
+```shell
+qvm exec 6.8.3 -- qmake -query QT_VERSION
+qvm exec 6.8.3 -- cmake -S . -B build
+qvm exec 6.8.3 -- windeployqt build\app.exe
 ```
 
 ---
