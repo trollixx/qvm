@@ -204,6 +204,16 @@ func mergeVersionInfo(dst, src *QtVersionInfo) {
 		}
 	}
 
+	// Merge package dependencies.
+	if dst.PackageDependencies == nil && len(src.PackageDependencies) > 0 {
+		dst.PackageDependencies = make(map[string][]string)
+	}
+	for k, v := range src.PackageDependencies {
+		if _, exists := dst.PackageDependencies[k]; !exists {
+			dst.PackageDependencies[k] = v
+		}
+	}
+
 	// Merge feature flags.
 	dst.HasDocs = dst.HasDocs || src.HasDocs
 	dst.HasExamples = dst.HasExamples || src.HasExamples
@@ -715,13 +725,9 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 		versionMap[verStr] = vi
 	}
 
-	// Store real archive refs for this package (works for both virtual and non-virtual).
-	if refs := buildArchiveRefs(pkg, baseURL); len(refs) > 0 {
-		if vi.PackageArchives == nil {
-			vi.PackageArchives = make(map[string][]ArchiveRef)
-		}
-		vi.PackageArchives[pkg.Name] = refs
-	}
+	// Store real archive refs and declared dependencies for this package
+	// (works for both virtual and non-virtual).
+	storePackageData(vi, pkg, baseURL)
 
 	// The remainder of this function handles metadata registration (modules, targets,
 	// feature flags). Virtual packages contribute archives but not metadata.
@@ -786,6 +792,22 @@ func processQtPackage(pkg packageXML, versionMap map[string]*QtVersionInfo, base
 
 	// Check for doc/examples/sources/debug_info by package name suffix.
 	setVersionFeatureFlags(vi, pkg.Name)
+}
+
+// storePackageData records pkg's archive refs and declared dependencies on vi.
+func storePackageData(vi *QtVersionInfo, pkg packageXML, baseURL string) {
+	if refs := buildArchiveRefs(pkg, baseURL); len(refs) > 0 {
+		if vi.PackageArchives == nil {
+			vi.PackageArchives = make(map[string][]ArchiveRef)
+		}
+		vi.PackageArchives[pkg.Name] = refs
+	}
+	if deps := parseDependencies(pkg.Dependencies); len(deps) > 0 {
+		if vi.PackageDependencies == nil {
+			vi.PackageDependencies = make(map[string][]string)
+		}
+		vi.PackageDependencies[pkg.Name] = deps
+	}
 }
 
 // setVersionFeatureFlags inspects a package name and sets the corresponding
@@ -945,6 +967,18 @@ func extractTarget(parts []string) string {
 
 func isVirtual(s string) bool {
 	return strings.EqualFold(strings.TrimSpace(s), "true")
+}
+
+// parseDependencies splits a comma-separated <Dependencies> value into package names.
+func parseDependencies(s string) []string {
+	var deps []string
+	for dep := range strings.SplitSeq(s, ",") {
+		dep = strings.TrimSpace(dep)
+		if dep != "" {
+			deps = append(deps, dep)
+		}
+	}
+	return deps
 }
 
 func parseDate(s string) time.Time {

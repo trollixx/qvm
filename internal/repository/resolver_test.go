@@ -32,7 +32,7 @@ func testVersionInfo(addonModules ...string) *QtVersionInfo {
 
 func TestResolveArchives_ExactModuleName(t *testing.T) {
 	vi := testVersionInfo("qtcharts", "qtwebengine")
-	archives, err := resolveArchives(vi, ResolveOptions{
+	archives, _, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
 		Modules: []string{"qtcharts"},
@@ -90,7 +90,7 @@ func TestResolveArchives_ExcludesBundledDebugSymbols(t *testing.T) {
 	}
 
 	// Default: debug-symbols excluded.
-	archives, err := resolveArchives(vi, ResolveOptions{
+	archives, _, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2", Arch: arch, Modules: []string{"qtwebengine"},
 	})
 	require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestResolveArchives_ExcludesBundledDebugSymbols(t *testing.T) {
 	assert.NotContains(t, names, "6.10.2-0-202601qtwebengine-Windows-ARM64-debug-symbols.7z")
 
 	// With --debug-symbols: bundled symbols are kept.
-	archives, err = resolveArchives(vi, ResolveOptions{
+	archives, _, err = resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2", Arch: arch, Modules: []string{"qtwebengine"}, DebugInfo: true,
 	})
 	require.NoError(t, err)
@@ -108,7 +108,7 @@ func TestResolveArchives_ExcludesBundledDebugSymbols(t *testing.T) {
 
 func TestResolveArchives_AutoPrefixQt(t *testing.T) {
 	vi := testVersionInfo("qtcharts", "qtwebengine", "qtimageformats")
-	archives, err := resolveArchives(vi, ResolveOptions{
+	archives, _, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
 		Modules: []string{"charts", "webengine", "imageformats"},
@@ -126,7 +126,7 @@ func TestResolveArchives_AutoPrefixQt(t *testing.T) {
 
 func TestResolveArchives_MixedPrefixed(t *testing.T) {
 	vi := testVersionInfo("qtcharts", "qthttpserver")
-	archives, err := resolveArchives(vi, ResolveOptions{
+	archives, _, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
 		Modules: []string{"charts", "qthttpserver"},
@@ -143,7 +143,7 @@ func TestResolveArchives_MixedPrefixed(t *testing.T) {
 
 func TestResolveArchives_UnknownModule_Error(t *testing.T) {
 	vi := testVersionInfo("qtcharts")
-	_, err := resolveArchives(vi, ResolveOptions{
+	_, _, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
 		Modules: []string{"nonexistent"},
@@ -155,7 +155,7 @@ func TestResolveArchives_UnknownModule_Error(t *testing.T) {
 
 func TestResolveArchives_MultipleUnknown_FailsOnFirst(t *testing.T) {
 	vi := testVersionInfo("qtcharts")
-	_, err := resolveArchives(vi, ResolveOptions{
+	_, _, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
 		Modules: []string{"foo", "bar"},
@@ -168,7 +168,7 @@ func TestResolveArchives_MultipleUnknown_FailsOnFirst(t *testing.T) {
 func TestResolveArchives_NoPrefixForAlreadyPrefixed(t *testing.T) {
 	// "qtcharts" is already prefixed - should not try "qtqtcharts".
 	vi := testVersionInfo("qtcharts")
-	archives, err := resolveArchives(vi, ResolveOptions{
+	archives, _, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
 		Modules: []string{"qtcharts"},
@@ -182,7 +182,7 @@ func TestResolveArchives_EssentialModuleSkipped(t *testing.T) {
 	vi := testVersionInfo("qtcharts")
 	vi.Archs[0].EssentialModules = []string{"qtbase", "qtimageformats", "qtwebchannel"}
 
-	archives, err := resolveArchives(vi, ResolveOptions{
+	archives, _, err := resolveArchives(vi, ResolveOptions{
 		Version: "6.10.2",
 		Arch:    "win64_msvc2022_64",
 		Modules: []string{"imageformats", "charts", "webchannel"},
@@ -235,7 +235,7 @@ func TestResolveArchives_DebugInfoScopedToModules(t *testing.T) {
 	}
 	vi.Archs[0].EssentialModules = []string{"qtbase", "qtdeclarative"}
 
-	archives, err := resolveArchives(vi, ResolveOptions{
+	archives, _, err := resolveArchives(vi, ResolveOptions{
 		Version:        "6.10.2",
 		Arch:           arch,
 		Modules:        []string{"qtcharts", "qtimageformats"},
@@ -261,9 +261,152 @@ func TestResolveArchives_DebugInfoScopedToModules(t *testing.T) {
 	assert.NotContains(t, debugFiles, "6.10.2-0-202503010000qt3d-Windows-debug-symbols.7z")
 }
 
+func TestResolveArchives_ExpandsDependencyModules(t *testing.T) {
+	const arch = "win64_msvc2022_64"
+	vi := testVersionInfo("qthttpserver", "qtwebsockets")
+	vi.PackageDependencies = map[string][]string{
+		"qt.qt6.6102.addons.qthttpserver": {
+			"qt.qt6.6102.doc.qthttpserver",
+			"qt.qt6.6102.examples.qthttpserver",
+			"qt.qt6.6102.addons.qtwebsockets",
+			"qt.tools.qtcreator",
+		},
+	}
+
+	archives, modules, err := resolveArchives(vi, ResolveOptions{
+		Version: "6.10.2", Arch: arch, Modules: []string{"httpserver"},
+	})
+	require.NoError(t, err)
+
+	var names []string
+	for _, a := range archives {
+		names = append(names, a.Name)
+	}
+	assert.Contains(t, names, "qt.qt6.6102.addons.qthttpserver."+arch)
+	assert.Contains(t, names, "qt.qt6.6102.addons.qtwebsockets."+arch)
+	assert.Len(t, archives, 3, "essentials + 2 addons; doc/examples/tools dependencies must be ignored")
+	assert.Equal(t, []string{"httpserver", "qtwebsockets"}, modules)
+}
+
+func TestResolveArchives_TransitiveDependencies(t *testing.T) {
+	vi := testVersionInfo("qtquick3d", "qtshadertools", "qtquicktimeline")
+	vi.PackageDependencies = map[string][]string{
+		"qt.qt6.6102.addons.qtquick3d":     {"qt.qt6.6102.addons.qtshadertools"},
+		"qt.qt6.6102.addons.qtshadertools": {"qt.qt6.6102.addons.qtquicktimeline"},
+	}
+
+	_, modules, err := resolveArchives(vi, ResolveOptions{
+		Version: "6.10.2", Arch: "win64_msvc2022_64", Modules: []string{"qtquick3d"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"qtquick3d", "qtshadertools", "qtquicktimeline"}, modules)
+}
+
+func TestResolveArchives_NoDeps(t *testing.T) {
+	vi := testVersionInfo("qthttpserver", "qtwebsockets")
+	vi.PackageDependencies = map[string][]string{
+		"qt.qt6.6102.addons.qthttpserver": {"qt.qt6.6102.addons.qtwebsockets"},
+	}
+
+	archives, modules, err := resolveArchives(vi, ResolveOptions{
+		Version: "6.10.2", Arch: "win64_msvc2022_64", Modules: []string{"qthttpserver"}, NoDeps: true,
+	})
+	require.NoError(t, err)
+	assert.Len(t, archives, 2, "essentials + qthttpserver only")
+	assert.Equal(t, []string{"qthttpserver"}, modules)
+}
+
+func TestResolveArchives_DependencyAlreadyInstalled(t *testing.T) {
+	vi := testVersionInfo("qthttpserver", "qtwebsockets")
+	vi.PackageDependencies = map[string][]string{
+		"qt.qt6.6102.addons.qthttpserver": {"qt.qt6.6102.addons.qtwebsockets"},
+	}
+
+	archives, modules, err := resolveArchives(vi, ResolveOptions{
+		Version:        "6.10.2",
+		Arch:           "win64_msvc2022_64",
+		Modules:        []string{"qthttpserver"},
+		AllModules:     []string{"qtwebsockets", "qthttpserver"},
+		SkipEssentials: true,
+	})
+	require.NoError(t, err)
+	assert.Len(t, archives, 1, "installed dependency must not be re-downloaded")
+	assert.Equal(t, []string{"qthttpserver"}, modules)
+}
+
+func TestResolveArchives_DependencyWithoutArchPackageSkipped(t *testing.T) {
+	vi := testVersionInfo("qthttpserver")
+	vi.PackageDependencies = map[string][]string{
+		"qt.qt6.6102.addons.qthttpserver": {"qt.qt6.6102.addons.qtnotforthisarch"},
+	}
+
+	archives, modules, err := resolveArchives(vi, ResolveOptions{
+		Version: "6.10.2", Arch: "win64_msvc2022_64", Modules: []string{"qthttpserver"},
+	})
+	require.NoError(t, err)
+	assert.Len(t, archives, 2)
+	assert.Equal(t, []string{"qthttpserver"}, modules)
+}
+
+func TestResolveArchives_DependencyAlsoRequested_NoDuplicate(t *testing.T) {
+	vi := testVersionInfo("qtquick3d", "qtshadertools")
+	vi.PackageDependencies = map[string][]string{
+		"qt.qt6.6102.addons.qtquick3d": {"qt.qt6.6102.addons.qtshadertools"},
+	}
+
+	archives, modules, err := resolveArchives(vi, ResolveOptions{
+		Version: "6.10.2", Arch: "win64_msvc2022_64", Modules: []string{"quick3d", "shadertools"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"quick3d", "shadertools"}, modules)
+
+	count := 0
+	for _, a := range archives {
+		if a.Name == "qt.qt6.6102.addons.qtshadertools.win64_msvc2022_64" {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count)
+}
+
+func TestResolveArchives_CyclicDependenciesTerminate(t *testing.T) {
+	vi := testVersionInfo("qta", "qtb")
+	vi.PackageDependencies = map[string][]string{
+		"qt.qt6.6102.addons.qta": {"qt.qt6.6102.addons.qtb"},
+		"qt.qt6.6102.addons.qtb": {"qt.qt6.6102.addons.qta"},
+	}
+
+	_, modules, err := resolveArchives(vi, ResolveOptions{
+		Version: "6.10.2", Arch: "win64_msvc2022_64", Modules: []string{"qta"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"qta", "qtb"}, modules)
+}
+
+func TestResolveArchives_DocsCoverDependencyModules(t *testing.T) {
+	vi := testVersionInfo("qthttpserver", "qtwebsockets")
+	vi.PackageDependencies = map[string][]string{
+		"qt.qt6.6102.addons.qthttpserver": {"qt.qt6.6102.addons.qtwebsockets"},
+	}
+	vi.PackageArchives["qt.qt6.6102.doc.qtwebsockets"] = []ArchiveRef{
+		{URL: "http://x/doc.7z", Filename: "qtwebsockets-doc.7z"},
+	}
+
+	archives, _, err := resolveArchives(vi, ResolveOptions{
+		Version: "6.10.2", Arch: "win64_msvc2022_64", Modules: []string{"qthttpserver"}, Docs: true,
+	})
+	require.NoError(t, err)
+
+	var names []string
+	for _, a := range archives {
+		names = append(names, a.Name)
+	}
+	assert.Contains(t, names, "qt.qt6.6102.doc.qtwebsockets")
+}
+
 func TestResolveArchives_SkipEssentials(t *testing.T) {
 	vi := testVersionInfo("qtcharts")
-	archives, err := resolveArchives(vi, ResolveOptions{
+	archives, _, err := resolveArchives(vi, ResolveOptions{
 		Version:        "6.10.2",
 		Arch:           "win64_msvc2022_64",
 		Modules:        []string{"qtcharts"},

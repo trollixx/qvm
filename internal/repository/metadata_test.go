@@ -239,6 +239,64 @@ func TestParseRepoIndex_ReleaseDate(t *testing.T) {
 	assert.Equal(t, want, idx.QtVersions[0].ReleaseDate)
 }
 
+// <Dependencies> values are captured per package, including virtual packages.
+func TestParseRepoIndex_PackageDependencies(t *testing.T) {
+	body := []byte(`<?xml version="1.0" encoding="UTF-8"?><Updates>
+		<PackageUpdate>
+			<Name>qt.qt6.6111.addons.qthttpserver</Name>
+			<Virtual>false</Virtual>
+			<Dependencies>qt.qt6.6111.doc.qthttpserver, qt.qt6.6111.addons.qtwebsockets</Dependencies>
+		</PackageUpdate>
+		<PackageUpdate>
+			<Name>qt.qt6.6111.addons.qthttpserver.win64_msvc2022_64</Name>
+			<Virtual>true</Virtual>
+			<Dependencies>qt.qt6.6111.win64_msvc2022_64</Dependencies>
+			<DownloadableArchives>qthttpserver.7z</DownloadableArchives>
+		</PackageUpdate>
+	</Updates>`)
+
+	idx, err := parseRepoIndex(body, "")
+	require.NoError(t, err)
+	require.Len(t, idx.QtVersions, 1)
+
+	deps := idx.QtVersions[0].PackageDependencies
+	assert.Equal(t,
+		[]string{"qt.qt6.6111.doc.qthttpserver", "qt.qt6.6111.addons.qtwebsockets"},
+		deps["qt.qt6.6111.addons.qthttpserver"])
+	assert.Equal(t,
+		[]string{"qt.qt6.6111.win64_msvc2022_64"},
+		deps["qt.qt6.6111.addons.qthttpserver.win64_msvc2022_64"],
+		"virtual packages contribute dependencies too")
+}
+
+func TestParseDependencies(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{"", nil},
+		{"a", []string{"a"}},
+		{"a, b,c", []string{"a", "b", "c"}},
+		{"a, ", []string{"a"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			assert.Equal(t, tc.want, parseDependencies(tc.input))
+		})
+	}
+}
+
+// Per-arch indexes (Qt 6.11+) merge their dependency maps.
+func TestMergeVersionInfo_PackageDependencies(t *testing.T) {
+	dst := &QtVersionInfo{Version: "6.11.1"}
+	src := &QtVersionInfo{
+		Version:             "6.11.1",
+		PackageDependencies: map[string][]string{"a": {"b"}},
+	}
+	mergeVersionInfo(dst, src)
+	assert.Equal(t, []string{"b"}, dst.PackageDependencies["a"])
+}
+
 // Multiple Qt versions in one file are all parsed.
 func TestParseRepoIndex_MultipleVersions(t *testing.T) {
 	xml := packagesXML([]struct{ name, virtual, archives string }{
