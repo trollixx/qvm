@@ -444,6 +444,9 @@ cd qvm
 go build ./cmd/qvm
 ```
 
+`qvm --version` reports the module version stamped by the Go toolchain (for
+`go install` and VCS builds); release builds may override it via `-ldflags`.
+
 Run tests:
 
 ```shell

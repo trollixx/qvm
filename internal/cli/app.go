@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strconv"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -17,6 +19,30 @@ import (
 // Version is the current qvm version string.
 // Override at build time: go build -ldflags "-X github.com/trollixx/qvm/internal/cli.Version=1.2.3".
 var Version = "dev" //nolint:gochecknoglobals // set by build ldflags
+
+// versionDisplay formats a version for human-facing output: numeric versions
+// get a "v" prefix, while "dev" and already-prefixed module versions pass
+// through unchanged.
+func versionDisplay(version string) string {
+	if version == "" || version == "dev" || strings.HasPrefix(version, "v") {
+		return version
+	}
+	return "v" + version
+}
+
+// resolveVersion returns the effective version string: an explicit ldflags
+// override wins; otherwise the module version stamped by the Go toolchain
+// (set for 'go install module@version' and, since Go 1.24, for VCS builds);
+// otherwise ldflagsVersion as-is.
+func resolveVersion(ldflagsVersion string) string {
+	if ldflagsVersion != "dev" {
+		return ldflagsVersion
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+	return ldflagsVersion
+}
 
 // app holds shared dependencies for all CLI commands.
 type app struct {
@@ -33,7 +59,7 @@ func newRootCommand(streams *IOStreams) *cli.Command {
 	return &cli.Command{
 		Name:                  "qvm",
 		Usage:                 "Qt Version Manager",
-		Version:               Version,
+		Version:               resolveVersion(Version),
 		EnableShellCompletion: true,
 		Writer:                a.streams.Out,
 		ErrWriter:             a.streams.ErrOut,
@@ -69,8 +95,8 @@ func newRootCommand(streams *IOStreams) *cli.Command {
 }
 
 // runDefault handles bare "qvm" with no arguments by printing a quick-start guide.
-func (a *app) runDefault(_ context.Context, _ *cli.Command) error {
-	fmt.Fprintf(a.streams.Out, "qvm - Qt Version Manager (v%s)\n", Version)
+func (a *app) runDefault(_ context.Context, cmd *cli.Command) error {
+	fmt.Fprintf(a.streams.Out, "qvm - Qt Version Manager (%s)\n", versionDisplay(cmd.Version))
 	fmt.Fprintln(a.streams.Out)
 	fmt.Fprintln(a.streams.Out, "Quick start:")
 	fmt.Fprintln(a.streams.Out, "  qvm list-remote          List available Qt versions")
