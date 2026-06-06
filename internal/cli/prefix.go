@@ -49,6 +49,19 @@ func (a *app) runPrefix(_ context.Context, cmd *cli.Command) error {
 }
 
 func (a *app) prefixQt(reg *storage.Registry, version, arch string) error {
+	qt, err := resolveInstalledQt(reg, version, arch, "prefix")
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(a.streams.Out, qt.InstallDir)
+	return nil
+}
+
+// resolveInstalledQt finds the installed Qt matching version and arch. With an
+// empty arch and multiple installs, the local machine's default arch wins;
+// otherwise an error asks the user to disambiguate (cmdName names the calling
+// command in the hint).
+func resolveInstalledQt(reg *storage.Registry, version, arch, cmdName string) (*storage.InstalledQt, error) {
 	// Collect all matching installs.
 	var matches []storage.InstalledQt
 	for i := range reg.Qt {
@@ -61,25 +74,23 @@ func (a *app) prefixQt(reg *storage.Registry, version, arch string) error {
 	switch len(matches) {
 	case 0:
 		if arch != "" {
-			return withHint(
+			return nil, withHint(
 				fmt.Errorf("Qt %s (arch: %s) is not installed", version, arch),
 				fmt.Sprintf("To install it: qvm install %s --arch %s", version, arch),
 			)
 		}
-		return withHint(
+		return nil, withHint(
 			fmt.Errorf("Qt %s is not installed", version),
 			fmt.Sprintf("To install it: qvm install %s", version),
 		)
 	case 1:
-		fmt.Fprintln(a.streams.Out, matches[0].InstallDir)
-		return nil
+		return &matches[0], nil
 	default:
 		// Multiple archs installed - prefer the local machine's default.
 		defaultArch := platform.Current().DefaultArch(version)
-		for _, m := range matches {
-			if m.Arch == defaultArch {
-				fmt.Fprintln(a.streams.Out, m.InstallDir)
-				return nil
+		for i := range matches {
+			if matches[i].Arch == defaultArch {
+				return &matches[i], nil
 			}
 		}
 		// No default match - ask the user to specify.
@@ -87,9 +98,9 @@ func (a *app) prefixQt(reg *storage.Registry, version, arch string) error {
 		for i, m := range matches {
 			archs[i] = m.Arch
 		}
-		return withHint(
+		return nil, withHint(
 			fmt.Errorf("Qt %s is installed for multiple archs: %s", version, strings.Join(archs, ", ")),
-			fmt.Sprintf("Use --arch to specify which one, e.g.:\n  qvm prefix %s --arch %s", version, archs[0]),
+			fmt.Sprintf("Use --arch to specify which one, e.g.:\n  qvm %s %s --arch %s", cmdName, version, archs[0]),
 		)
 	}
 }
