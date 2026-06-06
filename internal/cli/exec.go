@@ -20,7 +20,7 @@ func (a *app) newExecCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "exec",
 		Usage:           "Run a command with a Qt version's environment",
-		ArgsUsage:       "<version> [--] <command> [args...]",
+		ArgsUsage:       "[<version>] [--] <command> [args...]",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			newArchFlag(),
@@ -30,14 +30,19 @@ func (a *app) newExecCommand() *cli.Command {
 }
 
 func (a *app) runExec(ctx context.Context, cmd *cli.Command) error {
-	args := cmd.Args().Slice()
-	if len(args) < 2 {
+	version, childArgs := splitExecArgs(cmd.Args().Slice())
+	version, err := resolveVersionArg(version)
+	if err != nil {
+		return err
+	}
+	if version == "" || len(childArgs) == 0 {
 		return newHintError("missing arguments",
 			"Usage:\n"+
-				"  qvm exec <version> [--] <command> [args...]\n\n"+
+				"  qvm exec [<version>] [--] <command> [args...]\n\n"+
 				"Examples:\n"+
 				"  qvm exec 6.8.3 -- qmake --version\n"+
-				"  qvm exec 6.8.3 -- cmake -S . -B build")
+				"  qvm exec 6.8.3 -- cmake -S . -B build\n\n"+
+				"Tip: set a default version with 'qvm use <version>' to omit it here.")
 	}
 
 	registry, err := storage.NewRegistryManager()
@@ -50,12 +55,23 @@ func (a *app) runExec(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("loading registry: %w", err)
 	}
 
-	qt, err := resolveInstalledQt(reg, args[0], cmd.String("arch"), "exec")
+	qt, err := resolveInstalledQt(reg, version, cmd.String("arch"), "exec")
 	if err != nil {
 		return err
 	}
 
-	return execChild(ctx, args[1:], mergedEnv(buildQtEnv(qt.InstallDir, os.Getenv)))
+	return execChild(ctx, childArgs, mergedEnv(buildQtEnv(qt.InstallDir, os.Getenv)))
+}
+
+// splitExecArgs separates an optional leading version from the child command.
+// A first argument shaped like a full Qt version (major.minor.patch) selects
+// the version explicitly; anything else is the start of the command and the
+// configured default version applies.
+func splitExecArgs(args []string) (string, []string) {
+	if len(args) > 0 && looksLikeVersion(args[0]) {
+		return args[0], args[1:]
+	}
+	return "", args
 }
 
 // execChild runs args[0] with args[1:] in the given environment, with stdio

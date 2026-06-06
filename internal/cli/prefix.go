@@ -15,7 +15,7 @@ func (a *app) newPrefixCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "prefix",
 		Usage:           "Print the install directory of a Qt version",
-		ArgsUsage:       "<version>",
+		ArgsUsage:       "[<version>]",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			newArchFlag(),
@@ -25,14 +25,18 @@ func (a *app) newPrefixCommand() *cli.Command {
 }
 
 func (a *app) runPrefix(_ context.Context, cmd *cli.Command) error {
-	arg := cmd.Args().Get(0)
+	arg, err := resolveVersionArg(cmd.Args().Get(0))
+	if err != nil {
+		return err
+	}
 	if arg == "" {
 		return newHintError("missing argument",
 			"Usage:\n"+
-				"  qvm prefix <version>         Print Qt install directory\n\n"+
+				"  qvm prefix [<version>]       Print Qt install directory\n\n"+
 				"Examples:\n"+
 				"  qvm prefix 6.8.3\n"+
-				"  cmake -DCMAKE_PREFIX_PATH=$(qvm prefix 6.8.3) ..")
+				"  cmake -DCMAKE_PREFIX_PATH=$(qvm prefix 6.8.3) ..\n\n"+
+				"Tip: set a default version with 'qvm use <version>' to omit it here.")
 	}
 
 	registry, err := storage.NewRegistryManager()

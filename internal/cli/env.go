@@ -20,7 +20,7 @@ func (a *app) newEnvCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "env",
 		Usage:           "Print shell commands to activate a Qt version in the current shell",
-		ArgsUsage:       "<version>",
+		ArgsUsage:       "[<version>]",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			newArchFlag(),
@@ -34,14 +34,18 @@ func (a *app) newEnvCommand() *cli.Command {
 }
 
 func (a *app) runEnv(_ context.Context, cmd *cli.Command) error {
-	arg := cmd.Args().Get(0)
+	arg, err := resolveVersionArg(cmd.Args().Get(0))
+	if err != nil {
+		return err
+	}
 	if arg == "" {
 		return newHintError("missing argument",
 			"Usage:\n"+
-				"  qvm env <version> [--shell <fmt>]   Print environment exports\n\n"+
+				"  qvm env [<version>] [--shell <fmt>]   Print environment exports\n\n"+
 				"Examples:\n"+
 				`  eval "$(qvm env 6.8.3 --shell bash)"`+"\n"+
-				"  qvm env 6.8.3 --shell powershell | Out-String | Invoke-Expression")
+				"  qvm env 6.8.3 --shell powershell | Out-String | Invoke-Expression\n\n"+
+				"Tip: set a default version with 'qvm use <version>' to omit it here.")
 	}
 
 	registry, err := storage.NewRegistryManager()

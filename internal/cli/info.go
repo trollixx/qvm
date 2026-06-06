@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -17,7 +16,7 @@ func (a *app) newInfoCommand() *cli.Command {
 		Name:            "info",
 		Aliases:         []string{"show"},
 		Usage:           "Show detailed info about an installed Qt version",
-		ArgsUsage:       "<version>",
+		ArgsUsage:       "[<version>]",
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			newArchFlag(),
@@ -30,13 +29,17 @@ func (a *app) newInfoCommand() *cli.Command {
 func (a *app) runInfo(ctx context.Context, cmd *cli.Command) error {
 	_ = ctx
 
-	arg := cmd.Args().Get(0)
+	arg, err := resolveVersionArg(cmd.Args().Get(0))
+	if err != nil {
+		return err
+	}
 	if arg == "" {
-		return errors.New("missing argument\n\n" +
-			"Usage:\n" +
-			"  qvm info <version>            Show Qt version details\n\n" +
-			"Example:\n" +
-			"  qvm info 6.8.3")
+		return newHintError("missing argument",
+			"Usage:\n"+
+				"  qvm info [<version>]          Show Qt version details\n\n"+
+				"Example:\n"+
+				"  qvm info 6.8.3\n\n"+
+				"Tip: set a default version with 'qvm use <version>' to omit it here.")
 	}
 
 	format := cmd.String("format")
