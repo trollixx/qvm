@@ -28,6 +28,10 @@ func (a *app) newInstallCommand() *cli.Command {
 				Aliases: []string{"m"},
 				Usage:   "comma-separated list of add-on modules to install (e.g. charts,webengine)",
 			},
+			&cli.BoolFlag{
+				Name:  "no-deps",
+				Usage: "do not auto-install modules the requested modules depend on",
+			},
 			newArchFlag(),
 			newTargetFlag(),
 			newHostFlag(),
@@ -102,6 +106,7 @@ func buildInstallOptions(cmd *cli.Command, cfg *config.Config, version, arch str
 		Version:     version,
 		Arch:        arch,
 		Modules:     cmd.StringSlice("modules"),
+		NoDeps:      cmd.Bool("no-deps"),
 		Docs:        cmd.Bool("docs"),
 		Examples:    cmd.Bool("examples"),
 		Sources:     cmd.Bool("sources"),
@@ -280,6 +285,8 @@ func (p *ProgressPrinter) print(ev install.ProgressEvent) {
 		fmt.Fprintf(p.w, "Patching qt.conf...\n")
 	case "warning":
 		fmt.Fprintf(p.w, "warning: %s\n", ev.Warning)
+	case "info":
+		fmt.Fprintf(p.w, "%s\n", ev.Message)
 	case "registering":
 		fmt.Fprintf(p.w, "Registering installation...\n")
 	case "done":

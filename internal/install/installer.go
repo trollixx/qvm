@@ -47,6 +47,7 @@ type ProgressEvent struct {
 	ArchiveIndex int     // 1-based index of the archive being processed (0 = unknown)
 	ArchiveTotal int     // total number of archives in this install (0 = unknown)
 	Warning      string  // non-empty message when Phase == "warning"
+	Message      string  // non-empty message when Phase == "info"
 }
 
 // Options configures a Qt SDK installation.
@@ -54,6 +55,7 @@ type Options struct {
 	Version     string
 	Arch        string
 	Modules     []string
+	NoDeps      bool // do not auto-install required dependency modules
 	Docs        bool
 	Examples    bool
 	Sources     bool
@@ -98,7 +100,7 @@ func (inst *Installer) findExisting(opts Options) *storage.InstalledQt {
 func buildResolveOptions(
 	opts Options, existingQt *storage.InstalledQt, modules []string,
 ) (repository.ResolveOptions, bool) {
-	ro := repository.ResolveOptions{Version: opts.Version, Arch: opts.Arch}
+	ro := repository.ResolveOptions{Version: opts.Version, Arch: opts.Arch, NoDeps: opts.NoDeps}
 	if existingQt == nil {
 		ro.Modules = modules
 		ro.Docs = opts.Docs
@@ -251,10 +253,11 @@ func verifyDownloads(paths []string, refs []repository.ArchiveRef, progressCh ch
 }
 
 // buildRegistryEntry assembles the storage entry for a fresh install or a delta merge.
-// Module names are stored in their canonical (qt-prefixed) form so that subsequent
-// installs can correctly diff against them regardless of how the user spelled them.
+// modules is the resolved module list (requested plus auto-added dependencies); names
+// are stored in their canonical (qt-prefixed) form so that subsequent installs can
+// correctly diff against them regardless of how the user spelled them.
 func buildRegistryEntry(
-	opts Options, existingQt *storage.InstalledQt, installDir string, totalSize int64,
+	opts Options, existingQt *storage.InstalledQt, modules []string, installDir string, totalSize int64,
 ) storage.InstalledQt {
 	entry := storage.InstalledQt{
 		Version:     opts.Version,
@@ -262,7 +265,7 @@ func buildRegistryEntry(
 		InstallDir:  installDir,
 		InstalledAt: time.Now(),
 	}
-	canonicalModules := normalizeModuleNames(opts.Modules)
+	canonicalModules := normalizeModuleNames(modules)
 	if existingQt == nil {
 		entry.Modules = canonicalModules
 		entry.Extras = storage.InstalledExtras{
@@ -306,10 +309,11 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 			return ErrUpToDate
 		}
 		sendProgress(progressCh, ProgressEvent{Phase: "resolving"})
-		archives, err := inst.resolver.Resolve(ctx, resolveOpts)
+		archives, modules, err := inst.resolver.Resolve(ctx, resolveOpts)
 		if err != nil {
 			return fmt.Errorf("resolving archives: %w", err)
 		}
+		reportDepModules(progressCh, resolveOpts.Modules, modules)
 		runDryRun(archives, progressCh)
 		return nil
 	}
@@ -331,10 +335,11 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 
 	// Resolve archives.
 	sendProgress(progressCh, ProgressEvent{Phase: "resolving"})
-	archives, err := inst.resolver.Resolve(ctx, resolveOpts)
+	archives, modules, err := inst.resolver.Resolve(ctx, resolveOpts)
 	if err != nil {
 		return fmt.Errorf("resolving archives: %w", err)
 	}
+	reportDepModules(progressCh, resolveOpts.Modules, modules)
 
 	// Populate per-archive SHA-1 digests from their ".sha1" sidecars so downloads
 	// can be integrity-checked. Qt does not embed these in Updates.xml.
@@ -405,13 +410,26 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	}
 
 	sendProgress(progressCh, ProgressEvent{Phase: "registering"})
-	err = inst.registry.AddQt(buildRegistryEntry(opts, existingQt, installDir, totalSize))
+	err = inst.registry.AddQt(buildRegistryEntry(opts, existingQt, modules, installDir, totalSize))
 	if err != nil {
 		return fmt.Errorf("registering installation: %w", err)
 	}
 
 	sendProgress(progressCh, ProgressEvent{Phase: "done", Percent: 100})
 	return nil
+}
+
+// reportDepModules emits an info event listing dependency modules that were
+// added beyond the requested set.
+func reportDepModules(progressCh chan<- ProgressEvent, requested, resolved []string) {
+	extra := diffSlices(normalizeModuleNames(resolved), normalizeModuleNames(requested))
+	if len(extra) == 0 {
+		return
+	}
+	sendProgress(progressCh, ProgressEvent{
+		Phase:   "info",
+		Message: "Installing required dependency modules: " + strings.Join(extra, ", "),
+	})
 }
 
 func sendProgress(ch chan<- ProgressEvent, ev ProgressEvent) {

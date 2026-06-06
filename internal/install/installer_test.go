@@ -183,7 +183,7 @@ func TestBuildRegistryEntry_NormalizesModules(t *testing.T) {
 			Arch:    "win64_msvc2022_64",
 			Modules: []string{"webengine", "imageformats"},
 		}
-		entry := buildRegistryEntry(opts, nil, "C:\\Qt\\6.8.3\\win64_msvc2022_64", 0)
+		entry := buildRegistryEntry(opts, nil, opts.Modules, "C:\\Qt\\6.8.3\\win64_msvc2022_64", 0)
 		assert.Equal(t, []string{"qtwebengine", "qtimageformats"}, entry.Modules)
 	})
 
@@ -198,8 +198,46 @@ func TestBuildRegistryEntry_NormalizesModules(t *testing.T) {
 			Arch:    "win64_msvc2022_64",
 			Modules: []string{"webengine", "charts"}, // raw user input
 		}
-		entry := buildRegistryEntry(opts, existing, "C:\\Qt\\6.8.3\\win64_msvc2022_64", 0)
+		entry := buildRegistryEntry(opts, existing, opts.Modules, "C:\\Qt\\6.8.3\\win64_msvc2022_64", 0)
 		assert.Equal(t, []string{"qtwebengine", "qtcharts"}, entry.Modules)
+	})
+}
+
+func TestBuildRegistryEntry_RecordsDependencyModules(t *testing.T) {
+	opts := Options{
+		Version: "6.11.1",
+		Arch:    "win64_msvc2022_64",
+		Modules: []string{"httpserver"},
+	}
+	// Resolver returned the requested module plus an auto-added dependency.
+	resolved := []string{"httpserver", "qtwebsockets"}
+	entry := buildRegistryEntry(opts, nil, resolved, "C:\\Qt\\6.11.1\\win64_msvc2022_64", 0)
+	assert.Equal(t, []string{"qthttpserver", "qtwebsockets"}, entry.Modules)
+}
+
+func TestBuildResolveOptions_NoDeps(t *testing.T) {
+	ro, _ := buildResolveOptions(Options{NoDeps: true}, nil, nil)
+	assert.True(t, ro.NoDeps)
+
+	ro, _ = buildResolveOptions(Options{NoDeps: true}, &storage.InstalledQt{}, nil)
+	assert.True(t, ro.NoDeps, "delta installs must honor NoDeps too")
+}
+
+func TestReportDepModules(t *testing.T) {
+	t.Run("emits info event for added dependencies", func(t *testing.T) {
+		ch := make(chan ProgressEvent, 1)
+		reportDepModules(ch, []string{"httpserver"}, []string{"httpserver", "qtwebsockets"})
+
+		ev := <-ch
+		assert.Equal(t, "info", ev.Phase)
+		assert.Contains(t, ev.Message, "qtwebsockets")
+		assert.NotContains(t, ev.Message, "qthttpserver")
+	})
+
+	t.Run("silent when nothing was added", func(t *testing.T) {
+		ch := make(chan ProgressEvent, 1)
+		reportDepModules(ch, []string{"charts"}, []string{"qtcharts"})
+		assert.Empty(t, ch)
 	})
 }
 

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"unicode"
@@ -22,6 +23,7 @@ type ResolveOptions struct {
 	Examples       bool
 	Sources        bool
 	DebugInfo      bool
+	NoDeps         bool // skip automatic resolution of required dependency modules
 	SkipEssentials bool // true when the essential bundle is already installed
 }
 
@@ -69,11 +71,13 @@ func (r *Resolver) FetchChecksums(ctx context.Context, archives []ResolvedArchiv
 	wg.Wait()
 }
 
-// Resolve returns the archives needed for the given options.
-func (r *Resolver) Resolve(ctx context.Context, opts ResolveOptions) ([]ResolvedArchive, error) {
+// Resolve returns the archives needed for the given options, along with the
+// final module list: the requested modules plus any dependency modules pulled
+// in automatically (unless opts.NoDeps is set).
+func (r *Resolver) Resolve(ctx context.Context, opts ResolveOptions) ([]ResolvedArchive, []string, error) {
 	idx, err := r.fetcher.FetchQtVersion(ctx, opts.Version)
 	if err != nil {
-		return nil, fmt.Errorf("fetching metadata for Qt %s: %w", opts.Version, err)
+		return nil, nil, fmt.Errorf("fetching metadata for Qt %s: %w", opts.Version, err)
 	}
 
 	// Find the requested version.
@@ -89,7 +93,7 @@ func (r *Resolver) Resolve(ctx context.Context, opts ResolveOptions) ([]Resolved
 		for _, v := range idx.QtVersions {
 			available = append(available, v.Version)
 		}
-		return nil, qerr.SuggestVersion(opts.Version, available)
+		return nil, nil, qerr.SuggestVersion(opts.Version, available)
 	}
 
 	// Validate arch.
@@ -106,7 +110,7 @@ func (r *Resolver) Resolve(ctx context.Context, opts ResolveOptions) ([]Resolved
 			for _, a := range vi.Archs {
 				available = append(available, a.Name)
 			}
-			return nil, qerr.SuggestArch(opts.Arch, available)
+			return nil, nil, qerr.SuggestArch(opts.Arch, available)
 		}
 	}
 
@@ -129,10 +133,17 @@ func lookupAddonArchives(vi *QtVersionInfo, prefix, mod, arch string) (bool, []R
 }
 
 // resolveArchives resolves the concrete archives from a QtVersionInfo and options.
-func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive, error) {
+// It returns the archives and the final module list (requested modules plus any
+// dependency modules added by expandModuleDeps).
+func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive, []string, error) {
 	major := vi.Major
 	verStr := versionToRepoStr(opts.Version, major)
 	prefix := fmt.Sprintf("qt.qt%d.%s", major, verStr)
+
+	modules := opts.Modules
+	if !opts.NoDeps {
+		modules = expandModuleDeps(vi, prefix, opts.Arch, opts.Modules, opts.AllModules)
+	}
 
 	var archives []ResolvedArchive
 
@@ -158,7 +169,7 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 	}
 
 	// Add-on module archives.
-	for _, mod := range opts.Modules {
+	for _, mod := range modules {
 		if found, res := lookupAddonArchives(vi, prefix, mod, opts.Arch); found {
 			archives = append(archives, res...)
 			continue
@@ -180,12 +191,12 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 		for _, m := range vi.ModulesForArch(opts.Arch) {
 			available = append(available, m.Name)
 		}
-		return nil, qerr.SuggestModule(mod, available)
+		return nil, nil, qerr.SuggestModule(mod, available)
 	}
 
 	// Build the full module list for scoping docs/examples.
 	// Use AllModules if provided (delta install), otherwise derive from
-	// the arch's essentials + requested addons.
+	// the arch's essentials + resolved addons.
 	allModules := opts.AllModules
 	if len(allModules) == 0 {
 		for _, a := range vi.Archs {
@@ -194,7 +205,11 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 				break
 			}
 		}
-		allModules = append(allModules, opts.Modules...)
+	}
+	for _, mod := range modules {
+		if !slices.Contains(allModules, mod) {
+			allModules = append(allModules, mod)
+		}
 	}
 
 	// Docs, examples, sources, and debug info - scoped to all installed modules.
@@ -209,10 +224,54 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 	}
 
 	if len(archives) == 0 {
-		return nil, fmt.Errorf("no archives resolved for Qt %s %s", opts.Version, opts.Arch)
+		return nil, nil, fmt.Errorf("no archives resolved for Qt %s %s", opts.Version, opts.Arch)
 	}
 
-	return archives, nil
+	return archives, modules, nil
+}
+
+// expandModuleDeps returns the requested modules plus any addon modules they
+// transitively depend on, per the <Dependencies> declared on addon meta-packages
+// (e.g. qthttpserver -> qtwebsockets). Modules already installed and dependency
+// packages other than arch-available addons (docs, examples, tools) are skipped.
+func expandModuleDeps(vi *QtVersionInfo, prefix, arch string, requested, installed []string) []string {
+	canon := func(mod string) string {
+		if strings.HasPrefix(mod, "qt") {
+			return mod
+		}
+		return "qt" + mod
+	}
+
+	seen := make(map[string]bool, len(requested)+len(installed))
+	out := make([]string, 0, len(requested))
+	for _, mod := range requested {
+		if c := canon(mod); !seen[c] {
+			seen[c] = true
+			out = append(out, mod)
+		}
+	}
+	for _, mod := range installed {
+		seen[canon(mod)] = true
+	}
+
+	queue := slices.Clone(out)
+	for len(queue) > 0 {
+		mod := queue[0]
+		queue = queue[1:]
+		for _, dep := range vi.PackageDependencies[prefix+".addons."+canon(mod)] {
+			depMod, ok := strings.CutPrefix(dep, prefix+".addons.")
+			if !ok || strings.Contains(depMod, ".") || seen[depMod] {
+				continue
+			}
+			if _, exists := vi.PackageArchives[prefix+".addons."+depMod+"."+arch]; !exists {
+				continue
+			}
+			seen[depMod] = true
+			out = append(out, depMod)
+			queue = append(queue, depMod)
+		}
+	}
+	return out
 }
 
 // resolveExtraContent resolves the optional docs, examples, sources, and

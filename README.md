@@ -24,6 +24,7 @@ $Env:Qt6_DIR=$(qvm prefix 6.8.3)
 
 - Install any Qt 6.x version with a single command (Qt 5 is not supported).
 - Install Qt add-on modules, documentation, examples, sources, and debug symbols.
+- Automatic module dependency resolution (e.g. `qthttpserver` pulls in `qtwebsockets`).
 - Parallel downloads with retry, resumable interrupted transfers, and progress reporting.
 - Auto-detect the best compiler/ABI for the current machine.
 - Mirror management — auto-probe and switch to the fastest Qt mirror.
@@ -83,6 +84,7 @@ qvm install <version> [flags]
 | `--arch`, `-a` | Compiler/ABI target (e.g. `win64_msvc2022_64`, `clang_64`). Auto-detected if omitted. |
 | `--target` | Qt platform: `desktop` (default), `android`, `ios`, `wasm`. WASM resolves under `desktop/`; pick a `--arch` like `wasm_singlethread`. WinRT is not supported (removed in Qt 6). |
 | `--modules`, `-m` | Comma-separated add-on modules (e.g. `qtcharts,qtwebengine`). The `qt` prefix is optional (`charts` and `qtcharts` both work). |
+| `--no-deps` | Do not auto-install modules the requested modules depend on |
 | `--docs` | Install documentation for all selected modules |
 | `--examples` | Install examples for all selected modules |
 | `--sources` | Install Qt source code |
@@ -95,6 +97,12 @@ qvm install <version> [flags]
 
 If a Qt version is already installed, qvm will only download and install the
 delta — any new modules or extras you have added — unless `--force` is given.
+
+Modules that the requested modules depend on (as declared in Qt's repository
+metadata) are installed automatically — for example, `qthttpserver` requires
+`qtwebsockets`, and `qtquick3d` requires `qtshadertools` and `qtquicktimeline`.
+Already-installed dependencies are never re-downloaded. Pass `--no-deps` to
+install only the modules you named.
 
 #### Examples
 

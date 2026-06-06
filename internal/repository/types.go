@@ -45,6 +45,10 @@ type QtVersionInfo struct {
 	//   "qt.qt6.6101.addons.qtcharts.win64_msvc2022_64" (addon module)
 	//   "qt.qt6.6101.doc.qtcharts"                   (documentation)
 	PackageArchives map[string][]ArchiveRef `json:"-"`
+	// PackageDependencies maps Qt package name -> declared <Dependencies> package
+	// names from Updates.xml. Addon-to-addon dependencies (e.g. qthttpserver ->
+	// qtwebsockets) are declared on the arch-less addon meta-package.
+	PackageDependencies map[string][]string `json:"-"`
 }
 
 // SetDefaultArch marks the named arch as IsDefault (and clears the flag on all others).
