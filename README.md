@@ -28,6 +28,7 @@ $Env:Qt6_DIR=$(qvm prefix 6.8.3)
 - Parallel downloads with retry, resumable interrupted transfers, and progress reporting.
 - Activate a Qt version in any shell with `qvm env` (PowerShell, cmd, bash, zsh, fish, nu).
 - Run one-off commands in a Qt environment with `qvm exec` (e.g. `qvm exec 6.8.3 -- qmake`).
+- Set a default version with `qvm use` — then `env`, `exec`, `prefix`, and `info` need no version argument.
 - Auto-detect the best compiler/ABI for the current machine.
 - Mirror management — auto-probe and switch to the fastest Qt mirror.
 - Fuzzy search for module names.
@@ -187,7 +188,7 @@ qvm uninstall <version> [flags]
 Print the installation directory for a Qt version.
 
 ```shell
-qvm prefix <version> [--arch <arch>]
+qvm prefix [<version>] [--arch <arch>]
 ```
 
 Ideal for use in build scripts:
@@ -206,7 +207,7 @@ default arch automatically; use `--arch` to disambiguate explicitly.
 Print shell commands that activate a Qt version in the current shell.
 
 ```shell
-qvm env <version> [flags]
+qvm env [<version>] [flags]
 ```
 
 | Flag | Description |
@@ -246,7 +247,7 @@ Run a single command with a Qt version's environment, without modifying the
 current shell.
 
 ```shell
-qvm exec <version> [--] <command> [args...]
+qvm exec [<version>] [--] <command> [args...]
 ```
 
 | Flag | Description |
@@ -259,6 +260,11 @@ Qt's `qmake` even if another Qt is first on your shell's `PATH`. Stdin/stdout
 are passed through untouched and the child's exit code becomes qvm's exit
 code, so it composes with pipes, redirection, and CI scripts.
 
+The first argument is treated as a Qt version only when it is shaped like
+`major.minor.patch`; anything else starts the command and the default from
+`qvm use` applies. In the unlikely case your command is itself named like a
+version, pass an explicit version first: `qvm exec 6.8.3 -- 1.2.3 ...`.
+
 ```shell
 qvm exec 6.8.3 -- qmake -query QT_VERSION
 qvm exec 6.8.3 -- cmake -S . -B build
@@ -267,12 +273,34 @@ qvm exec 6.8.3 -- windeployqt build\app.exe
 
 ---
 
+### `use`
+
+Set the default Qt version. `env`, `exec`, `prefix`, and `info` use it when no
+version argument is given.
+
+```shell
+qvm use [<version>] [--unset]
+```
+
+```shell
+qvm use 6.8.3        # set the default (must be installed)
+qvm use              # print the current default
+qvm use --unset      # clear it
+qvm exec -- qmake    # now runs the default Qt's qmake
+```
+
+The default is stored in the config file (`qt.default`) and marked with `*` in
+`qvm list`. Note that setting it does not modify any shell environment — pair
+it with `qvm env` or `qvm exec` to actually build against the default version.
+
+---
+
 ### `info` (`show`)
 
 Show detailed information about an installed Qt version.
 
 ```shell
-qvm info <version> [flags]
+qvm info [<version>] [flags]
 ```
 
 | Flag | Description |
@@ -327,6 +355,7 @@ qvm config path
 
 | Key | Default | Description |
 | --- | --- | --- |
+| `qt.default` | - | Default Qt version for `env`/`exec`/`prefix`/`info` (set via `qvm use`) |
 | `install.dir` | `C:\Qt` / `~/Qt` | Qt installation root |
 | `repository.url` | `https://download.qt.io/` | Primary Qt mirror |
 | `repository.mirrors` | - | Fallback mirror URLs (comma-separated) |

@@ -62,11 +62,16 @@ func (a *app) runList(_ context.Context, cmd *cli.Command) error {
 		return a.printJSON(reg.Qt)
 	}
 
-	a.printInstalledQt(reg)
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	a.printInstalledQt(reg, cfg.Qt.Default)
 	return nil
 }
 
-func (a *app) printInstalledQt(reg *storage.Registry) {
+func (a *app) printInstalledQt(reg *storage.Registry, defaultVersion string) {
 	fmt.Fprintln(a.streams.Out, "Installed Qt versions")
 
 	if len(reg.Qt) == 0 {
@@ -77,14 +82,20 @@ func (a *app) printInstalledQt(reg *storage.Registry) {
 		return
 	}
 
+	starred := false
 	for _, q := range reg.Qt {
 		size := ""
 		if q.SizeBytes > 0 {
 			size = formatSize(q.SizeBytes)
 		}
 
-		fmt.Fprintf(a.streams.Out, "  %-8s %-30s %-40s %s\n",
-			q.Version, q.Arch, q.InstallDir, size)
+		marker := " "
+		if q.Version == defaultVersion {
+			marker = "*"
+			starred = true
+		}
+		fmt.Fprintf(a.streams.Out, "%s %-8s %-30s %-40s %s\n",
+			marker, q.Version, q.Arch, q.InstallDir, size)
 
 		if len(q.Modules) > 0 {
 			fmt.Fprintf(a.streams.Out, "          modules: %s\n", strings.Join(q.Modules, ", "))
@@ -94,6 +105,10 @@ func (a *app) printInstalledQt(reg *storage.Registry) {
 		if extras != "" {
 			fmt.Fprintf(a.streams.Out, "          extras:  %s\n", extras)
 		}
+	}
+
+	if starred {
+		fmt.Fprintf(a.streams.Out, "\n* default version (set with 'qvm use')\n")
 	}
 }
 

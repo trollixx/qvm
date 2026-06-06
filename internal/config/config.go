@@ -11,6 +11,10 @@ import (
 
 // Config holds all qvm configuration.
 type Config struct {
+	Qt struct {
+		Default string `toml:"default"` // default version for commands that take an optional <version>
+	} `toml:"qt"`
+
 	Install struct {
 		Dir string `toml:"dir"`
 	} `toml:"install"`
