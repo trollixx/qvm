@@ -35,34 +35,6 @@ func TestSetDefaultQt_NotInstalled(t *testing.T) {
 	assert.Empty(t, cfg.Qt.Default)
 }
 
-func TestSplitExecArgs(t *testing.T) {
-	tests := []struct {
-		name        string
-		args        []string
-		wantVersion string
-		wantChild   []string
-	}{
-		{"version then command", []string{"6.8.3", "qmake", "-v"}, "6.8.3", []string{"qmake", "-v"}},
-		{"command only", []string{"qmake", "-v"}, "", []string{"qmake", "-v"}},
-		{"partial version is a command", []string{"6.8", "qmake"}, "", []string{"6.8", "qmake"}},
-		{"empty", nil, "", nil},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			version, child := splitExecArgs(tt.args)
-			assert.Equal(t, tt.wantVersion, version)
-			assert.Equal(t, tt.wantChild, child)
-		})
-	}
-}
-
-func TestLooksLikeVersion(t *testing.T) {
-	assert.True(t, looksLikeVersion("6.8.3"))
-	assert.False(t, looksLikeVersion("6.8"))
-	assert.False(t, looksLikeVersion("qmake"))
-	assert.False(t, looksLikeVersion(""))
-}
-
 func TestConfigKey_QtDefault(t *testing.T) {
 	cfg := &config.Config{}
 	require.NoError(t, configSet(cfg, "qt.default", "6.11.1"))

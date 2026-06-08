@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -16,11 +17,28 @@ import (
 	"github.com/trollixx/qvm/internal/storage"
 )
 
+// archHint explains how to supply an architecture; reused by the arch
+// parse errors below.
+const archHint = "Provide an architecture, e.g. '-a win64_msvc2022_64'."
+
+const execUsageHint = "Usage:\n" +
+	"  qvm exec <command> [args...]\n" +
+	"  qvm exec [<version>] -- <command> [args...]\n\n" +
+	"Examples:\n" +
+	"  qvm exec 6.8.3 -- qmake --version\n" +
+	"  qvm exec 6.8.3 -- cmake -S . -B build\n" +
+	"  qvm exec -- qmake --version    (uses the default version)\n\n" +
+	"Tip: set a default version with 'qvm use <version>' to omit it here."
+
 func (a *app) newExecCommand() *cli.Command {
 	return &cli.Command{
-		Name:            "exec",
-		Usage:           "Run a command with a Qt version's environment",
-		ArgsUsage:       "[<version>] [--] <command> [args...]",
+		Name:      "exec",
+		Usage:     "Run a command with a Qt version's environment",
+		ArgsUsage: "[<version> --] <command> [args...]",
+		// The child command and its flags must reach the child untouched, so we
+		// disable cli's flag parsing and interpret exec's own arguments in
+		// parseExecArgs instead. newArchFlag stays declared for the help text.
+		SkipFlagParsing: true,
 		CommandNotFound: showHelpOnNotFound,
 		Flags: []cli.Flag{
 			newArchFlag(),
@@ -30,19 +48,25 @@ func (a *app) newExecCommand() *cli.Command {
 }
 
 func (a *app) runExec(ctx context.Context, cmd *cli.Command) error {
-	version, childArgs := splitExecArgs(cmd.Args().Slice())
-	version, err := resolveVersionArg(version)
+	parsed, err := parseExecArgs(cmd.Args().Slice())
 	if err != nil {
 		return err
 	}
-	if version == "" || len(childArgs) == 0 {
-		return newHintError("missing arguments",
-			"Usage:\n"+
-				"  qvm exec [<version>] [--] <command> [args...]\n\n"+
-				"Examples:\n"+
-				"  qvm exec 6.8.3 -- qmake --version\n"+
-				"  qvm exec 6.8.3 -- cmake -S . -B build\n\n"+
-				"Tip: set a default version with 'qvm use <version>' to omit it here.")
+	if parsed.help {
+		return cli.ShowSubcommandHelp(cmd)
+	}
+	if len(parsed.child) == 0 {
+		return newHintError("missing command", execUsageHint)
+	}
+
+	version, err := resolveVersionArg(parsed.version)
+	if err != nil {
+		return err
+	}
+	if version == "" {
+		return newHintError("no default Qt version set",
+			"Pass one before '--' (qvm exec <version> -- <command>) "+
+				"or set a default with 'qvm use <version>'.")
 	}
 
 	registry, err := storage.NewRegistryManager()
@@ -55,23 +79,86 @@ func (a *app) runExec(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("loading registry: %w", err)
 	}
 
-	qt, err := resolveInstalledQt(reg, version, cmd.String("arch"), "exec")
+	qt, err := resolveInstalledQt(reg, version, parsed.arch, "exec")
 	if err != nil {
 		return err
 	}
 
-	return execChild(ctx, childArgs, mergedEnv(buildQtEnv(qt.InstallDir, os.Getenv)))
+	return execChild(ctx, parsed.child, mergedEnv(buildQtEnv(qt.InstallDir, os.Getenv)))
 }
 
-// splitExecArgs separates an optional leading version from the child command.
-// A first argument shaped like a full Qt version (major.minor.patch) selects
-// the version explicitly; anything else is the start of the command and the
-// configured default version applies.
-func splitExecArgs(args []string) (string, []string) {
-	if len(args) > 0 && looksLikeVersion(args[0]) {
-		return args[0], args[1:]
+// execArgs holds the result of interpreting exec's raw command line.
+type execArgs struct {
+	arch    string
+	version string
+	child   []string
+	help    bool
+}
+
+// parseExecArgs interprets exec's arguments. Because flag parsing is disabled at
+// the cli layer (SkipFlagParsing), exec owns its own option handling here.
+//
+// Leading -a/--arch (and -h/--help) are consumed first, like sudo/env accepting
+// their own flags ahead of the child. "--" then separates an optional version
+// from the child command: a single token before "--" is the version, everything
+// after "--" is the child command and is passed through verbatim. Without "--",
+// the remaining arguments are the child command and the configured default
+// version applies. A version is never inferred from an argument's shape.
+func parseExecArgs(args []string) (execArgs, error) {
+	var parsed execArgs
+
+	// Consume leading qvm flags, stopping at the first non-flag token or "--".
+	i := 0
+flags:
+	for i < len(args) {
+		arg := args[i]
+		switch {
+		case arg == "--":
+			break flags
+		case isHelpFlag(arg):
+			return execArgs{help: true}, nil
+		case arg == "-a" || arg == "--arch":
+			if i+1 >= len(args) || args[i+1] == "--" {
+				return execArgs{}, newHintError("missing value for "+arg, archHint)
+			}
+			parsed.arch = args[i+1]
+			i += 2
+		case strings.HasPrefix(arg, "--arch="), strings.HasPrefix(arg, "-a="):
+			name, val, _ := strings.Cut(arg, "=")
+			if val == "" {
+				return execArgs{}, newHintError("missing value for "+name, archHint)
+			}
+			parsed.arch = val
+			i++
+		default:
+			break flags
+		}
 	}
-	return "", args
+
+	rest := args[i:]
+	sep := slices.Index(rest, "--")
+	if sep < 0 {
+		// No separator: the remaining arguments are the child command.
+		parsed.child = rest
+		return parsed, nil
+	}
+
+	version, child := rest[:sep], rest[sep+1:]
+	parsed.child = child
+	if len(version) > 1 {
+		return execArgs{}, newHintError(
+			fmt.Sprintf("unexpected arguments before '--': %s", strings.Join(version, " ")),
+			"Only an optional version may precede '--'; put the command after it.\n\n"+execUsageHint)
+	}
+	if len(version) == 1 {
+		parsed.version = version[0]
+	}
+	return parsed, nil
+}
+
+// isHelpFlag reports whether arg is exec's help flag.
+func isHelpFlag(arg string) bool {
+	return arg == "-h" || arg == "--help"
 }
 
 // execChild runs args[0] with args[1:] in the given environment, with stdio
