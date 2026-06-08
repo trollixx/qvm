@@ -8,7 +8,6 @@ import (
 
 	"github.com/trollixx/qvm/internal/config"
 	"github.com/trollixx/qvm/internal/storage"
-	"github.com/trollixx/qvm/pkg/qtmeta"
 )
 
 func (a *app) newUseCommand() *cli.Command {
@@ -102,10 +101,4 @@ func resolveVersionArg(arg string) (string, error) {
 		return "", fmt.Errorf("loading config: %w", err)
 	}
 	return cfg.Qt.Default, nil
-}
-
-// looksLikeVersion reports whether s is a full Qt version (major.minor.patch).
-func looksLikeVersion(s string) bool {
-	_, err := qtmeta.ParseVersion(s)
-	return err == nil
 }

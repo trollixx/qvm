@@ -11,6 +11,129 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseExecArgs(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		wantArch    string
+		wantVersion string
+		wantChild   []string
+		wantHelp    bool
+	}{
+		{
+			"version then command",
+			[]string{"6.8.3", "--", "qmake", "-v"},
+			"",
+			"6.8.3",
+			[]string{"qmake", "-v"},
+			false,
+		},
+		{
+			"no version, separator",
+			[]string{"--", "qmake", "-v"},
+			"",
+			"",
+			[]string{"qmake", "-v"},
+			false,
+		},
+		{
+			"no separator is all command",
+			[]string{"qmake", "-v"},
+			"",
+			"",
+			[]string{"qmake", "-v"},
+			false,
+		},
+		{
+			"version without separator is the command",
+			[]string{"6.8.3", "qmake"},
+			"",
+			"",
+			[]string{"6.8.3", "qmake"},
+			false,
+		},
+		{
+			"arch flag then version",
+			[]string{"-a", "win64", "6.8.3", "--", "cmake"},
+			"win64",
+			"6.8.3",
+			[]string{"cmake"},
+			false,
+		},
+		{
+			"arch flag without separator",
+			[]string{"-a", "win64", "qmake"},
+			"win64",
+			"",
+			[]string{"qmake"},
+			false,
+		},
+		{
+			"arch flag without separator, child args",
+			[]string{"--arch=win64", "cmake", "-S", "."},
+			"win64",
+			"",
+			[]string{"cmake", "-S", "."},
+			false,
+		},
+		{
+			"long arch flag, no version",
+			[]string{"--arch", "win64", "--", "cmake"},
+			"win64",
+			"",
+			[]string{"cmake"},
+			false,
+		},
+		{
+			"arch equals form",
+			[]string{"--arch=win64", "6.8.3", "--", "cmake"},
+			"win64",
+			"6.8.3",
+			[]string{"cmake"},
+			false,
+		},
+		{"help flag", []string{"--help"}, "", "", nil, true},
+		{"short help flag", []string{"-h"}, "", "", nil, true},
+		{"help before separator", []string{"--help", "--", "qmake"}, "", "", nil, true},
+		{"empty", nil, "", "", nil, false},
+		{"separator with no command", []string{"6.8.3", "--"}, "", "6.8.3", []string{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseExecArgs(tt.args)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantArch, got.arch)
+			assert.Equal(t, tt.wantVersion, got.version)
+			assert.Equal(t, tt.wantChild, got.child)
+			assert.Equal(t, tt.wantHelp, got.help)
+		})
+	}
+}
+
+func TestParseExecArgs_Errors(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			"two tokens before separator",
+			[]string{"6.8.3", "extra", "--", "qmake"},
+			"unexpected arguments before '--'",
+		},
+		{"arch flag missing value", []string{"-a", "--", "qmake"}, "missing value for -a"},
+		{"empty long arch value", []string{"--arch=", "--", "qmake"}, "missing value for --arch"},
+		{"empty short arch value", []string{"-a=", "--", "qmake"}, "missing value for -a"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseExecArgs(tt.args)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.want)
+		})
+	}
+}
+
 func TestMergedEnv_OverridesParentValue(t *testing.T) {
 	t.Setenv("QVM_TEST_MERGE", "parent")
 	env := mergedEnv(map[string]string{"QVM_TEST_MERGE": "child"})
@@ -39,7 +162,12 @@ func TestMergedEnv_CaseInsensitiveOnWindows(t *testing.T) {
 
 	assert.Contains(t, env, "QVM_TEST_CASE=child")
 	for _, e := range env {
-		assert.False(t, strings.HasPrefix(e, "Qvm_Test_Case="), "old-cased entry must be replaced: %s", e)
+		assert.False(
+			t,
+			strings.HasPrefix(e, "Qvm_Test_Case="),
+			"old-cased entry must be replaced: %s",
+			e,
+		)
 	}
 }
 
