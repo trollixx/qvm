@@ -1,23 +1,27 @@
-# qvm — Qt Version Manager
+# qvm: Qt Version Manager
 
 A single-binary CLI tool for installing and managing Qt SDK versions on Windows and macOS.
 
-Linux is not supported — use your distribution's Qt packages instead.
+Linux is not supported; use your distribution's Qt packages instead.
 
 > [!WARNING]
 > This tool is mostly AI generated for my own needs. The code has not been thoroughly reviewed. Use at your own risk! The interface will most likely change too.
 
-```shell
-qvm install 6.8.3
+```console
+$ qvm install 6.8.3
 Resolving archives for Qt 6.8.3 (win64_msvc2022_64)...
 Downloading [1/12] qtbase-windows-x86_64.7z  124 MB/s  34%
 ...
 Qt 6.8.3 (win64_msvc2022_64) installed to C:\Qt\6.8.3\win64_msvc2022_64
 
-qvm prefix 6.8.3
+$ qvm prefix 6.8.3
 C:\Qt\6.8.3\win64_msvc2022_64
+```
 
-$Env:Qt6_DIR=$(qvm prefix 6.8.3)
+Point your build at it (PowerShell):
+
+```powershell
+$env:Qt6_DIR = qvm prefix 6.8.3
 ```
 
 ## Features
@@ -28,13 +32,13 @@ $Env:Qt6_DIR=$(qvm prefix 6.8.3)
 - Parallel downloads with retry, resumable interrupted transfers, and progress reporting.
 - Activate a Qt version in any shell with `qvm env` (PowerShell, cmd, bash, zsh, fish, nu).
 - Run one-off commands in a Qt environment with `qvm exec` (e.g. `qvm exec 6.8.3 -- qmake`).
-- Set a default version with `qvm use` — then `env`, `exec`, `prefix`, and `info` need no version argument.
+- Set a default version with `qvm use`, so `env`, `exec`, `prefix`, and `info` need no version argument.
 - Auto-detect the best compiler/ABI for the current machine.
-- Mirror management — auto-probe and switch to the fastest Qt mirror.
+- Mirror management: auto-probe and switch to the fastest Qt mirror.
 - Fuzzy search for module names.
 - JSON output for scripting and automation.
 - Metadata caching to minimize network requests.
-- Concurrent-install safe: a per-install-dir lock serializes parallel `qvm install` runs targeting the same version+arch; parallel installs to different version+arch combinations proceed independently.
+- Concurrent-install safe: parallel `qvm install` runs serialize per install directory, so installs of different versions or ABIs proceed independently.
 
 ## Installation
 
@@ -48,7 +52,7 @@ go install github.com/trollixx/qvm/cmd/qvm@latest
 
 Download from the [Releases](https://github.com/trollixx/qvm/releases) page.
 
-## Quick Start
+## Quick start
 
 ```shell
 # List available Qt versions
@@ -85,7 +89,7 @@ qvm install <version> [flags]
 | Flag | Description |
 | --- | --- |
 | `--arch`, `-a` | Compiler/ABI target (e.g. `win64_msvc2022_64`, `clang_64`). Auto-detected if omitted. |
-| `--target` | Qt platform: `desktop` (default), `android`, `ios`, `wasm`. WASM resolves under `desktop/`; pick a `--arch` like `wasm_singlethread`. WinRT is not supported (removed in Qt 6). |
+| `--target` | Qt platform: `desktop` (default), `android`, `ios`, `wasm`. WASM variants live under `desktop/` and must be selected explicitly with `--arch` (e.g. `wasm_singlethread`); see the note below. WinRT is not supported (removed in Qt 6). |
 | `--modules`, `-m` | Comma-separated add-on modules (e.g. `qtcharts,qtwebengine`). The `qt` prefix is optional (`charts` and `qtcharts` both work). |
 | `--no-deps` | Do not auto-install modules the requested modules depend on |
 | `--docs` | Install documentation for all selected modules |
@@ -98,11 +102,11 @@ qvm install <version> [flags]
 | `--dry-run` | Resolve and print archives (with sizes) without downloading |
 | `--quiet`, `-q` | Suppress progress output |
 
-If a Qt version is already installed, qvm will only download and install the
-delta — any new modules or extras you have added — unless `--force` is given.
+If a Qt version is already installed, qvm downloads and installs only the
+delta (any new modules or extras you have added), unless `--force` is given.
 
 Modules that the requested modules depend on (as declared in Qt's repository
-metadata) are installed automatically — for example, `qthttpserver` requires
+metadata) are installed automatically. For example, `qthttpserver` requires
 `qtwebsockets`, and `qtquick3d` requires `qtshadertools` and `qtquicktimeline`.
 Already-installed dependencies are never re-downloaded. Pass `--no-deps` to
 install only the modules you named.
@@ -124,10 +128,10 @@ qvm install 6.8.3 --target android
 ```
 
 > Desktop is the most thoroughly exercised target. Android and iOS resolve under
-> their own repository paths but the rest of the pipeline is shared, so any
+> their own repository paths, but the rest of the pipeline is shared, so any
 > archive Qt publishes for the chosen target will install. WASM packages live
-> under `desktop/` as separate arch variants; current qvm releases do not yet
-> auto-discover them.
+> under `desktop/` as separate arch variants; qvm does not list them
+> automatically, so pass the variant yourself with `--arch`.
 
 ---
 
@@ -188,8 +192,12 @@ qvm uninstall <version> [flags]
 Print the installation directory for a Qt version.
 
 ```shell
-qvm prefix [<version>] [--arch <arch>]
+qvm prefix [<version>] [flags]
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--arch`, `-a` | Select a specific ABI (for multi-arch installations) |
 
 Ideal for use in build scripts:
 
@@ -212,12 +220,12 @@ qvm env [<version>] [flags]
 
 | Flag | Description |
 | --- | --- |
-| `--arch`, `-a` | Specify ABI for multi-arch installations |
+| `--arch`, `-a` | Select a specific ABI (for multi-arch installations) |
 | `--shell` | Output format: `powershell` (`pwsh`), `cmd` (`bat`), `bash` (`sh`, `zsh`), `fish`, `nu` (`nushell`). Defaults to `powershell` on Windows, `bash` elsewhere. |
 
 Two variables are set: the install prefix is prepended to `CMAKE_PREFIX_PATH`
 and `<prefix>/bin` to `PATH` (so `qmake`, `qtdiag`, `windeployqt`/`macdeployqt`,
-`qmlls`, etc. resolve). Existing values are preserved, never clobbered — Qt
+`qmlls`, etc. resolve). Existing values are preserved, never clobbered, so Qt
 composes with vcpkg or other prefixes already in your environment.
 
 Evaluate the output in your shell:
@@ -247,23 +255,25 @@ Run a single command with a Qt version's environment, without modifying the
 current shell.
 
 ```shell
-qvm exec [<version>] [--] <command> [args...]
+qvm exec <command> [args...]
+qvm exec [<version>] -- <command> [args...]
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--arch`, `-a` | Specify ABI for multi-arch installations |
+| `--arch`, `-a` | Select a specific ABI (for multi-arch installations) |
 
 The same variables as `qvm env` are applied, and the command itself is
-resolved against the modified `PATH` — so `qvm exec 6.8.3 qmake` runs that
+resolved against the modified `PATH`, so `qvm exec 6.8.3 -- qmake` runs that
 Qt's `qmake` even if another Qt is first on your shell's `PATH`. Stdin/stdout
 are passed through untouched and the child's exit code becomes qvm's exit
 code, so it composes with pipes, redirection, and CI scripts.
 
-The first argument is treated as a Qt version only when it is shaped like
-`major.minor.patch`; anything else starts the command and the default from
-`qvm use` applies. In the unlikely case your command is itself named like a
-version, pass an explicit version first: `qvm exec 6.8.3 -- 1.2.3 ...`.
+The Qt version is positional and must come before `--`. Without `--`, every
+argument is the command and the default from `qvm use` applies. The version is
+never guessed from an argument's shape, so `qvm exec 6.8.3 qmake` looks for a
+command named `6.8.3`; write `qvm exec 6.8.3 -- qmake` to select a version. A
+leading `-a`/`--arch` flag is accepted with or without `--`.
 
 ```shell
 qvm exec 6.8.3 -- qmake -query QT_VERSION
@@ -279,8 +289,12 @@ Set the default Qt version. `env`, `exec`, `prefix`, and `info` use it when no
 version argument is given.
 
 ```shell
-qvm use [<version>] [--unset]
+qvm use [<version>] [flags]
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--unset` | Clear the default version |
 
 ```shell
 qvm use 6.8.3        # set the default (must be installed)
@@ -290,7 +304,7 @@ qvm exec -- qmake    # now runs the default Qt's qmake
 ```
 
 The default is stored in the config file (`qt.default`) and marked with `*` in
-`qvm list`. Note that setting it does not modify any shell environment — pair
+`qvm list`. Note that setting it does not modify any shell environment; pair
 it with `qvm env` or `qvm exec` to actually build against the default version.
 
 ---
@@ -305,7 +319,7 @@ qvm info [<version>] [flags]
 
 | Flag | Description |
 | --- | --- |
-| `--arch`, `-a` | Specify ABI for multi-arch installations |
+| `--arch`, `-a` | Select a specific ABI (for multi-arch installations) |
 | `--format`, `-f` | `text` (default) or `json` |
 
 ---
@@ -400,12 +414,14 @@ qvm mirror select --auto
 qvm mirror select <url>
 ```
 
-- **`list`** — Probe all cached mirrors and display latency. Marks the current primary (`*`) and fastest (`←`).
-- **`refresh`** — Fetch the latest mirror list from Qt.
-- **`select --auto`** — Probe all mirrors and switch to the fastest reachable one.
-- **`select <url>`** — Test a specific URL and switch to it if reachable.
+| Subcommand | Description |
+| --- | --- |
+| `list` | Probe all cached mirrors and display latency. Marks the current primary (`*`) and fastest (`←`). |
+| `refresh` | Fetch the latest mirror list from Qt |
+| `select --auto` | Probe all mirrors and switch to the fastest reachable one |
+| `select <url>` | Test a specific URL and switch to it if reachable |
 
-## Platform Support
+## Platform support
 
 | OS | Architectures | Default ABI |
 | --- | --- | --- |
@@ -424,7 +440,7 @@ qvm mirror select <url>
 
 The `install` command auto-detects the recommended ABI for the current machine. Use `--arch` to override.
 
-## File Locations
+## File locations
 
 qvm uses standard Windows app directories on Windows, and the macOS Application
 Support / Caches conventions on macOS.
@@ -436,7 +452,7 @@ Support / Caches conventions on macOS.
 | Download cache | `%LOCALAPPDATA%\qvm\downloads\` | `~/Library/Caches/qvm/downloads/` |
 | Metadata cache | `%LOCALAPPDATA%\qvm\metadata\` | `~/Library/Caches/qvm/metadata/` |
 
-## Building from Source
+## Building from source
 
 ```shell
 git clone https://github.com/trollixx/qvm.git
