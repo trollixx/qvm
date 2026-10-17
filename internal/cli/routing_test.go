@@ -42,6 +42,41 @@ func TestInstall_QtNoVersion(t *testing.T) {
 	assertErrContains(t, err, "specify a version")
 }
 
+// Windows arm64 builds start with Qt 6.8: older versions get a hint for the
+// x64 host instead of the repository's 404, without fetching anything.
+func TestInstall_OldQtForWindowsARM64(t *testing.T) {
+	err := run(t, "install", "6.7.3", "--host", "windows_arm64")
+	assertErrContains(t, err, "Qt 6.7.3 has no Windows arm64 build")
+	var he *hintError
+	require.ErrorAs(t, err, &he)
+	assert.Contains(t, he.hint, "qvm install 6.7.3 --host windows_x86")
+}
+
+func TestListRemote_OldQtForWindowsARM64(t *testing.T) {
+	err := run(t, "list-remote", "6.7", "--host", "windows_arm64")
+	assertErrContains(t, err, "Qt 6.7 has no Windows arm64 build")
+	var he *hintError
+	require.ErrorAs(t, err, &he)
+	assert.Contains(t, he.hint, "qvm list-remote 6.7 --host windows_x86")
+}
+
+func TestNoWindowsARM64Build(t *testing.T) {
+	for _, tc := range []struct {
+		version, host string
+		hint          bool
+	}{
+		{"6.7.3", "windows_arm64", true},
+		{"5.15.2", "windows_arm64", true},
+		{"6.8.0", "windows_arm64", false},
+		{"6.10", "windows_arm64", false},
+		{"6.7.3", "windows_x86", false},
+		{"latest", "windows_arm64", false},
+	} {
+		err := noWindowsARM64Build("install", tc.version, tc.host)
+		assert.Equalf(t, tc.hint, err != nil, "%s on %s: %v", tc.version, tc.host, err)
+	}
+}
+
 // -- list ----------------------------------------------------------------------
 
 func TestList_NoArg(t *testing.T) {

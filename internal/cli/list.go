@@ -135,6 +135,11 @@ func (a *app) runListRemote(ctx context.Context, cmd *cli.Command) error {
 	arg := cmd.Args().Get(0)
 	format := cmd.String("format")
 	host := cmd.String("host")
+	if arg != "" {
+		if err := noWindowsARM64Build("list-remote", arg, host); err != nil {
+			return err
+		}
+	}
 
 	cfg, err := config.Load()
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 	"github.com/trollixx/qvm/internal/install"
 	"github.com/trollixx/qvm/internal/repository"
 	"github.com/trollixx/qvm/internal/storage"
+	"github.com/trollixx/qvm/pkg/qtmeta"
 )
 
 // Version is the current qvm version string.
@@ -115,6 +116,34 @@ func resolveHost(host string) string {
 		return host
 	}
 	return repository.PlatformHost()
+}
+
+// noWindowsARM64Build returns an error with a hint if host (or the detected
+// host) is Windows arm64 and Qt version is older than its first builds there,
+// rather than the 404 the repository answers with. command is the qvm command
+// the hint repeats for the x64 host.
+func noWindowsARM64Build(command, version, host string) error {
+	if resolveHost(host) != repository.HostWindowsARM64 {
+		return nil
+	}
+	if v, ok := parseQtVersion(version); !ok || v.GTE(qtmeta.MustParseVersion("6.8.0")) {
+		return nil
+	}
+	return newHintError(
+		fmt.Sprintf("Qt %s has no Windows arm64 build; those start with Qt 6.8", version),
+		fmt.Sprintf("For the x64 build, which runs under emulation:\n  qvm %s %s --host %s",
+			command, version, repository.HostWindowsX86),
+	)
+}
+
+// parseQtVersion parses a full Qt version, or a minor one, like 6.7, as its
+// first release.
+func parseQtVersion(s string) (qtmeta.Version, bool) {
+	if v, err := qtmeta.ParseVersion(s); err == nil {
+		return v, true
+	}
+	v, err := qtmeta.ParseVersion(s + ".0")
+	return v, err == nil
 }
 
 // resolveTarget returns target if non-empty, otherwise the default (desktop).

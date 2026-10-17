@@ -260,12 +260,10 @@ func formatAge(d time.Duration) string {
 }
 
 func osDescription() string {
-	arch := runtime.GOARCH
-	switch arch {
-	case "amd64":
-		arch = "x64"
-	case "arm64":
-		arch = "arm64"
+	arch := archName(platform.NativeArch())
+	// An x64 qvm runs under emulation on Windows on ARM.
+	if own := archName(runtime.GOARCH); own != arch {
+		arch += ", qvm built for " + own
 	}
 
 	switch runtime.GOOS {
@@ -276,4 +274,11 @@ func osDescription() string {
 	default:
 		return fmt.Sprintf("Linux (%s)", arch)
 	}
+}
+
+func archName(goarch string) string {
+	if goarch == "amd64" {
+		return "x64"
+	}
+	return goarch
 }

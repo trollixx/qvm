@@ -122,6 +122,9 @@ func buildInstallOptions(cmd *cli.Command, cfg *config.Config, version, arch str
 func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 	host := cmd.String("host")
 	target := cmd.String("target")
+	if err := noWindowsARM64Build("install", version, host); err != nil {
+		return err
+	}
 
 	cfg, err := config.Load()
 	if err != nil {
