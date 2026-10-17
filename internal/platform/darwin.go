@@ -34,6 +34,6 @@ func (d *Darwin) CheckCompilerPresent(_ string) (bool, string) {
 	if err != nil {
 		return true, ""
 	}
-	ver := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
+	ver, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
 	return true, ver
 }
