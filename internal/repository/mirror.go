@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/trollixx/qvm/internal/platform"
 	"github.com/trollixx/qvm/pkg/qtmeta"
 )
 
@@ -294,18 +295,19 @@ func (m *MirrorList) SrcDocExURLsFor(version string, major int) []string {
 	return urls
 }
 
-// PlatformHost returns the repository host path component for the current OS/arch.
+// PlatformHost returns the repository host path component for this machine's
+// OS and architecture.
 func PlatformHost() string {
 	switch runtime.GOOS {
 	case "windows":
-		if runtime.GOARCH == "arm64" {
+		if platform.NativeArch() == "arm64" {
 			return HostWindowsARM64
 		}
 		return HostWindowsX86
 	case "darwin":
 		return HostMacX64
 	case "linux":
-		if runtime.GOARCH == "arm64" {
+		if platform.NativeArch() == "arm64" {
 			return HostLinuxARM64
 		}
 		return HostLinuxX64

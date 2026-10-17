@@ -425,7 +425,8 @@ qvm mirror select <url>
 
 | OS | Architectures | Default ABI |
 | --- | --- | --- |
-| Windows | x86_64, arm64 | `win64_msvc2022_64` |
+| Windows | x86_64 | `win64_msvc2022_64` |
+| Windows | arm64 | `win64_msvc2022_arm64` |
 | macOS | x86_64, arm64 (universal) | `clang_64` |
 
 ### Common ABI values

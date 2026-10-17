@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"debug/pe"
 	"runtime"
 	"testing"
 
@@ -45,10 +46,10 @@ func TestDefaultArchForHost(t *testing.T) {
 	}
 }
 
-// TestCurrentDefaultArchMatchesHost exercises the [runtime.GOARCH] auto-detection
+// TestCurrentDefaultArchMatchesHost exercises the [NativeArch] auto-detection
 // path: Current().DefaultArch must agree with the explicit --host mapping for
-// the host equivalent to this machine. It is only meaningful when run natively
-// on each arch, so it relies on the arm64 CI runners to cover the arm64 branch.
+// the host equivalent to this machine. It relies on the arm64 CI runners to
+// cover the arm64 branch.
 func TestCurrentDefaultArchMatchesHost(t *testing.T) {
 	// Qt 6.8+ so both Windows MSVC paths resolve to 2022 without probing for
 	// an installed toolchain, and arm64 builds exist.
@@ -58,12 +59,12 @@ func TestCurrentDefaultArchMatchesHost(t *testing.T) {
 	switch runtime.GOOS {
 	case "windows":
 		host = "windows_x86"
-		if runtime.GOARCH == "arm64" {
+		if NativeArch() == "arm64" {
 			host = "windows_arm64"
 		}
 	case "linux":
 		host = "linux_x64"
-		if runtime.GOARCH == "arm64" {
+		if NativeArch() == "arm64" {
 			host = "linux_arm64"
 		}
 	case "darwin":
@@ -75,5 +76,24 @@ func TestCurrentDefaultArchMatchesHost(t *testing.T) {
 	want := DefaultArchForHost(host, version)
 	got := Current().DefaultArch(version)
 	assert.Equalf(t, want, got,
-		"auto-detected arch for %s/%s should match --host %s", runtime.GOOS, runtime.GOARCH, host)
+		"auto-detected arch for %s/%s should match --host %s", runtime.GOOS, NativeArch(), host)
+}
+
+func TestMachineArch(t *testing.T) {
+	assert.Equal(t, "amd64", machineArch(pe.IMAGE_FILE_MACHINE_AMD64))
+	assert.Equal(t, "arm64", machineArch(pe.IMAGE_FILE_MACHINE_ARM64))
+	assert.Equal(t, "386", machineArch(pe.IMAGE_FILE_MACHINE_I386))
+	assert.Empty(t, machineArch(pe.IMAGE_FILE_MACHINE_ARMNT))
+}
+
+func TestNativeArch(t *testing.T) {
+	got := NativeArch()
+	t.Logf("native arch: %s (qvm built for %s)", got, runtime.GOARCH)
+	switch runtime.GOARCH {
+	case "amd64":
+		// Native x64, or x64 under emulation on Windows on ARM.
+		assert.Contains(t, []string{"amd64", "arm64"}, got)
+	case "arm64":
+		assert.Equal(t, "arm64", got)
+	}
 }
