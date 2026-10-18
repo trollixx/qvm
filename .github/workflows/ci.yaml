@@ -51,8 +51,8 @@ jobs:
           CGO_ENABLED: "1"
         run: go test -race ./...
 
+      # Each OS compiles its own platform files; Codecov merges the uploads.
       - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v7
         with:
           files: coverage.txt
