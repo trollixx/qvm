@@ -17,6 +17,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest, windows-11-arm]
     runs-on: ${{ matrix.os }}
+    # id-token lets the coverage upload authenticate to Codecov with OIDC.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -52,6 +56,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           files: coverage.txt
+          use_oidc: true
 
   # Real end-to-end install: download -> extract -> qt.conf patch -> prefix,
   # then verify qmake reports the installed version. Covers Windows (x64 +
