@@ -1,5 +1,10 @@
 # qvm: Qt Version Manager
 
+[![CI](https://img.shields.io/github/actions/workflow/status/trollixx/qvm/ci.yaml?branch=main&label=ci&style=flat-square)](https://github.com/trollixx/qvm/actions/workflows/ci.yaml)
+[![Coverage](https://img.shields.io/codecov/c/github/trollixx/qvm?style=flat-square)](https://app.codecov.io/gh/trollixx/qvm)
+[![Release](https://img.shields.io/github/v/release/trollixx/qvm?style=flat-square)](https://github.com/trollixx/qvm/releases)
+[![License](https://img.shields.io/github/license/trollixx/qvm?style=flat-square)](LICENSE)
+
 A single-binary CLI tool for installing and managing Qt SDK versions on Windows and macOS.
 
 Linux is not supported; use your distribution's Qt packages instead.
