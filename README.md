@@ -1,455 +1,169 @@
-# qvm: Qt Version Manager
+# qvm
 
 [![CI](https://img.shields.io/github/actions/workflow/status/trollixx/qvm/ci.yaml?branch=main&label=ci&style=flat-square)](https://github.com/trollixx/qvm/actions/workflows/ci.yaml)
 [![Coverage](https://img.shields.io/codecov/c/github/trollixx/qvm?style=flat-square)](https://app.codecov.io/gh/trollixx/qvm)
 [![Release](https://img.shields.io/github/v/release/trollixx/qvm?style=flat-square)](https://github.com/trollixx/qvm/releases)
 [![License](https://img.shields.io/github/license/trollixx/qvm?style=flat-square)](LICENSE)
 
-A single-binary CLI tool for installing and managing Qt SDK versions on Windows and macOS.
+Install Qt from the command line on Windows and macOS. One binary: no Qt account, no Python, no 7-Zip.
 
-Linux is not supported; use your distribution's Qt packages instead.
+```sh
+qvm install 6.8.3
+qvm exec 6.8.3 -- cmake -B build
+```
 
 > [!WARNING]
 > This tool is mostly AI generated for my own needs. The code has not been thoroughly reviewed. Use at your own risk! The interface will most likely change too.
 
-```console
-$ qvm install 6.8.3
-Resolving archives for Qt 6.8.3 (win64_msvc2022_64)...
-Downloading [1/12] qtbase-windows-x86_64.7z  124 MB/s  34%
-...
-Qt 6.8.3 (win64_msvc2022_64) installed to C:\Qt\6.8.3\win64_msvc2022_64
+## Why
 
-$ qvm prefix 6.8.3
-C:\Qt\6.8.3\win64_msvc2022_64
+Qt's prebuilt SDKs come from its online repository, and the usual ways to get them each have a catch:
+
+- **Qt Online Installer**: needs a Qt account.
+- **aqtinstall**: needs Python.
+- **install-qt-action**: GitHub Actions only, and runs aqtinstall.
+- **vcpkg**: builds Qt from source, which can take hours.
+
+qvm downloads the same archives as the online installer, straight from `download.qt.io` or a mirror, and needs nothing else installed.
+
+Linux isn't supported; use your distribution's Qt packages.
+
+## Install
+
+Download the binary for your platform from the [latest release](https://github.com/trollixx/qvm/releases/latest): `qvm-windows-amd64.exe`, `qvm-windows-arm64.exe`, `qvm-macos-arm64`, or `qvm-macos-amd64`. Rename it to `qvm.exe` (`qvm` on macOS, then `chmod +x qvm`) and put it on your `PATH`. With the `gh` CLI:
+
+```sh
+gh release download --repo trollixx/qvm --pattern qvm-windows-amd64.exe --output qvm.exe
 ```
 
-Point your build at it (PowerShell):
+Or build it with Go:
 
-```powershell
-$env:Qt6_DIR = qvm prefix 6.8.3
-```
-
-## Features
-
-- Install any Qt 6.x version with a single command (Qt 5 is not supported).
-- Install Qt add-on modules, documentation, examples, sources, and debug symbols.
-- Automatic module dependency resolution (e.g. `qthttpserver` pulls in `qtwebsockets`).
-- Parallel downloads with retry, resumable interrupted transfers, and progress reporting.
-- Activate a Qt version in any shell with `qvm env` (PowerShell, cmd, bash, zsh, fish, nu).
-- Run one-off commands in a Qt environment with `qvm exec` (e.g. `qvm exec 6.8.3 -- qmake`).
-- Set a default version with `qvm use`, so `env`, `exec`, `prefix`, and `info` need no version argument.
-- Auto-detect the best compiler/ABI for the current machine.
-- Mirror management: auto-probe and switch to the fastest Qt mirror.
-- Fuzzy search for module names.
-- JSON output for scripting and automation.
-- Metadata caching to minimize network requests.
-- Concurrent-install safe: parallel `qvm install` runs serialize per install directory, so installs of different versions or ABIs proceed independently.
-
-## Installation
-
-### From source
-
-```shell
+```sh
 go install github.com/trollixx/qvm/cmd/qvm@latest
 ```
 
-### Pre-built binaries
+## Usage
 
-Download from the [Releases](https://github.com/trollixx/qvm/releases) page.
+Find a version and install it:
 
-## Quick start
-
-```shell
-# List available Qt versions
-qvm list-remote
-
-# Install Qt 6.8.3 (auto-detects compiler/ABI)
-qvm install 6.8.3
-
-# Install with specific modules
-qvm install 6.8.3 --modules qtcharts,qtwebengine
-
-# Show what is installed
-qvm list
-
-# Get the install path (useful with CMake)
-qvm prefix 6.8.3
-
-# Run health checks
-qvm doctor
+```sh
+qvm list-remote                    # versions in Qt's repository, LTS releases marked
+qvm list-remote 6.8.3              # one version's ABIs, add-on modules, and extras
+qvm install 6.8.3 --modules charts,webengine
 ```
 
-## Commands
+Then build against it:
 
-### `install` (`i`)
-
-Install a Qt version.
-
-```shell
-qvm install <version> [flags]
+```sh
+qvm exec 6.8.3 -- cmake -B build   # one command with this Qt on PATH and CMAKE_PREFIX_PATH
+qvm prefix 6.8.3                   # or print its directory for your own scripts
 ```
 
-#### Flags
+`qvm use 6.8.3` makes it the default, so `exec`, `env`, `prefix`, and `info` can leave the version out: `qvm exec qmake -query`.
 
-| Flag | Description |
+| Command | What it does |
 | --- | --- |
-| `--arch`, `-a` | Compiler/ABI target (e.g. `win64_msvc2022_64`, `clang_64`). Auto-detected if omitted. |
-| `--target` | Qt platform: `desktop` (default), `android`, `ios`, `wasm`. WASM variants live under `desktop/` and must be selected explicitly with `--arch` (e.g. `wasm_singlethread`); see the note below. WinRT is not supported (removed in Qt 6). |
-| `--modules`, `-m` | Comma-separated add-on modules (e.g. `qtcharts,qtwebengine`). The `qt` prefix is optional (`charts` and `qtcharts` both work). |
-| `--no-deps` | Do not auto-install modules the requested modules depend on |
-| `--docs` | Install documentation for all selected modules |
-| `--examples` | Install examples for all selected modules |
-| `--sources` | Install Qt source code |
-| `--debug-symbols` | Install debug symbol files |
-| `--host` | Host platform override (e.g. `windows_arm64`, `mac_x64`). Auto-detected if omitted. |
-| `--force` | Re-install even if already present |
-| `--dir` | Override Qt installation directory |
-| `--dry-run` | Resolve and print archives (with sizes) without downloading |
-| `--quiet`, `-q` | Suppress progress output |
+| `qvm install <version>` | Install Qt, add-on modules, and extras |
+| `qvm uninstall <version>` | Remove an install (`--arch` for one ABI) |
+| `qvm list` | List installed versions, offline |
+| `qvm list-remote [<version>]` | List versions in Qt's repository, or one version's contents |
+| `qvm search <query>` | Fuzzy-search add-on module names |
+| `qvm exec [<version> --] <cmd> [args...]` | Run one command with Qt on `PATH` and `CMAKE_PREFIX_PATH` |
+| `qvm env [<version>]` | Print commands that set the same in your shell |
+| `qvm prefix [<version>]` | Print an install's directory |
+| `qvm use [<version>]` | Set or print the default version |
+| `qvm info [<version>]` | Show an install's modules, extras, and size |
+| `qvm doctor` | Check the config, caches, disk space, and installs |
+| `qvm config` | Get or set configuration values |
+| `qvm mirror` | Probe Qt's mirrors and switch to the fastest |
+| `qvm cache` | List or clean downloaded archives and metadata |
 
-If a Qt version is already installed, qvm downloads and installs only the
-delta (any new modules or extras you have added), unless `--force` is given.
+`qvm <command> --help` lists every flag. `list`, `list-remote`, `info`, and `search` print JSON with `--format json`.
 
-Modules that the requested modules depend on (as declared in Qt's repository
-metadata) are installed automatically. For example, `qthttpserver` requires
-`qtwebsockets`, and `qtquick3d` requires `qtshadertools` and `qtquicktimeline`.
-Already-installed dependencies are never re-downloaded. Pass `--no-deps` to
-install only the modules you named.
+## Installing Qt
 
-#### Examples
+`qvm install <version>` installs Qt's essential modules for this machine. Running it again with more modules or extras downloads only what's missing.
 
-```shell
-# Base Qt only
-qvm install 6.8.3
-
-# With modules and docs
-qvm install 6.8.3 --modules qtcharts,qtmultimedia --docs
-
-# Specific ABI
-qvm install 6.8.3 --arch win64_mingw
-
-# Android target
-qvm install 6.8.3 --target android
-```
-
-> Desktop is the most thoroughly exercised target. Android and iOS resolve under
-> their own repository paths, but the rest of the pipeline is shared, so any
-> archive Qt publishes for the chosen target will install. WASM packages live
-> under `desktop/` as separate arch variants; qvm does not list them
-> automatically, so pass the variant yourself with `--arch`.
-
----
-
-### `list` (`ls`)
-
-List installed Qt versions. Fast and offline (no network access).
-
-```shell
-qvm list [flags]
-```
-
-| Flag | Description |
+| Flag | |
 | --- | --- |
-| `--format`, `-f` | Output format: `text` (default) or `json` |
+| `--modules`, `-m` | Add-on modules, comma-separated; the `qt` prefix is optional |
+| `--no-deps` | Don't add the modules those depend on |
+| `--docs`, `--examples`, `--sources`, `--debug-symbols` | Extras, for every selected module |
+| `--arch`, `-a` | ABI, e.g. `win64_mingw`; see the defaults below |
+| `--target` | `desktop` (default), `android`, `ios`, or `wasm`; all but `desktop` need `--arch` |
+| `--host` | Another host's build, e.g. `windows_x86` |
+| `--dir` | Install root, instead of `install.dir` |
+| `--dry-run` | List the archives without downloading them |
+| `--force` | Reinstall |
+| `--quiet`, `-q` | No progress output |
 
----
+Modules come with the modules they depend on in Qt's metadata: `qthttpserver` brings `qtwebsockets`, and `qtquick3d` brings `qtshadertools` and `qtquicktimeline`.
 
-### `list-remote` (`ls-remote`)
+Without `--arch`, you get the ABI for this machine:
 
-List Qt versions available in the repository, with installed versions marked.
-
-```shell
-qvm list-remote [<version-filter>] [flags]
-```
-
-| Flag | Description |
+| Machine | Default ABI |
 | --- | --- |
-| `--format`, `-f` | Output format: `text` (default) or `json` |
-| `--host` | Host platform override (e.g. `windows_arm64`, `mac_x64`) |
+| Windows x64 | `win64_msvc2022_64`; for Qt 6.0–6.5, `win64_msvc2019_64` unless only Visual Studio 2022 is installed |
+| Windows on ARM | `win64_msvc2022_arm64`, even from `qvm-windows-amd64.exe` |
+| macOS | `clang_64`, a universal x86_64 and arm64 build |
 
-```shell
-qvm list-remote                # all available, grouped by major
-qvm list-remote 6              # all 6.x versions
-qvm list-remote 6.8            # all 6.8.x versions
-qvm list-remote 6.8.3          # detailed view: archs, modules, extras
-qvm list-remote --format json  # machine-readable output
+Qt has Windows ARM64 builds from 6.8 on. For older versions, `--host windows_x86` installs the x64 build, which runs under emulation. `qvm list-remote <version>` lists the other ABIs, such as `win64_mingw` and `win64_llvm_mingw`.
+
+Desktop is the most tested target. Android, iOS, and WebAssembly builds go through the same pipeline, so any archive Qt publishes for them should install.
+
+## Shell setup
+
+`qvm env` prints commands that prepend the install to `CMAKE_PREFIX_PATH` and its `bin` directory to `PATH`, keeping what's already there. Run it with the line for your shell, or put that line in your shell's profile.
+
+PowerShell:
+
+```powershell
+qvm env 6.8.3 | Out-String | Invoke-Expression
 ```
 
----
+cmd (in a batch file, use `%%i` instead of `%i`):
 
-### `uninstall` (`remove`)
-
-Uninstall a Qt version.
-
-```shell
-qvm uninstall <version> [flags]
+```bat
+for /f "delims=" %i in ('qvm env 6.8.3 --shell cmd') do @%i
 ```
 
-| Flag | Description |
-| --- | --- |
-| `--arch`, `-a` | Remove only a specific ABI (for multi-arch installations) |
-| `--yes`, `-y` | Skip confirmation prompt |
+Nushell:
 
----
-
-### `prefix`
-
-Print the installation directory for a Qt version.
-
-```shell
-qvm prefix [<version>] [flags]
+```nu
+load-env (qvm env 6.8.3 --shell nu | from json)
 ```
 
-| Flag | Description |
-| --- | --- |
-| `--arch`, `-a` | Select a specific ABI (for multi-arch installations) |
+bash or zsh on macOS:
 
-Ideal for use in build scripts:
-
-```shell
-cmake -DCMAKE_PREFIX_PATH=$(qvm prefix 6.8.3) ..
+```sh
+eval "$(qvm env 6.8.3 --shell bash)"
 ```
 
-If multiple ABIs are installed for the same version, qvm picks the host's
-default arch automatically; use `--arch` to disambiguate explicitly.
+fish on macOS:
 
----
-
-### `env`
-
-Print shell commands that activate a Qt version in the current shell.
-
-```shell
-qvm env [<version>] [flags]
+```fish
+qvm env 6.8.3 --shell fish | source
 ```
 
-| Flag | Description |
-| --- | --- |
-| `--arch`, `-a` | Select a specific ABI (for multi-arch installations) |
-| `--shell` | Output format: `powershell` (`pwsh`), `cmd` (`bat`), `bash` (`sh`, `zsh`), `fish`, `nu` (`nushell`). Defaults to `powershell` on Windows, `bash` elsewhere. |
+Git Bash and MSYS2 on Windows aren't supported yet: the bash and fish output sets a Windows-style `PATH`, which they can't use.
 
-Two variables are set: the install prefix is prepended to `CMAKE_PREFIX_PATH`
-and `<prefix>/bin` to `PATH` (so `qmake`, `qtdiag`, `windeployqt`/`macdeployqt`,
-`qmlls`, etc. resolve). Existing values are preserved, never clobbered, so Qt
-composes with vcpkg or other prefixes already in your environment.
+## Configuration
 
-Evaluate the output in your shell:
+`qvm config list` shows every value, and `qvm config set <key> <value>` changes one.
 
-```shell
-# PowerShell
-qvm env 6.10.2 | Out-String | Invoke-Expression
-
-# bash / zsh
-eval "$(qvm env 6.10.2 --shell bash)"
-
-# fish
-qvm env 6.10.2 --shell fish | source
-
-# nushell
-load-env (qvm env 6.10.2 --shell nu | from json)
-
-# cmd
-for /f "delims=" %i in ('qvm env 6.10.2 --shell cmd') do @%i
-```
-
----
-
-### `exec`
-
-Run a single command with a Qt version's environment, without modifying the
-current shell.
-
-```shell
-qvm exec <command> [args...]
-qvm exec [<version>] -- <command> [args...]
-```
-
-| Flag | Description |
-| --- | --- |
-| `--arch`, `-a` | Select a specific ABI (for multi-arch installations) |
-
-The same variables as `qvm env` are applied, and the command itself is
-resolved against the modified `PATH`, so `qvm exec 6.8.3 -- qmake` runs that
-Qt's `qmake` even if another Qt is first on your shell's `PATH`. Stdin/stdout
-are passed through untouched and the child's exit code becomes qvm's exit
-code, so it composes with pipes, redirection, and CI scripts.
-
-The Qt version is positional and must come before `--`. Without `--`, every
-argument is the command and the default from `qvm use` applies. The version is
-never guessed from an argument's shape, so `qvm exec 6.8.3 qmake` looks for a
-command named `6.8.3`; write `qvm exec 6.8.3 -- qmake` to select a version. A
-leading `-a`/`--arch` flag is accepted with or without `--`.
-
-```shell
-qvm exec 6.8.3 -- qmake -query QT_VERSION
-qvm exec 6.8.3 -- cmake -S . -B build
-qvm exec 6.8.3 -- windeployqt build\app.exe
-```
-
----
-
-### `use`
-
-Set the default Qt version. `env`, `exec`, `prefix`, and `info` use it when no
-version argument is given.
-
-```shell
-qvm use [<version>] [flags]
-```
-
-| Flag | Description |
-| --- | --- |
-| `--unset` | Clear the default version |
-
-```shell
-qvm use 6.8.3        # set the default (must be installed)
-qvm use              # print the current default
-qvm use --unset      # clear it
-qvm exec -- qmake    # now runs the default Qt's qmake
-```
-
-The default is stored in the config file (`qt.default`) and marked with `*` in
-`qvm list`. Note that setting it does not modify any shell environment; pair
-it with `qvm env` or `qvm exec` to actually build against the default version.
-
----
-
-### `info` (`show`)
-
-Show detailed information about an installed Qt version.
-
-```shell
-qvm info [<version>] [flags]
-```
-
-| Flag | Description |
-| --- | --- |
-| `--arch`, `-a` | Select a specific ABI (for multi-arch installations) |
-| `--format`, `-f` | `text` (default) or `json` |
-
----
-
-### `search` (`s`)
-
-Fuzzy-search available add-on module names.
-
-```shell
-qvm search <query>
-```
-
-```shell
-qvm search charts                  # finds qtcharts
-qvm search webengine
-qvm search --format json multimedia
-```
-
----
-
-### `doctor`
-
-Run environment health checks.
-
-```shell
-qvm doctor
-```
-
-Checks include config readability, metadata cache freshness, disk space, Qt
-installation integrity (qmake works), and compiler availability (MSVC on
-Windows).
-
----
-
-### `config`
-
-Get, set, or list configuration values.
-
-```shell
-qvm config list
-qvm config get <key>
-qvm config set <key> <value>
-qvm config path
-```
-
-#### Available keys
-
-| Key | Default | Description |
+| Key | Default | |
 | --- | --- | --- |
-| `qt.default` | - | Default Qt version for `env`/`exec`/`prefix`/`info` (set via `qvm use`) |
-| `install.dir` | `C:\Qt` / `~/Qt` | Qt installation root |
-| `repository.url` | `https://download.qt.io/` | Primary Qt mirror |
-| `repository.mirrors` | - | Fallback mirror URLs (comma-separated) |
-| `repository.blacklist` | - | Mirrors to exclude (comma-separated) |
-| `download.concurrency` | `4` | Parallel download threads |
+| `install.dir` | `C:\Qt`, or `~/Qt` on macOS | Where versions are installed |
+| `qt.default` | | Default version, set by `qvm use` |
+| `repository.url` | `https://download.qt.io/` | Mirror to download from |
+| `repository.mirrors` | | Fallback mirrors, comma-separated |
+| `repository.blacklist` | | Mirrors for `qvm mirror` to skip, comma-separated |
+| `download.concurrency` | `4` | Parallel downloads |
 | `download.timeout_seconds` | `300` | HTTP timeout |
 
-```shell
-qvm config set install.dir /opt/Qt
-qvm config set download.concurrency 8
-qvm config set repository.mirrors https://ftp.jaist.ac.jp/pub/qtproject/,https://mirrors.dotsrc.org/qtproject/
-```
+`qvm mirror refresh` fetches Qt's mirror list, `qvm mirror list` probes each one, and `qvm mirror select --auto` sets `repository.url` to the fastest.
 
----
-
-### `cache`
-
-Manage download and metadata caches.
-
-```shell
-qvm cache list
-qvm cache clean [flags]
-```
-
-| Flag | Description |
-| --- | --- |
-| `--incomplete` | Remove only partial downloads, keep complete archives |
-| `--metadata` | Remove cached repository metadata |
-| `--all` | Remove everything |
-| `--yes`, `-y` | Skip confirmation |
-
----
-
-### `mirror`
-
-Probe and manage Qt repository mirrors.
-
-```shell
-qvm mirror list
-qvm mirror refresh
-qvm mirror select --auto
-qvm mirror select <url>
-```
-
-| Subcommand | Description |
-| --- | --- |
-| `list` | Probe all cached mirrors and display latency. Marks the current primary (`*`) and fastest (`←`). |
-| `refresh` | Fetch the latest mirror list from Qt |
-| `select --auto` | Probe all mirrors and switch to the fastest reachable one |
-| `select <url>` | Test a specific URL and switch to it if reachable |
-
-## Platform support
-
-| OS | Architectures | Default ABI |
-| --- | --- | --- |
-| Windows | x86_64 | `win64_msvc2022_64` |
-| Windows | arm64 | `win64_msvc2022_arm64` |
-| macOS | x86_64, arm64 (universal) | `clang_64` |
-
-### Common ABI values
-
-| Platform | ABI | Compiler |
-| --- | --- | --- |
-| Windows | `win64_msvc2022_64` | MSVC 2022 64-bit |
-| Windows | `win64_msvc2019_64` | MSVC 2019 64-bit |
-| Windows | `win64_mingw` | MinGW-w64 64-bit |
-| Windows | `win64_llvm_mingw` | LLVM/Clang MinGW 64-bit |
-| macOS | `clang_64` | Clang (universal: x86_64 + arm64) |
-
-The `install` command auto-detects the recommended ABI for the current machine. Use `--arch` to override.
-
-## File locations
-
-qvm uses standard Windows app directories on Windows, and the macOS Application
-Support / Caches conventions on macOS.
+qvm keeps its files here:
 
 | File | Windows | macOS |
 | --- | --- | --- |
@@ -458,22 +172,30 @@ Support / Caches conventions on macOS.
 | Download cache | `%LOCALAPPDATA%\qvm\downloads\` | `~/Library/Caches/qvm/downloads/` |
 | Metadata cache | `%LOCALAPPDATA%\qvm\metadata\` | `~/Library/Caches/qvm/metadata/` |
 
+## How it works
+
+qvm reads the package metadata (`Updates.xml`) of Qt's online repository, the same one the online installer uses, and caches it. From it, qvm works out the archives for the version, ABI, and modules you asked for, including the modules they depend on.
+
+It downloads the archives in parallel, retrying failures and resuming partial downloads, and checks each against the SHA-1 file Qt publishes next to it. It extracts them with a built-in 7-Zip decoder, then writes `bin/qt.conf` so the install works from its directory, and records it in the registry. `list`, `info`, `prefix`, `exec`, and `env` only read the registry, so they work offline.
+
+Each install locks its target directory, so parallel `qvm install` runs of different versions or ABIs don't wait for each other.
+
+## Requirements
+
+- Windows (x64 or ARM64) or macOS
+- Qt 6; Qt 5 isn't supported
+- A compiler for the ABI you install, such as Visual Studio or the Xcode Command Line Tools; on Windows, `qvm doctor` checks for MSVC
+
 ## Building from source
 
-```shell
+```sh
 git clone https://github.com/trollixx/qvm.git
 cd qvm
 go build ./cmd/qvm
-```
-
-`qvm --version` reports the module version stamped by the Go toolchain (for
-`go install` and VCS builds); release builds may override it via `-ldflags`.
-
-Run tests:
-
-```shell
 go test ./...
 ```
+
+`qvm --version` reports the module version that the Go toolchain stamps into `go install` and VCS builds; release builds set it with `-ldflags`.
 
 ## License
 
