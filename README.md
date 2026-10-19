@@ -130,19 +130,19 @@ Nushell:
 load-env (qvm env 6.8.3 --shell nu | from json)
 ```
 
-bash or zsh on macOS:
+bash or zsh, including Git Bash and MSYS2 on Windows:
 
 ```sh
 eval "$(qvm env 6.8.3 --shell bash)"
 ```
 
-fish on macOS:
+fish:
 
 ```fish
 qvm env 6.8.3 --shell fish | source
 ```
 
-Git Bash and MSYS2 on Windows aren't supported yet: the bash and fish output sets a Windows-style `PATH`, which they can't use.
+On Windows, the bash and fish output converts `PATH` to POSIX paths with `cygpath`, which ships with Git for Windows and MSYS2.
 
 ## Configuration
 

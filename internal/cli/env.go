@@ -67,7 +67,7 @@ func (a *app) envQt(reg *storage.Registry, version, arch, shell string) error {
 		return err
 	}
 	env := buildQtEnv(qt.InstallDir, os.Getenv)
-	return writeEnvScript(a.streams.Out, resolveShell(shell), env)
+	return writeEnvScript(a.streams.Out, resolveShell(shell), env, runtime.GOOS == "windows")
 }
 
 // resolveShell returns shell if non-empty, otherwise the platform default.
@@ -101,7 +101,9 @@ func prependPathList(existing, entry string) string {
 }
 
 // writeEnvScript renders env as shell statements for the requested shell.
-func writeEnvScript(w io.Writer, shell string, env map[string]string) error {
+// With cygpath set, bash and fish convert PATH to POSIX paths, as Git Bash and
+// MSYS2 on Windows need.
+func writeEnvScript(w io.Writer, shell string, env map[string]string, cygpath bool) error {
 	keys := make([]string, 0, len(env))
 	for k := range env {
 		keys = append(keys, k)
@@ -118,12 +120,24 @@ func writeEnvScript(w io.Writer, shell string, env map[string]string) error {
 			fmt.Fprintf(w, "set %s=%s\n", k, env[k])
 		}
 	case "bash", "sh", "zsh":
+		// PATH in Git Bash and MSYS2 holds POSIX paths. qvm gets it in Windows
+		// form, and cygpath converts the result back using the shell's own
+		// mount table; if that fails, PATH stays as it was.
 		for _, k := range keys {
+			if k == "PATH" && cygpath {
+				fmt.Fprintf(w, "export PATH=\"$(cygpath -u -p %s || echo \"$PATH\")\"\n", shQuote(env[k]))
+				continue
+			}
 			fmt.Fprintf(w, "export %s=%s\n", k, shQuote(env[k]))
 		}
 	case "fish":
 		for _, k := range keys {
-			fmt.Fprintf(w, "set -gx %s %s\n", k, shQuote(env[k]))
+			if k == "PATH" && cygpath {
+				fmt.Fprintf(w, "if set -l p (cygpath -u -p %s); set -gx PATH (string split : -- $p); end\n",
+					fishQuote(env[k]))
+				continue
+			}
+			fmt.Fprintf(w, "set -gx %s %s\n", k, fishQuote(env[k]))
 		}
 	case "nu", "nushell":
 		return json.NewEncoder(w).Encode(env)
@@ -142,4 +156,10 @@ func psQuote(s string) string {
 
 func shQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// fishQuote quotes for fish, where \\ and \' are escapes even inside single
+// quotes, so a value ending in a backslash would otherwise eat the quote.
+func fishQuote(s string) string {
+	return "'" + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(s) + "'"
 }

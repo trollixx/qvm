@@ -52,12 +52,12 @@ func TestWriteEnvScript_Formats(t *testing.T) {
 		{"cmd", []string{`set CMAKE_PREFIX_PATH=C:\Qt`, `set PATH=C:\Qt\bin`}},
 		{"bash", []string{"export CMAKE_PREFIX_PATH='C:\\Qt'", "export PATH='C:\\Qt\\bin'"}},
 		{"zsh", []string{"export PATH='C:\\Qt\\bin'"}},
-		{"fish", []string{"set -gx CMAKE_PREFIX_PATH 'C:\\Qt'", "set -gx PATH 'C:\\Qt\\bin'"}},
+		{"fish", []string{`set -gx CMAKE_PREFIX_PATH 'C:\\Qt'`, `set -gx PATH 'C:\\Qt\\bin'`}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.shell, func(t *testing.T) {
 			var buf bytes.Buffer
-			require.NoError(t, writeEnvScript(&buf, tc.shell, env))
+			require.NoError(t, writeEnvScript(&buf, tc.shell, env, false))
 			for _, line := range tc.want {
 				assert.Contains(t, buf.String(), line+"\n")
 			}
@@ -68,7 +68,7 @@ func TestWriteEnvScript_Formats(t *testing.T) {
 func TestWriteEnvScript_SortedAndCaseInsensitiveShell(t *testing.T) {
 	var buf bytes.Buffer
 	env := map[string]string{"PATH": "b", "CMAKE_PREFIX_PATH": "a"}
-	require.NoError(t, writeEnvScript(&buf, "PowerShell", env))
+	require.NoError(t, writeEnvScript(&buf, "PowerShell", env, false))
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	require.Len(t, lines, 2)
@@ -79,27 +79,62 @@ func TestWriteEnvScript_SortedAndCaseInsensitiveShell(t *testing.T) {
 func TestWriteEnvScript_Nu_EmitsJSON(t *testing.T) {
 	var buf bytes.Buffer
 	env := map[string]string{"PATH": `C:\Qt\bin`, "CMAKE_PREFIX_PATH": `C:\Qt`}
-	require.NoError(t, writeEnvScript(&buf, "nu", env))
+	require.NoError(t, writeEnvScript(&buf, "nu", env, true))
 
 	var decoded map[string]string
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &decoded))
 	assert.Equal(t, env, decoded)
 }
 
+func TestWriteEnvScript_Cygpath(t *testing.T) {
+	env := map[string]string{"PATH": `C:\Qt\bin;C:\Windows`, "CMAKE_PREFIX_PATH": `C:\Qt`}
+
+	tests := []struct {
+		shell string
+		want  string
+	}{
+		{"bash", "export CMAKE_PREFIX_PATH='C:\\Qt'\n" +
+			"export PATH=\"$(cygpath -u -p 'C:\\Qt\\bin;C:\\Windows' || echo \"$PATH\")\"\n"},
+		{"zsh", "export CMAKE_PREFIX_PATH='C:\\Qt'\n" +
+			"export PATH=\"$(cygpath -u -p 'C:\\Qt\\bin;C:\\Windows' || echo \"$PATH\")\"\n"},
+		{"fish", "set -gx CMAKE_PREFIX_PATH 'C:\\\\Qt'\n" +
+			"if set -l p (cygpath -u -p 'C:\\\\Qt\\\\bin;C:\\\\Windows'); set -gx PATH (string split : -- $p); end\n"},
+		// Native Windows shells take PATH as it is.
+		{"powershell", "$env:CMAKE_PREFIX_PATH = 'C:\\Qt'\n$env:PATH = 'C:\\Qt\\bin;C:\\Windows'\n"},
+		{"cmd", "set CMAKE_PREFIX_PATH=C:\\Qt\nset PATH=C:\\Qt\\bin;C:\\Windows\n"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.shell, func(t *testing.T) {
+			var buf bytes.Buffer
+			require.NoError(t, writeEnvScript(&buf, tc.shell, env, true))
+			assert.Equal(t, tc.want, buf.String())
+		})
+	}
+}
+
 func TestWriteEnvScript_Quoting(t *testing.T) {
 	env := map[string]string{"PATH": `C:\it's here`}
 
 	var buf bytes.Buffer
-	require.NoError(t, writeEnvScript(&buf, "powershell", env))
+	require.NoError(t, writeEnvScript(&buf, "powershell", env, false))
 	assert.Contains(t, buf.String(), `$env:PATH = 'C:\it''s here'`)
 
 	buf.Reset()
-	require.NoError(t, writeEnvScript(&buf, "bash", env))
+	require.NoError(t, writeEnvScript(&buf, "bash", env, false))
 	assert.Contains(t, buf.String(), `export PATH='C:\it'\''s here'`)
+
+	buf.Reset()
+	require.NoError(t, writeEnvScript(&buf, "fish", env, false))
+	assert.Contains(t, buf.String(), `set -gx PATH 'C:\\it\'s here'`)
+
+	// A trailing backslash would escape fish's closing quote.
+	buf.Reset()
+	require.NoError(t, writeEnvScript(&buf, "fish", map[string]string{"PATH": `C:\Qt\`}, false))
+	assert.Contains(t, buf.String(), `set -gx PATH 'C:\\Qt\\'`)
 }
 
 func TestWriteEnvScript_UnsupportedShell(t *testing.T) {
-	err := writeEnvScript(&bytes.Buffer{}, "tcsh", map[string]string{"PATH": "x"})
+	err := writeEnvScript(&bytes.Buffer{}, "tcsh", map[string]string{"PATH": "x"}, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "tcsh")
 }
@@ -131,5 +166,9 @@ func TestEnvQt_EmitsExports(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, out.String(), "export CMAKE_PREFIX_PATH='"+testPrefix)
-	assert.Contains(t, out.String(), "export PATH='"+filepath.Join(testPrefix, "bin"))
+	path := "export PATH='" + filepath.Join(testPrefix, "bin")
+	if runtime.GOOS == "windows" {
+		path = "export PATH=\"$(cygpath -u -p '" + filepath.Join(testPrefix, "bin")
+	}
+	assert.Contains(t, out.String(), path)
 }
