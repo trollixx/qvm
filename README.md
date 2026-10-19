@@ -12,9 +12,6 @@ qvm install 6.8.3
 qvm exec 6.8.3 -- cmake -B build
 ```
 
-> [!WARNING]
-> This tool is mostly AI generated for my own needs. The code has not been thoroughly reviewed. Use at your own risk! The interface will most likely change too.
-
 ## Why
 
 Qt's prebuilt SDKs come from its online repository, and the usual ways to get them each have a catch:
