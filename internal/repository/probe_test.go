@@ -16,7 +16,12 @@ import (
 func okHandler(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }
 
 func TestProbeURLs_Reachable(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(okHandler))
+	// The delay keeps the latency above the clock's resolution: on Windows, a
+	// localhost request can otherwise measure as 0.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(5 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
 	defer ts.Close()
 
 	results := repository.ProbeURLs(context.Background(), []string{ts.URL + "/"}, 5, "windows_x86")
@@ -24,7 +29,7 @@ func TestProbeURLs_Reachable(t *testing.T) {
 	require.Len(t, results, 1)
 	assert.Equal(t, ts.URL+"/", results[0].URL)
 	assert.True(t, results[0].Reachable)
-	assert.Greater(t, results[0].Latency, time.Duration(0))
+	assert.Positive(t, results[0].Latency)
 }
 
 func TestProbeURLs_Unreachable(t *testing.T) {
