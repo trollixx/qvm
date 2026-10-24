@@ -11,108 +11,79 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsSafePath(t *testing.T) {
+const (
+	testVersion = "6.7.0"
+	testArch    = "win64_msvc2022_64"
+)
+
+func TestIsInstallDir(t *testing.T) {
 	// Use platform-appropriate absolute paths.
-	var root, child, outside, relative string
+	var root, relative string
 	if runtime.GOOS == "windows" {
-		root = `C:\Qt`
-		child = `C:\Qt\6.7.0\msvc2022_64`
-		outside = `D:\Other\dir`
-		relative = `Qt\6.7.0`
+		root = `D:\Somewhere\Qt`
+		relative = `Qt\6.7.0\win64_msvc2022_64`
 	} else {
-		root = "/home/user/Qt"
-		child = "/home/user/Qt/6.7.0/gcc_64"
-		outside = "/tmp/other"
-		relative = "Qt/6.7.0"
+		root = "/opt/somewhere/Qt"
+		relative = "Qt/6.7.0/win64_msvc2022_64"
 	}
 
 	tests := []struct {
-		name       string
-		installDir string
-		root       string
-		want       bool
+		name    string
+		dir     string
+		version string
+		arch    string
+		want    bool
 	}{
-		{
-			name:       "valid subdirectory",
-			installDir: child,
-			root:       root,
-			want:       true,
-		},
-		{
-			name:       "root itself is safe",
-			installDir: root,
-			root:       root,
-			want:       true,
-		},
-		{
-			name:       "empty installDir",
-			installDir: "",
-			root:       root,
-			want:       false,
-		},
-		{
-			name:       "empty root",
-			installDir: child,
-			root:       "",
-			want:       false,
-		},
-		{
-			name:       "both empty",
-			installDir: "",
-			root:       "",
-			want:       false,
-		},
-		{
-			name:       "relative path rejected",
-			installDir: relative,
-			root:       root,
-			want:       false,
-		},
-		{
-			name:       "outside root",
-			installDir: outside,
-			root:       root,
-			want:       false,
-		},
+		{"install under any root", filepath.Join(root, testVersion, testArch), testVersion, testArch, true},
+		{"trailing separator", filepath.Join(root, testVersion, testArch) + string(os.PathSeparator),
+			testVersion, testArch, true},
+		{"root itself", root, testVersion, testArch, false},
+		{"version dir", filepath.Join(root, testVersion), testVersion, testArch, false},
+		{"other arch", filepath.Join(root, testVersion, "win64_mingw"), testVersion, testArch, false},
+		{"other version", filepath.Join(root, "6.8.3", testArch), testVersion, testArch, false},
+		{"relative path", relative, testVersion, testArch, false},
+		{"empty dir", "", testVersion, testArch, false},
+		{"empty version", filepath.Join(root, testVersion, testArch), "", testArch, false},
+		{"empty arch", filepath.Join(root, testVersion, testArch), testVersion, "", false},
+		{"dot-dot arch", filepath.Join(root, testVersion, ".."), testVersion, "..", false},
+		{"arch with separator", filepath.Join(root, testVersion, "a", "b"), testVersion, "a/b", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, isSafePath(tt.installDir, tt.root))
+			assert.Equal(t, tt.want, isInstallDir(tt.dir, tt.version, tt.arch))
 		})
 	}
 }
 
-func TestIsSafePath_TraversalAttack(t *testing.T) {
-	var root, traversal string
+func TestIsInstallDir_TraversalAttack(t *testing.T) {
+	var traversal string
 	if runtime.GOOS == "windows" {
-		root = `C:\Qt`
-		traversal = `C:\Qt\..\Windows\System32`
+		traversal = `C:\Qt\6.7.0\win64_msvc2022_64\..\..\..\Windows\System32`
 	} else {
-		root = "/home/user/Qt"
-		traversal = "/home/user/Qt/../../etc/passwd"
+		traversal = "/home/user/Qt/6.7.0/win64_msvc2022_64/../../../../etc"
 	}
-	assert.False(t, isSafePath(traversal, root),
-		"path traversal outside root must be rejected")
+	assert.False(t, isInstallDir(traversal, testVersion, testArch),
+		"a path that only names the version and arch on the way must be rejected")
 }
 
 func TestCleanup(t *testing.T) {
 	// Set up a temp directory tree that mimics a real install.
 	tmpRoot := t.TempDir()
-	installDir := filepath.Join(tmpRoot, "6.7.0", "msvc2022_64")
+	installDir := InstallDir(tmpRoot, testVersion, testArch)
 	require.NoError(t, os.MkdirAll(installDir, 0o755))
 	// Put a sentinel file inside to verify removal.
 	require.NoError(t, os.WriteFile(filepath.Join(installDir, "bin.txt"), []byte("data"), 0o644))
 
 	mgr := NewRegistryManagerAt(filepath.Join(tmpRoot, "registry.json"))
 	require.NoError(t, mgr.AddQt(InstalledQt{
-		Version:     "6.7.0",
-		Arch:        "win64_msvc2022_64",
+		Version:     testVersion,
+		Arch:        testArch,
 		InstallDir:  installDir,
 		InstalledAt: time.Now().UTC(),
 	}))
 
-	require.NoError(t, Cleanup(mgr, "6.7.0", "win64_msvc2022_64", tmpRoot))
+	require.NoError(t, Cleanup(mgr, testVersion, testArch))
 
 	// Directory should be gone.
 	_, err := os.Stat(installDir)
@@ -126,19 +97,19 @@ func TestCleanup(t *testing.T) {
 
 func TestCleanup_RemovesEmptyVersionParent(t *testing.T) {
 	tmpRoot := t.TempDir()
-	versionDir := filepath.Join(tmpRoot, "6.7.0")
-	installDir := filepath.Join(versionDir, "msvc2022_64")
+	versionDir := filepath.Join(tmpRoot, testVersion)
+	installDir := filepath.Join(versionDir, testArch)
 	require.NoError(t, os.MkdirAll(installDir, 0o755))
 
-	mgr := NewRegistryManagerAt(filepath.Join(tmpRoot, "registry.json"))
+	mgr := NewRegistryManagerAt(filepath.Join(t.TempDir(), "registry.json"))
 	require.NoError(t, mgr.AddQt(InstalledQt{
-		Version:     "6.7.0",
-		Arch:        "win64_msvc2022_64",
+		Version:     testVersion,
+		Arch:        testArch,
 		InstallDir:  installDir,
 		InstalledAt: time.Now().UTC(),
 	}))
 
-	require.NoError(t, Cleanup(mgr, "6.7.0", "win64_msvc2022_64", tmpRoot))
+	require.NoError(t, Cleanup(mgr, testVersion, testArch))
 
 	// Empty parent (the "6.7.0" dir) should also be removed.
 	_, err := os.Stat(versionDir)
@@ -151,25 +122,25 @@ func TestCleanup_RemovesEmptyVersionParent(t *testing.T) {
 
 func TestCleanup_KeepsParentWhenNotEmpty(t *testing.T) {
 	tmpRoot := t.TempDir()
-	versionDir := filepath.Join(tmpRoot, "6.7.0")
-	installA := filepath.Join(versionDir, "msvc2022_64")
-	installB := filepath.Join(versionDir, "mingw")
+	versionDir := filepath.Join(tmpRoot, testVersion)
+	installA := filepath.Join(versionDir, testArch)
+	installB := filepath.Join(versionDir, "win64_mingw")
 	require.NoError(t, os.MkdirAll(installA, 0o755))
 	require.NoError(t, os.MkdirAll(installB, 0o755))
 
-	mgr := NewRegistryManagerAt(filepath.Join(tmpRoot, "registry.json"))
+	mgr := NewRegistryManagerAt(filepath.Join(t.TempDir(), "registry.json"))
 	require.NoError(t, mgr.AddQt(InstalledQt{
-		Version:    "6.7.0",
-		Arch:       "win64_msvc2022_64",
+		Version:    testVersion,
+		Arch:       testArch,
 		InstallDir: installA,
 	}))
 	require.NoError(t, mgr.AddQt(InstalledQt{
-		Version:    "6.7.0",
+		Version:    testVersion,
 		Arch:       "win64_mingw",
 		InstallDir: installB,
 	}))
 
-	require.NoError(t, Cleanup(mgr, "6.7.0", "win64_msvc2022_64", tmpRoot))
+	require.NoError(t, Cleanup(mgr, testVersion, testArch))
 
 	// Sibling arch dir still on disk → version dir must remain.
 	_, err := os.Stat(versionDir)
@@ -182,24 +153,24 @@ func TestCleanup_NotRegistered(t *testing.T) {
 	tmpRoot := t.TempDir()
 	mgr := NewRegistryManagerAt(filepath.Join(tmpRoot, "registry.json"))
 
-	err := Cleanup(mgr, "6.99.0", "win64_msvc2022_64", tmpRoot)
+	err := Cleanup(mgr, "6.99.0", testArch)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not registered")
 }
 
 func TestCleanup_RejectsUnsafePath(t *testing.T) {
 	tmpRoot := t.TempDir()
-	outsideDir := t.TempDir() // separate temp dir, outside tmpRoot
+	outsideDir := t.TempDir() // not laid out as <root>/<version>/<arch>
 
 	mgr := NewRegistryManagerAt(filepath.Join(tmpRoot, "registry.json"))
 
-	// Manually save a registry entry pointing outside the root.
+	// Manually save a registry entry pointing at an unrelated directory.
 	reg := &Registry{
 		Version: 1,
 		Qt: []InstalledQt{
 			{
-				Version:     "6.7.0",
-				Arch:        "bad_arch",
+				Version:     testVersion,
+				Arch:        testArch,
 				InstallDir:  outsideDir,
 				InstalledAt: time.Now().UTC(),
 			},
@@ -207,11 +178,11 @@ func TestCleanup_RejectsUnsafePath(t *testing.T) {
 	}
 	require.NoError(t, mgr.Save(reg))
 
-	err := Cleanup(mgr, "6.7.0", "bad_arch", tmpRoot)
+	err := Cleanup(mgr, testVersion, testArch)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "outside expected root")
+	assert.Contains(t, err.Error(), "not a qvm install directory")
 
-	// The outside directory must still exist.
+	// The unrelated directory must still exist.
 	_, statErr := os.Stat(outsideDir)
-	assert.NoError(t, statErr, "directory outside root must not be deleted")
+	assert.NoError(t, statErr, "unrelated directory must not be deleted")
 }

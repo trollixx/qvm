@@ -7,24 +7,26 @@ import (
 	"strings"
 )
 
-// isSafePath validates that installDir is a non-empty absolute path that resides
-// under expectedRoot. This prevents accidental removal of unrelated directories.
-func isSafePath(installDir, expectedRoot string) bool {
-	if installDir == "" || expectedRoot == "" {
+// isInstallDir reports whether dir is where qvm installs version and arch: an
+// absolute path ending in <version>/<arch>, as [InstallDir] makes it, under any
+// root. This keeps a bad registry entry from removing an unrelated directory,
+// while installs made with --dir, or before install.dir changed, still qualify.
+func isInstallDir(dir, version, arch string) bool {
+	if !isPathElem(version) || !isPathElem(arch) || !filepath.IsAbs(dir) {
 		return false
 	}
-	if !filepath.IsAbs(installDir) {
-		return false
-	}
-	cleanDir := filepath.Clean(installDir)
-	cleanRoot := filepath.Clean(expectedRoot)
-	return cleanDir == cleanRoot || strings.HasPrefix(cleanDir, cleanRoot+string(os.PathSeparator))
+	clean := filepath.Clean(dir)
+	return filepath.Base(clean) == arch && filepath.Base(filepath.Dir(clean)) == version
+}
+
+// isPathElem reports whether s is a single path element other than . and ..
+func isPathElem(s string) bool {
+	return s != "" && s != "." && s != ".." && !strings.ContainsAny(s, `/\`)
 }
 
 // Cleanup removes an installed Qt version directory and updates the registry.
-// expectedRoot is the Qt install root directory (e.g. C:\Qt); only paths under
-// this root will be removed.
-func Cleanup(reg *RegistryManager, version, arch, expectedRoot string) error {
+// Only directories laid out as qvm installs them are removed.
+func Cleanup(reg *RegistryManager, version, arch string) error {
 	r, err := reg.Load()
 	if err != nil {
 		return err
@@ -41,8 +43,9 @@ func Cleanup(reg *RegistryManager, version, arch, expectedRoot string) error {
 	}
 
 	for _, q := range toRemove {
-		if !isSafePath(q.InstallDir, expectedRoot) {
-			return fmt.Errorf("refusing to remove %s: path is outside expected root %s", q.InstallDir, expectedRoot)
+		if !isInstallDir(q.InstallDir, q.Version, q.Arch) {
+			return fmt.Errorf("refusing to remove %s: not a qvm install directory for Qt %s (%s)",
+				q.InstallDir, q.Version, q.Arch)
 		}
 		err = os.RemoveAll(q.InstallDir)
 		if err != nil && !os.IsNotExist(err) {
@@ -51,10 +54,7 @@ func Cleanup(reg *RegistryManager, version, arch, expectedRoot string) error {
 		// Best-effort: remove the now-empty version directory (e.g. C:\Qt\6.8.3)
 		// if no other archs of this version remain. os.Remove only succeeds when
 		// the directory is empty, so this is safe.
-		parent := filepath.Dir(q.InstallDir)
-		if isSafePath(parent, expectedRoot) && parent != filepath.Clean(expectedRoot) {
-			_ = os.Remove(parent)
-		}
+		_ = os.Remove(filepath.Dir(filepath.Clean(q.InstallDir)))
 	}
 
 	return reg.RemoveQt(version, arch)

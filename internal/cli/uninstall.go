@@ -9,7 +9,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/trollixx/qvm/internal/config"
 	"github.com/trollixx/qvm/internal/storage"
 )
 
@@ -40,11 +39,6 @@ func (a *app) runUninstall(ctx context.Context, cmd *cli.Command) error {
 			"  qvm uninstall 6.8.3")
 	}
 
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
-
 	registry, err := storage.NewRegistryManager()
 	if err != nil {
 		return fmt.Errorf("opening registry: %w", err)
@@ -52,13 +46,12 @@ func (a *app) runUninstall(ctx context.Context, cmd *cli.Command) error {
 
 	autoYes := cmd.Bool("yes")
 
-	return a.runUninstallQt(ctx, cmd, cfg, registry, arg, autoYes)
+	return a.runUninstallQt(ctx, cmd, registry, arg, autoYes)
 }
 
 func (a *app) runUninstallQt(
 	ctx context.Context,
 	cmd *cli.Command,
-	cfg *config.Config,
 	registry *storage.RegistryManager,
 	version string,
 	autoYes bool,
@@ -108,7 +101,7 @@ func (a *app) runUninstallQt(
 		}
 	}
 
-	err = storage.Cleanup(registry, version, arch, cfg.Install.Dir)
+	err = storage.Cleanup(registry, version, arch)
 	if err != nil {
 		return fmt.Errorf("uninstall failed: %w", err)
 	}
