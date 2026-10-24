@@ -32,8 +32,8 @@ func (a *app) newDoctorCommand() *cli.Command {
 	}
 }
 
-func (a *app) runDoctor(ctx context.Context, _ *cli.Command) error {
-	fmt.Fprintf(a.streams.Out, "qvm v%s   %s\n\n", Version, osDescription())
+func (a *app) runDoctor(ctx context.Context, cmd *cli.Command) error {
+	fmt.Fprintf(a.streams.Out, "qvm %s   %s\n\n", versionDisplay(cmd.Root().Version), osDescription())
 
 	// Load config once for all checks.
 	cfg, cfgErr := config.Load()

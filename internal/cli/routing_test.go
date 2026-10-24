@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -196,6 +197,22 @@ func TestListRemote_InvalidVersionFilter(t *testing.T) {
 func TestDoctor_Runs(t *testing.T) {
 	// Doctor should run without error in a clean environment (no installs).
 	assert.NoError(t, run(t, "doctor"))
+}
+
+// The header shows the version as --version does: release builds set a
+// v-prefixed tag, which must not get a second "v".
+func TestDoctor_VersionHeader(t *testing.T) {
+	for _, v := range []string{"v1.2.3", "1.2.3"} {
+		t.Run(v, func(t *testing.T) {
+			old := Version
+			Version = v
+			t.Cleanup(func() { Version = old })
+
+			streams, out, _ := NewTestIOStreams()
+			require.NoError(t, newRootCommand(streams).Run(context.Background(), []string{"qvm", "doctor"}))
+			assert.True(t, strings.HasPrefix(out.String(), "qvm v1.2.3 "), out.String())
+		})
+	}
 }
 
 // -- --target ------------------------------------------------------------------
