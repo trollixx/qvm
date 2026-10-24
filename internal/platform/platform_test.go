@@ -15,12 +15,14 @@ func TestDefaultArchForHost(t *testing.T) {
 		qtVersion string
 		want      string
 	}{
-		// Qt 6.0-6.5 gets msvc2019.
+		// Qt 6.0-6.7 gets msvc2019, the only MSVC x64 builds they have.
 		{"qt6.2_windows_x86", "windows_x86", "6.2.0", "win64_msvc2019_64"},
 		{"qt6.5_windows_x86", "windows_x86", "6.5.3", "win64_msvc2019_64"},
+		{"qt6.6_windows_x86", "windows_x86", "6.6.0", "win64_msvc2019_64"},
+		{"qt6.7_windows_x86", "windows_x86", "6.7.3", "win64_msvc2019_64"},
 
-		// Qt 6.6+ gets msvc2022.
-		{"qt6.6_windows_x86", "windows_x86", "6.6.0", "win64_msvc2022_64"},
+		// Qt 6.8+ gets msvc2022.
+		{"qt6.8.0_windows_x86", "windows_x86", "6.8.0", "win64_msvc2022_64"},
 		{"qt6.8_windows_x86", "windows_x86", "6.8.3", "win64_msvc2022_64"},
 		{"qt6.10_windows_x86", "windows_x86", "6.10.0", "win64_msvc2022_64"},
 
@@ -51,8 +53,7 @@ func TestDefaultArchForHost(t *testing.T) {
 // the host equivalent to this machine. It relies on the arm64 CI runners to
 // cover the arm64 branch.
 func TestCurrentDefaultArchMatchesHost(t *testing.T) {
-	// Qt 6.8+ so both Windows MSVC paths resolve to 2022 without probing for
-	// an installed toolchain, and arm64 builds exist.
+	// Qt 6.8+, where arm64 builds exist.
 	const version = "6.8.3"
 
 	var host string

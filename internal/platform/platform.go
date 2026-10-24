@@ -2,8 +2,9 @@ package platform
 
 import "github.com/trollixx/qvm/pkg/qtmeta"
 
-// qt66 is the Qt version threshold where MSVC 2022 became the default.
-const qt66 = "6.6.0"
+// qt68 is the first Qt version with MSVC 2022 x64 builds; older ones have only
+// MSVC 2019 builds.
+const qt68 = "6.8.0"
 
 const (
 	archWin64MSVC2019 = "win64_msvc2019_64"
@@ -41,14 +42,14 @@ func DefaultArchForHost(host, qtVersion string) string {
 	}
 }
 
-// windowsDefaultMSVC returns the default MSVC arch for the given Qt version.
-// Qt 6.6+ requires MSVC 2022; older versions use MSVC 2019.
+// windowsDefaultMSVC returns the default MSVC arch for the given Qt version:
+// MSVC 2022 for Qt 6.8+, MSVC 2019 before, which MSVC 2022 can link too.
 func windowsDefaultMSVC(qtVersion string) string {
 	v, err := qtmeta.ParseVersion(qtVersion)
 	if err != nil {
 		return archWin64MSVC2019
 	}
-	if v.GTE(qtmeta.MustParseVersion(qt66)) {
+	if v.GTE(qtmeta.MustParseVersion(qt68)) {
 		return archWin64MSVC2022
 	}
 	return archWin64MSVC2019

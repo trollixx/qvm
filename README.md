@@ -100,7 +100,7 @@ Without `--arch`, you get the ABI for this machine:
 
 | Machine | Default ABI |
 | --- | --- |
-| Windows x64 | `win64_msvc2022_64`; for Qt 6.0–6.5, `win64_msvc2019_64` unless only Visual Studio 2022 is installed |
+| Windows x64 | `win64_msvc2022_64`; before Qt 6.8, `win64_msvc2019_64`, which Visual Studio 2022 can use too |
 | Windows on ARM | `win64_msvc2022_arm64`, even from `qvm-windows-amd64.exe` |
 | macOS | `clang_64`, a universal x86_64 and arm64 build |
 

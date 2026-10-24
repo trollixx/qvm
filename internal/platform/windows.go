@@ -5,8 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/trollixx/qvm/pkg/qtmeta"
 )
 
 // Windows implements Platform for Windows.
@@ -23,21 +21,7 @@ func (w *Windows) DefaultArch(qtVersion string) string {
 	if NativeArch() == "arm64" {
 		return "win64_msvc2022_arm64"
 	}
-	v, err := qtmeta.ParseVersion(qtVersion)
-	if err != nil {
-		return archWin64MSVC2019
-	}
-	if v.GTE(qtmeta.MustParseVersion(qt66)) {
-		return archWin64MSVC2022
-	}
-	// Qt 6.0-6.5: both msvc2019 and msvc2022 exist; prefer what's installed.
-	if hasMSVC("2019") {
-		return archWin64MSVC2019
-	}
-	if hasMSVC("2022") {
-		return archWin64MSVC2022
-	}
-	return archWin64MSVC2019
+	return windowsDefaultMSVC(qtVersion)
 }
 
 func (w *Windows) CheckCompilerPresent(arch string) (bool, string) {
@@ -48,10 +32,14 @@ func (w *Windows) CheckCompilerPresent(arch string) (bool, string) {
 		}
 		return false, "MSVC 2022 not found. Install Visual Studio 2022 or Build Tools."
 	case strings.Contains(arch, "msvc2019"):
+		// MSVC 2022 links MSVC 2019 builds too.
 		if hasMSVC("2019") {
 			return true, "MSVC 2019 detected"
 		}
-		return false, "MSVC 2019 not found. Install Visual Studio 2019 or Build Tools."
+		if hasMSVC("2022") {
+			return true, "MSVC 2022 detected"
+		}
+		return false, "MSVC 2019 or later not found. Install Visual Studio 2022 or Build Tools."
 	case strings.Contains(arch, "mingw"):
 		path, err := exec.LookPath("g++")
 		if err != nil {
