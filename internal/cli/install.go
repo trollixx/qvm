@@ -73,21 +73,13 @@ func (a *app) runInstall(ctx context.Context, cmd *cli.Command) error {
 	return a.runInstallQt(ctx, cmd, arg)
 }
 
-// resolveInstallArch determines the arch to install. It honors an explicit --arch,
-// otherwise auto-detects (desktop only). For non-desktop targets without an
-// explicit --arch it returns an error pointing the user at list-remote.
-func resolveInstallArch(cmd *cli.Command, version, host, target string) (string, error) {
-	arch := cmd.String("arch")
-	if arch != "" {
-		return arch, nil
+// resolveInstallArch determines the arch to install: an explicit --arch, or
+// the default for the host.
+func resolveInstallArch(cmd *cli.Command, version, host string) string {
+	if arch := cmd.String("arch"); arch != "" {
+		return arch
 	}
-	if target != "" && target != repository.TargetDesktop {
-		return "", newHintError(
-			fmt.Sprintf("--arch is required when --target=%s", target),
-			fmt.Sprintf("Run 'qvm list-remote %s' to see available arches for this target.", version),
-		)
-	}
-	return defaultArch(version, host), nil
+	return defaultArch(version, host)
 }
 
 // defaultArch returns the default desktop arch for version: the one for host
@@ -128,6 +120,12 @@ func buildInstallOptions(cmd *cli.Command, cfg *config.Config, version, arch str
 func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string) error {
 	host := cmd.String("host")
 	target := cmd.String("target")
+	// Other targets need repository layouts and host tools qvm doesn't handle
+	// yet, so they fail here rather than with wrong or missing archives.
+	if target != "" && target != repository.TargetDesktop {
+		return newHintError(fmt.Sprintf("--target %s isn't supported yet", target),
+			"qvm installs desktop Qt only for now.")
+	}
 	if err := noWindowsARM64Build("install", version, host); err != nil {
 		return err
 	}
@@ -142,10 +140,7 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 		return fmt.Errorf("initializing dependencies: %w", err)
 	}
 
-	arch, err := resolveInstallArch(cmd, version, host, target)
-	if err != nil {
-		return err
-	}
+	arch := resolveInstallArch(cmd, version, host)
 
 	opts := buildInstallOptions(cmd, cfg, version, arch)
 	dryRun := opts.DryRun

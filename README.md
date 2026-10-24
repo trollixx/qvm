@@ -87,7 +87,6 @@ qvm prefix 6.8.3                   # or print its directory for your own scripts
 | `--no-deps` | Don't add the modules those depend on |
 | `--docs`, `--examples`, `--sources`, `--debug-symbols` | Extras, for every selected module |
 | `--arch`, `-a` | ABI, e.g. `win64_mingw`; see the defaults below |
-| `--target` | `desktop` (default), `android`, `ios`, or `wasm`; all but `desktop` need `--arch` |
 | `--host` | Another host's build, e.g. `windows_x86` |
 | `--dir` | Install root, instead of `install.dir` |
 | `--dry-run` | List the archives and their sizes without downloading them |
@@ -106,7 +105,7 @@ Without `--arch`, you get the ABI for this machine:
 
 Qt has Windows ARM64 builds from 6.8 on. For older versions, `--host windows_x86` installs the x64 build, which runs under emulation. `qvm list-remote <version>` lists the other ABIs, such as `win64_mingw` and `win64_llvm_mingw`.
 
-Desktop is the most tested target. Android, iOS, and WebAssembly builds go through the same pipeline, so any archive Qt publishes for them should install.
+qvm installs desktop Qt only. Android, iOS, and WebAssembly aren't supported yet.
 
 ## Shell setup
 

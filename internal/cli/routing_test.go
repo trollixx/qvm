@@ -221,3 +221,11 @@ func TestInstall_RejectsUnknownTarget(t *testing.T) {
 	err := run(t, "install", "6.10.2", "--target", "winrt")
 	assertErrContains(t, err, "unknown target")
 }
+
+// Other targets fail up front, without fetching anything.
+func TestInstall_NonDesktopTargetUnsupported(t *testing.T) {
+	for _, target := range []string{"android", "ios", "wasm"} {
+		err := run(t, "install", "6.8.3", "--target", target, "--arch", "x")
+		assertErrContains(t, err, "--target "+target+" isn't supported yet")
+	}
+}

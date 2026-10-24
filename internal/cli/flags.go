@@ -55,7 +55,7 @@ func newTargetFlag() *cli.StringFlag {
 	return &cli.StringFlag{
 		Name:      "target",
 		Value:     repository.TargetDesktop,
-		Usage:     "Qt target platform: " + strings.Join(repository.ValidTargets, ", "),
+		Usage:     "Qt target platform; only desktop is supported for now",
 		Validator: validateTarget,
 	}
 }
