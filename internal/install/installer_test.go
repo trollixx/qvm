@@ -1,6 +1,7 @@
 package install
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -215,6 +216,29 @@ func TestBuildRegistryEntry_RecordsDependencyModules(t *testing.T) {
 	resolved := []string{"httpserver", "qtwebsockets"}
 	entry := buildRegistryEntry(opts, nil, resolved, "C:\\Qt\\6.11.1\\win64_msvc2022_64", 0)
 	assert.Equal(t, []string{"qthttpserver", "qtwebsockets"}, entry.Modules)
+}
+
+// A delta records the whole install's size, measured again, not a sum.
+func TestBuildRegistryEntry_Size(t *testing.T) {
+	opts := Options{Version: "6.8.3", Arch: "win64_msvc2022_64"}
+	assert.Equal(t, int64(100), buildRegistryEntry(opts, nil, nil, "dir", 100).SizeBytes)
+
+	existing := &storage.InstalledQt{Version: "6.8.3", Arch: "win64_msvc2022_64", SizeBytes: 100}
+	assert.Equal(t, int64(150), buildRegistryEntry(opts, existing, nil, "dir", 150).SizeBytes)
+}
+
+func TestDirSize(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "bin"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "bin", "a.dll"), make([]byte, 1000), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "b.txt"), make([]byte, 24), 0o644))
+
+	size, err := dirSize(dir)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1024), size)
+
+	_, err = dirSize(filepath.Join(dir, "missing"))
+	assert.Error(t, err)
 }
 
 func TestInstallDirFor(t *testing.T) {

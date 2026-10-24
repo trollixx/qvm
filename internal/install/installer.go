@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -312,15 +313,17 @@ func verifyDownloads(paths []string, refs []repository.ArchiveRef, progressCh ch
 // buildRegistryEntry assembles the storage entry for a fresh install or a delta merge.
 // modules is the resolved module list (requested plus auto-added dependencies); names
 // are stored in their canonical (qt-prefixed) form so that subsequent installs can
-// correctly diff against them regardless of how the user spelled them.
+// correctly diff against them regardless of how the user spelled them. size is the
+// whole install's size on disk.
 func buildRegistryEntry(
-	opts Options, existingQt *storage.InstalledQt, modules []string, installDir string, totalSize int64,
+	opts Options, existingQt *storage.InstalledQt, modules []string, installDir string, size int64,
 ) storage.InstalledQt {
 	entry := storage.InstalledQt{
 		Version:     opts.Version,
 		Arch:        opts.Arch,
 		InstallDir:  installDir,
 		InstalledAt: time.Now(),
+		SizeBytes:   size,
 	}
 	canonicalModules := normalizeModuleNames(modules)
 	if existingQt == nil {
@@ -331,7 +334,6 @@ func buildRegistryEntry(
 			Sources:   opts.Sources,
 			DebugInfo: opts.DebugInfo,
 		}
-		entry.SizeBytes = totalSize
 		return entry
 	}
 	entry.InstalledAt = existingQt.InstalledAt
@@ -342,8 +344,27 @@ func buildRegistryEntry(
 		Sources:   existingQt.Extras.Sources || opts.Sources,
 		DebugInfo: existingQt.Extras.DebugInfo || opts.DebugInfo,
 	}
-	entry.SizeBytes = existingQt.SizeBytes + totalSize
 	return entry
+}
+
+// dirSize returns the total size of the regular files under dir.
+func dirSize(dir string) (int64, error) {
+	var size int64
+	err := filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		info, infoErr := d.Info()
+		if infoErr != nil {
+			return infoErr
+		}
+		size += info.Size()
+		return nil
+	})
+	return size, err
 }
 
 // Install performs a full Qt SDK installation.
@@ -470,14 +491,17 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		)
 	}
 
-	// Calculate installed size.
-	var totalSize int64
-	for _, a := range archives {
-		totalSize += a.Ref.Size
+	// The size on disk, of the whole install for a delta too. Non-fatal.
+	size, sizeErr := dirSize(installDir)
+	if sizeErr != nil {
+		sendProgress(
+			progressCh,
+			ProgressEvent{Phase: "warning", Warning: "measuring the install size failed: " + sizeErr.Error()},
+		)
 	}
 
 	sendProgress(progressCh, ProgressEvent{Phase: "registering"})
-	err = inst.registry.AddQt(buildRegistryEntry(opts, existingQt, modules, installDir, totalSize))
+	err = inst.registry.AddQt(buildRegistryEntry(opts, existingQt, modules, installDir, size))
 	if err != nil {
 		return fmt.Errorf("registering installation: %w", err)
 	}
