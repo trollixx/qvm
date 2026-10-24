@@ -94,7 +94,7 @@ qvm prefix 6.8.3                   # or print its directory for your own scripts
 | `--force` | Reinstall |
 | `--quiet`, `-q` | No progress output |
 
-Modules come with the modules they depend on in Qt's metadata: `qthttpserver` brings `qtwebsockets`, and `qtquick3d` brings `qtshadertools` and `qtquicktimeline`.
+Modules come with the modules they depend on: `qthttpserver` brings `qtwebsockets`, `qtquick3d` brings `qtshadertools` and `qtquicktimeline`, and `qtwebengine` brings `qtpositioning` and `qtwebchannel`.
 
 Without `--arch`, you get the ABI for this machine:
 

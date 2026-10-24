@@ -680,6 +680,11 @@ func TestFetchExtensions_Integration(t *testing.T) {
 	pdfArcs := vi.PackageArchives[pdfKey]
 	require.NotEmpty(t, pdfArcs, "expected archives for %s", pdfKey)
 	assert.Equal(t, "6.10.2-0-202503010000qtpdf-Windows-msvc.7z", pdfArcs[0].Filename)
+
+	// WebEngine's dependencies, which its extension metadata leaves out.
+	assert.Equal(t, []string{"qt.qt6.6102.addons.qtpositioning", "qt.qt6.6102.addons.qtwebchannel"},
+		vi.PackageDependencies["qt.qt6.6102.addons.qtwebengine"])
+	assert.NotContains(t, vi.PackageDependencies, "qt.qt6.6102.addons.qtpdf")
 }
 
 func TestFetchExtensions_SkipsPreQt68(t *testing.T) {

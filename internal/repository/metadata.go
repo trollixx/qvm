@@ -414,6 +414,7 @@ func (f *MetadataFetcher) fetchExtensions(ctx context.Context, vi *QtVersionInfo
 					DisplayName: extensionDisplayName(moduleName),
 				})
 			}
+			addExtensionDeps(vi, prefix, moduleName)
 		}
 	}
 
@@ -463,6 +464,35 @@ func extensionDisplayName(name string) string {
 	default:
 		return name
 	}
+}
+
+// extensionAddonDeps returns the add-on modules an extension module needs.
+// Extension metadata declares none, but Qt WebEngine's CMake package requires
+// these, and the add-on metadata before Qt 6.8 declared them.
+func extensionAddonDeps(name string) []string {
+	switch name {
+	case "qtwebengine":
+		return []string{"qtpositioning", "qtwebchannel"}
+	default:
+		return nil
+	}
+}
+
+// addExtensionDeps records extensionAddonDeps for moduleName in
+// vi.PackageDependencies, where the resolver looks for add-on dependencies.
+func addExtensionDeps(vi *QtVersionInfo, prefix, moduleName string) {
+	deps := extensionAddonDeps(moduleName)
+	if len(deps) == 0 {
+		return
+	}
+	if vi.PackageDependencies == nil {
+		vi.PackageDependencies = make(map[string][]string)
+	}
+	pkgs := make([]string, 0, len(deps))
+	for _, dep := range deps {
+		pkgs = append(pkgs, prefix+".addons."+dep)
+	}
+	vi.PackageDependencies[prefix+".addons."+moduleName] = pkgs
 }
 
 // fetchSrcDocExamples fetches the separate src/doc/examples Updates.xml and
