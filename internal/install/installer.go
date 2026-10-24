@@ -162,6 +162,12 @@ func buildResolveOptions(
 	}
 	ro.SkipEssentials = true
 	ro.Modules = diffSlices(modules, existingQt.Modules)
+	if !opts.NoDeps {
+		// Installed modules can still miss dependencies, as ones installed by an
+		// older qvm do. The resolver adds those and skips the modules themselves.
+		ro.Modules = modules
+		ro.Installed = existingQt.Modules
+	}
 	ro.AllModules = mergeSlices(existingQt.Modules, modules)
 	ro.Docs = opts.Docs && !existingQt.Extras.Docs
 	ro.Examples = opts.Examples && !existingQt.Extras.Examples
@@ -367,6 +373,9 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 		if err != nil {
 			return fmt.Errorf("resolving archives: %w", err)
 		}
+		if len(archives) == 0 {
+			return ErrUpToDate
+		}
 		reportDepModules(progressCh, resolveOpts.Modules, modules)
 		runDryRun(archives, progressCh)
 		return nil
@@ -392,6 +401,9 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 	archives, modules, err := inst.resolver.Resolve(ctx, resolveOpts)
 	if err != nil {
 		return fmt.Errorf("resolving archives: %w", err)
+	}
+	if len(archives) == 0 {
+		return ErrUpToDate
 	}
 	reportDepModules(progressCh, resolveOpts.Modules, modules)
 

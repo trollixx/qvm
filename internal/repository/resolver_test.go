@@ -404,6 +404,39 @@ func TestResolveArchives_DocsCoverDependencyModules(t *testing.T) {
 	assert.Contains(t, names, "qt.qt6.6102.doc.qtwebsockets")
 }
 
+// An installed module gets the dependencies it lacks, as one installed by an
+// older qvm can, without downloading the module again.
+func TestResolveArchives_InstalledModuleGetsMissingDeps(t *testing.T) {
+	const arch = "win64_msvc2022_64"
+	vi := testVersionInfo("qtwebengine", "qtpositioning", "qtwebchannel")
+	vi.PackageDependencies = map[string][]string{
+		"qt.qt6.6102.addons.qtwebengine": {"qt.qt6.6102.addons.qtpositioning", "qt.qt6.6102.addons.qtwebchannel"},
+	}
+	opts := ResolveOptions{
+		Version: "6.10.2", Arch: arch, Modules: []string{"qtwebengine"},
+		AllModules: []string{"qtwebengine"}, Installed: []string{"qtwebengine"}, SkipEssentials: true,
+	}
+
+	archives, modules, err := resolveArchives(vi, opts)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"qtpositioning", "qtwebchannel"}, modules)
+	var names []string
+	for _, a := range archives {
+		names = append(names, a.Name)
+	}
+	assert.Equal(t, []string{
+		"qt.qt6.6102.addons.qtpositioning." + arch, "qt.qt6.6102.addons.qtwebchannel." + arch,
+	}, names)
+
+	// With the dependencies installed too, there's nothing to do.
+	opts.AllModules = []string{"qtwebengine", "qtpositioning", "qtwebchannel"}
+	opts.Installed = opts.AllModules
+	archives, modules, err = resolveArchives(vi, opts)
+	require.NoError(t, err)
+	assert.Empty(t, archives)
+	assert.Empty(t, modules)
+}
+
 func TestResolveArchives_SkipEssentials(t *testing.T) {
 	vi := testVersionInfo("qtcharts")
 	archives, _, err := resolveArchives(vi, ResolveOptions{

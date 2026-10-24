@@ -273,6 +273,26 @@ func TestBuildResolveOptions_NoDeps(t *testing.T) {
 	assert.True(t, ro.NoDeps, "delta installs must honor NoDeps too")
 }
 
+func TestBuildResolveOptions_InstalledModules(t *testing.T) {
+	existing := &storage.InstalledQt{Modules: []string{"qtwebengine"}}
+	modules := []string{"qtwebengine"}
+
+	// Resolved, so the resolver can add dependencies the install lacks.
+	ro, upToDate := buildResolveOptions(Options{}, existing, modules)
+	assert.False(t, upToDate)
+	assert.Equal(t, modules, ro.Modules)
+	assert.Equal(t, existing.Modules, ro.Installed)
+
+	// Without dependencies, an installed module needs nothing.
+	ro, upToDate = buildResolveOptions(Options{NoDeps: true}, existing, modules)
+	assert.True(t, upToDate)
+	assert.Empty(t, ro.Modules)
+
+	// Nor does asking for no modules, which needs no metadata.
+	_, upToDate = buildResolveOptions(Options{}, existing, nil)
+	assert.True(t, upToDate)
+}
+
 func TestReportDepModules(t *testing.T) {
 	t.Run("emits info event for added dependencies", func(t *testing.T) {
 		ch := make(chan ProgressEvent, 1)

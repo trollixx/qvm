@@ -17,8 +17,9 @@ import (
 type ResolveOptions struct {
 	Version        string
 	Arch           string   // e.g. "win64_msvc2022_64"
-	Modules        []string // add-on module names to install (delta - only new ones)
+	Modules        []string // add-on module names to install
 	AllModules     []string // all module names (existing + new) for scoping docs/examples
+	Installed      []string // modules not to download again, though their missing dependencies are
 	Docs           bool
 	Examples       bool
 	Sources        bool
@@ -144,6 +145,9 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 	if !opts.NoDeps {
 		modules = expandModuleDeps(vi, prefix, opts.Arch, opts.Modules, opts.AllModules)
 	}
+	modules = slices.DeleteFunc(modules, func(mod string) bool {
+		return slices.Contains(opts.Installed, canonModule(mod))
+	})
 
 	var archives []ResolvedArchive
 
@@ -223,11 +227,20 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 		archives = filterDebugSymbolArchives(archives)
 	}
 
-	if len(archives) == 0 {
+	// A delta install can be complete already; a fresh one always needs archives.
+	if len(archives) == 0 && !opts.SkipEssentials {
 		return nil, nil, fmt.Errorf("no archives resolved for Qt %s %s", opts.Version, opts.Arch)
 	}
 
 	return archives, modules, nil
+}
+
+// canonModule returns mod with the "qt" prefix that installed module names have.
+func canonModule(mod string) string {
+	if strings.HasPrefix(mod, "qt") {
+		return mod
+	}
+	return "qt" + mod
 }
 
 // expandModuleDeps returns the requested modules plus any addon modules they
@@ -235,30 +248,23 @@ func resolveArchives(vi *QtVersionInfo, opts ResolveOptions) ([]ResolvedArchive,
 // (e.g. qthttpserver -> qtwebsockets). Modules already installed and dependency
 // packages other than arch-available addons (docs, examples, tools) are skipped.
 func expandModuleDeps(vi *QtVersionInfo, prefix, arch string, requested, installed []string) []string {
-	canon := func(mod string) string {
-		if strings.HasPrefix(mod, "qt") {
-			return mod
-		}
-		return "qt" + mod
-	}
-
 	seen := make(map[string]bool, len(requested)+len(installed))
 	out := make([]string, 0, len(requested))
 	for _, mod := range requested {
-		if c := canon(mod); !seen[c] {
+		if c := canonModule(mod); !seen[c] {
 			seen[c] = true
 			out = append(out, mod)
 		}
 	}
 	for _, mod := range installed {
-		seen[canon(mod)] = true
+		seen[canonModule(mod)] = true
 	}
 
 	queue := slices.Clone(out)
 	for len(queue) > 0 {
 		mod := queue[0]
 		queue = queue[1:]
-		for _, dep := range vi.PackageDependencies[prefix+".addons."+canon(mod)] {
+		for _, dep := range vi.PackageDependencies[prefix+".addons."+canonModule(mod)] {
 			depMod, ok := strings.CutPrefix(dep, prefix+".addons.")
 			if !ok || strings.Contains(depMod, ".") || seen[depMod] {
 				continue
