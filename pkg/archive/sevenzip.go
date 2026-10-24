@@ -63,21 +63,29 @@ func (cw *countingWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
+// targetPath returns where the archive entry name goes under destDir. Names are
+// rooted first, so .. can't climb above destDir; anything that still lands
+// outside it is an error.
+func targetPath(destDir, name string) (string, error) {
+	target := filepath.Join(destDir, filepath.Clean("/"+name))
+	cleanDest := filepath.Clean(destDir)
+	if target != cleanDest && !strings.HasPrefix(target, cleanDest+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path traversal blocked: %s", name)
+	}
+	return target, nil
+}
+
 func extractFile(f *sevenzip.File, destDir string, onBytes func(n int)) error {
-	// Sanitize path.
-	target := filepath.Join(destDir, filepath.Clean("/"+f.Name))
-	// Path traversal check: target must be within destDir.
-	cleanDest := filepath.Clean(destDir) + string(os.PathSeparator)
-	cleanTarget := filepath.Clean(target)
-	if cleanTarget != filepath.Clean(destDir) && !strings.HasPrefix(cleanTarget, cleanDest) {
-		return fmt.Errorf("path traversal blocked: %s", f.Name)
+	target, err := targetPath(destDir, f.Name)
+	if err != nil {
+		return err
 	}
 	mode := f.FileInfo().Mode()
 	if mode.IsDir() {
 		return os.MkdirAll(target, 0o755) //nolint:gosec // 0755 for Qt SDK
 	}
 
-	err := os.MkdirAll(filepath.Dir(target), 0o755) //nolint:gosec // 0755 for Qt SDK
+	err = os.MkdirAll(filepath.Dir(target), 0o755) //nolint:gosec // 0755 for Qt SDK
 	if err != nil {
 		return fmt.Errorf("creating directory for %s: %w", target, err)
 	}
