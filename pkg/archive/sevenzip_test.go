@@ -98,8 +98,9 @@ func TestTargetPath_Backslashes(t *testing.T) {
 }
 
 func TestExtractSymlink(t *testing.T) {
-	link := filepath.Join(t.TempDir(), "Current")
-	err := extractSymlink(strings.NewReader("A"), link)
+	dest := t.TempDir()
+	link := filepath.Join(dest, "Current")
+	err := extractSymlink(strings.NewReader("A"), dest, link)
 	if err != nil && runtime.GOOS == "windows" {
 		t.Skipf("can't create symlinks here: %v", err)
 	}
@@ -109,8 +110,80 @@ func TestExtractSymlink(t *testing.T) {
 	assert.Equal(t, "A", got)
 
 	// Extracting it again replaces the link.
-	require.NoError(t, extractSymlink(strings.NewReader("B"), link))
+	require.NoError(t, extractSymlink(strings.NewReader("B"), dest, link))
 	got, err = os.Readlink(link)
 	require.NoError(t, err)
 	assert.Equal(t, "B", got)
+}
+
+// An unsafe link fails without being created.
+func TestExtractSymlink_Unsafe(t *testing.T) {
+	dest := t.TempDir()
+	link := filepath.Join(dest, "lnk")
+	err := extractSymlink(strings.NewReader("../outside"), dest, link)
+	require.ErrorContains(t, err, "unsafe symlink")
+	_, err = os.Lstat(link)
+	assert.True(t, os.IsNotExist(err), "the link must not exist")
+}
+
+func TestCheckSymlink(t *testing.T) {
+	dest := t.TempDir()
+	at := func(parts ...string) string { return filepath.Join(append([]string{dest}, parts...)...) }
+	tests := []struct {
+		target, link, wantErr string
+	}{
+		// Links like Qt's.
+		{at("QtCore.framework", "Versions", "Current"), "A", ""},
+		{at("QtCore.framework", "QtCore"), "Versions/Current/QtCore", ""},
+		{at("lib", "libQt6Core.so"), "libQt6Core.so.6", ""},
+		{at("lib", "sub", "l"), "../other", ""},
+		{at("l"), ".", ""},
+		{at("a", "l"), "./b", ""},
+
+		{at("l"), "", "not a relative path"},
+		{at("l"), "/etc/passwd", "not a relative path"},
+		{at("l"), "../outside", "points outside"},
+		{at("a", "l"), "../../outside", "points outside"},
+		{at("l"), "a/..", ".. after a name"},
+		{at("l"), "a/../b", ".. after a name"},
+	}
+	if runtime.GOOS == "windows" {
+		tests = append(tests,
+			struct{ target, link, wantErr string }{at("l"), `C:\Windows`, "not a relative path"},
+			struct{ target, link, wantErr string }{at("l"), `..\..\outside`, "points outside"},
+		)
+	}
+	for _, tc := range tests {
+		t.Run(tc.link, func(t *testing.T) {
+			err := checkSymlink(dest, tc.target, tc.link)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
+// A link can't be made in a symlinked directory: the check on its target
+// would be relative to where the path seems to be, not where it really is.
+func TestCheckSymlink_InSymlinkedDir(t *testing.T) {
+	dest := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dest, "real"), 0o755))
+	if err := os.Symlink("real", filepath.Join(dest, "lnk")); err != nil {
+		t.Skipf("can't create symlinks here: %v", err)
+	}
+
+	require.NoError(t, checkSymlink(dest, filepath.Join(dest, "real", "l"), "x"))
+	err := checkSymlink(dest, filepath.Join(dest, "lnk", "l"), "x")
+	require.ErrorContains(t, err, "in symlinked directory "+filepath.Join(dest, "lnk"))
+}
+
+func TestClimbsAfterName(t *testing.T) {
+	for path, want := range map[string]bool{
+		"A": false, "../x": false, "../../x/y": false, "./x": false, "a//b": false,
+		"a/..": true, "a/../b": true, "../a/../b": true, "a/./..": true,
+	} {
+		assert.Equal(t, want, climbsAfterName(path), path)
+	}
 }

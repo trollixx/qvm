@@ -68,11 +68,16 @@ func (cw *countingWriter) Write(p []byte) (int, error) {
 // outside it is an error.
 func targetPath(destDir, name string) (string, error) {
 	target := filepath.Join(destDir, filepath.Clean("/"+name))
-	cleanDest := filepath.Clean(destDir)
-	if target != cleanDest && !strings.HasPrefix(target, cleanDest+string(os.PathSeparator)) {
+	if !isWithin(destDir, target) {
 		return "", fmt.Errorf("path traversal blocked: %s", name)
 	}
 	return target, nil
+}
+
+// isWithin reports whether the cleaned path is dir or under it.
+func isWithin(dir, path string) bool {
+	dir, path = filepath.Clean(dir), filepath.Clean(path)
+	return path == dir || strings.HasPrefix(path, dir+string(os.PathSeparator))
 }
 
 func extractFile(f *sevenzip.File, destDir string, onBytes func(n int)) error {
@@ -100,7 +105,7 @@ func extractFile(f *sevenzip.File, destDir string, onBytes func(n int)) error {
 	// as the file content. Recreate them as real symlinks rather than copying
 	// the target string into a regular file.
 	if mode&os.ModeSymlink != 0 {
-		return extractSymlink(rc, target)
+		return extractSymlink(rc, destDir, target)
 	}
 
 	// Preserve the archive's Unix permission bits so executables (qmake, etc.)
@@ -134,11 +139,16 @@ func extractFile(f *sevenzip.File, destDir string, onBytes func(n int)) error {
 	return nil
 }
 
-// extractSymlink reads a link target from rc and creates a symlink at target.
-func extractSymlink(rc io.Reader, target string) error {
+// extractSymlink reads a link target from rc and creates a symlink at target,
+// if it's safe under destDir (see checkSymlink).
+func extractSymlink(rc io.Reader, destDir, target string) error {
 	linkTarget, err := io.ReadAll(rc)
 	if err != nil {
 		return fmt.Errorf("reading symlink target for %s: %w", target, err)
+	}
+	err = checkSymlink(destDir, target, string(linkTarget))
+	if err != nil {
+		return err
 	}
 	// Replace any existing entry so re-extraction is idempotent.
 	_ = os.Remove(target)
@@ -147,4 +157,80 @@ func extractSymlink(rc io.Reader, target string) error {
 		return fmt.Errorf("creating symlink %s: %w", target, err)
 	}
 	return nil
+}
+
+// checkSymlink returns an error unless a symlink at target pointing to link
+// stays inside destDir. Qt only has relative links within an install, like
+// Versions/Current -> A in macOS frameworks; a link out of it would let later
+// entries be written outside destDir through the link.
+//
+// The check works on paths, which match where links really point only if no
+// symlink is in the way: so the link can't be in a symlinked directory, and its
+// target can't climb back up after a name, as a/.. does, in case a is a symlink.
+func checkSymlink(destDir, target, link string) error {
+	unsafe := func(why string) error {
+		return fmt.Errorf("unsafe symlink %s -> %s: %s", target, link, why)
+	}
+	l := filepath.FromSlash(link)
+	if l == "" || filepath.IsAbs(l) || filepath.VolumeName(l) != "" || strings.HasPrefix(l, string(os.PathSeparator)) {
+		return unsafe("not a relative path")
+	}
+	if climbsAfterName(l) {
+		return unsafe(".. after a name")
+	}
+	if !isWithin(destDir, filepath.Join(filepath.Dir(target), l)) {
+		return unsafe("points outside " + destDir)
+	}
+	dir, err := symlinkedParent(destDir, target)
+	if err != nil {
+		return fmt.Errorf("checking symlink %s: %w", target, err)
+	}
+	if dir != "" {
+		return unsafe("in symlinked directory " + dir)
+	}
+	return nil
+}
+
+// climbsAfterName reports whether path has a .. after a name, as a/.. has.
+func climbsAfterName(path string) bool {
+	seenName := false
+	for part := range strings.SplitSeq(filepath.ToSlash(path), "/") {
+		switch part {
+		case "", ".":
+		case "..":
+			if seenName {
+				return true
+			}
+		default:
+			seenName = true
+		}
+	}
+	return false
+}
+
+// symlinkedParent returns the first directory between destDir and path that is
+// a symlink, or "" if there's none.
+func symlinkedParent(destDir, path string) (string, error) {
+	rel, err := filepath.Rel(destDir, filepath.Dir(path))
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Clean(destDir)
+	for part := range strings.SplitSeq(rel, string(os.PathSeparator)) {
+		if part == "." {
+			continue
+		}
+		dir = filepath.Join(dir, part)
+		info, statErr := os.Lstat(dir)
+		if os.IsNotExist(statErr) {
+			return "", nil // nothing below it exists either
+		}
+		if statErr != nil {
+			return "", statErr
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return dir, nil
+		}
+	}
+	return "", nil
 }
