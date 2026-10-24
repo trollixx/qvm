@@ -117,6 +117,7 @@ func buildInstallOptions(cmd *cli.Command, cfg *config.Config, version, arch str
 		Sources:     cmd.Bool("sources"),
 		DebugInfo:   cmd.Bool("debug-symbols"),
 		InstallRoot: installRoot,
+		RootSet:     cmd.String("dir") != "",
 		Concurrency: cfg.Download.Concurrency,
 		Timeout:     cfg.Download.TimeoutSeconds,
 		Force:       cmd.Bool("force"),
@@ -168,6 +169,12 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 	installErr := installer.Install(ctx, opts, progressCh)
 	close(progressCh)
 	<-doneCh
+
+	var elsewhere *install.InstalledElsewhereError
+	if errors.As(installErr, &elsewhere) {
+		return newHintError(elsewhere.Error(), fmt.Sprintf(
+			"Run 'qvm uninstall %s --arch %s' first to install it in %s.", version, arch, elsewhere.Requested))
+	}
 
 	if dryRun {
 		// "Already up to date" is the dry-run answer, not an error.

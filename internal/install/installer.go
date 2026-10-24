@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -61,6 +62,9 @@ type Options struct {
 	Sources     bool
 	DebugInfo   bool
 	InstallRoot string // e.g. C:\Qt
+	// RootSet is true when the user chose InstallRoot (--dir). Otherwise an
+	// existing install of the same version and arch stays where it is.
+	RootSet     bool
 	Concurrency int
 	Timeout     int  // seconds
 	Force       bool // re-install even if already installed
@@ -78,11 +82,20 @@ func NewInstaller(resolver *repository.Resolver, registry *storage.RegistryManag
 	return &Installer{resolver: resolver, registry: registry}
 }
 
-// findExisting returns the registered install matching opts, or nil if not found or --force.
-func (inst *Installer) findExisting(opts Options) *storage.InstalledQt {
-	if opts.Force {
-		return nil
-	}
+// InstalledElsewhereError is returned by Install when the version and arch are
+// already installed in another directory than the one requested with --dir.
+type InstalledElsewhereError struct {
+	Version, Arch string
+	Dir           string // where it's installed
+	Requested     string // where it was asked to go
+}
+
+func (e *InstalledElsewhereError) Error() string {
+	return fmt.Sprintf("Qt %s (%s) is already installed in %s", e.Version, e.Arch, e.Dir)
+}
+
+// registered returns the registered install of opts' version and arch, or nil.
+func (inst *Installer) registered(opts Options) *storage.InstalledQt {
 	reg, err := inst.registry.Load()
 	if err != nil {
 		return nil
@@ -93,6 +106,44 @@ func (inst *Installer) findExisting(opts Options) *storage.InstalledQt {
 		}
 	}
 	return nil
+}
+
+// findExisting returns the registered install matching opts, or nil if not found or --force.
+func (inst *Installer) findExisting(opts Options) *storage.InstalledQt {
+	if opts.Force {
+		return nil
+	}
+	return inst.registered(opts)
+}
+
+// installDirFor returns where to install opts. A version and arch has one
+// install: it stays in its directory unless --dir asks for another one, which
+// is an error, even with --force, so the old files aren't left behind.
+func (inst *Installer) installDirFor(opts Options) (string, error) {
+	root, err := filepath.Abs(opts.InstallRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolving install root: %w", err)
+	}
+	dir := storage.InstallDir(root, opts.Version, opts.Arch)
+	existing := inst.registered(opts)
+	if existing == nil || samePath(existing.InstallDir, dir) {
+		return dir, nil
+	}
+	if !opts.RootSet {
+		return existing.InstallDir, nil
+	}
+	return "", &InstalledElsewhereError{
+		Version: opts.Version, Arch: opts.Arch, Dir: existing.InstallDir, Requested: dir,
+	}
+}
+
+// samePath reports whether a and b name the same path, ignoring case on Windows.
+func samePath(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }
 
 // buildResolveOptions computes resolver options for a fresh install or a delta over existingQt.
@@ -300,7 +351,10 @@ func buildRegistryEntry(
 //
 //nolint:funlen // orchestration pipeline; phases are each extracted to their own helper
 func (inst *Installer) Install(ctx context.Context, opts Options, progressCh chan<- ProgressEvent) error {
-	installDir := storage.InstallDir(opts.InstallRoot, opts.Version, opts.Arch)
+	installDir, dirErr := inst.installDirFor(opts)
+	if dirErr != nil {
+		return dirErr
+	}
 
 	// Dry-run is read-only and side-effect-free; no lock needed.
 	if opts.DryRun {

@@ -79,7 +79,7 @@ qvm prefix 6.8.3                   # or print its directory for your own scripts
 
 ## Installing Qt
 
-`qvm install <version>` installs Qt's essential modules for this machine. Running it again with more modules or extras downloads only what's missing.
+`qvm install <version>` installs Qt's essential modules for this machine. Running it again with more modules or extras downloads only what's missing. Each version and ABI has one install, so to move it to another `--dir`, uninstall it first.
 
 | Flag | |
 | --- | --- |

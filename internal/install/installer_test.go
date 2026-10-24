@@ -1,9 +1,11 @@
 package install
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trollixx/qvm/internal/storage"
 )
@@ -213,6 +215,54 @@ func TestBuildRegistryEntry_RecordsDependencyModules(t *testing.T) {
 	resolved := []string{"httpserver", "qtwebsockets"}
 	entry := buildRegistryEntry(opts, nil, resolved, "C:\\Qt\\6.11.1\\win64_msvc2022_64", 0)
 	assert.Equal(t, []string{"qthttpserver", "qtwebsockets"}, entry.Modules)
+}
+
+func TestInstallDirFor(t *testing.T) {
+	const version, arch = "6.8.3", "win64_msvc2022_64"
+	registeredRoot, otherRoot := t.TempDir(), t.TempDir()
+	registered := storage.InstallDir(registeredRoot, version, arch)
+
+	reg := storage.NewRegistryManagerAt(filepath.Join(t.TempDir(), "registry.json"))
+	require.NoError(t, reg.AddQt(storage.InstalledQt{Version: version, Arch: arch, InstallDir: registered}))
+	inst := NewInstaller(nil, reg)
+
+	t.Run("an install stays in its directory without --dir", func(t *testing.T) {
+		dir, err := inst.installDirFor(Options{Version: version, Arch: arch, InstallRoot: otherRoot})
+		require.NoError(t, err)
+		assert.Equal(t, registered, dir)
+	})
+
+	t.Run("--dir elsewhere fails, even with --force", func(t *testing.T) {
+		for _, force := range []bool{false, true} {
+			_, err := inst.installDirFor(Options{
+				Version: version, Arch: arch, InstallRoot: otherRoot, RootSet: true, Force: force,
+			})
+			var elsewhere *InstalledElsewhereError
+			require.ErrorAs(t, err, &elsewhere)
+			assert.Equal(t, registered, elsewhere.Dir)
+			assert.Equal(t, storage.InstallDir(otherRoot, version, arch), elsewhere.Requested)
+		}
+	})
+
+	t.Run("--dir naming its root is fine", func(t *testing.T) {
+		dir, err := inst.installDirFor(Options{
+			Version: version, Arch: arch, InstallRoot: registeredRoot, RootSet: true,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, registered, dir)
+	})
+
+	t.Run("another arch goes where asked", func(t *testing.T) {
+		dir, err := inst.installDirFor(Options{Version: version, Arch: "win64_mingw", InstallRoot: otherRoot})
+		require.NoError(t, err)
+		assert.Equal(t, storage.InstallDir(otherRoot, version, "win64_mingw"), dir)
+	})
+
+	t.Run("a relative root is made absolute", func(t *testing.T) {
+		dir, err := inst.installDirFor(Options{Version: version, Arch: "win64_mingw", InstallRoot: "Qt", RootSet: true})
+		require.NoError(t, err)
+		assert.True(t, filepath.IsAbs(dir), dir)
+	})
 }
 
 func TestBuildResolveOptions_NoDeps(t *testing.T) {
