@@ -225,8 +225,12 @@ func copyWithProgress(
 				return done, werr
 			}
 			done += int64(n)
-			elapsed := time.Since(start).Seconds()
-			speed := float64(done-rangeStart) / elapsed
+			// No speed yet when no time has passed, as a coarse clock can say;
+			// dividing would make it infinite.
+			var speed float64
+			if elapsed := time.Since(start).Seconds(); elapsed > 0 {
+				speed = float64(done-rangeStart) / elapsed
+			}
 			sendEvent(eventCh, DownloadEvent{
 				Filename:   filename,
 				BytesDone:  done,

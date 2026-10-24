@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -187,6 +188,7 @@ func TestCopyWithProgress(t *testing.T) {
 	assert.Equal(t, payload[10:], out.String())
 	var last DownloadEvent
 	for ev := range events {
+		assert.False(t, math.IsInf(ev.Speed, 0) || math.IsNaN(ev.Speed), "speed %v", ev.Speed)
 		last = ev
 	}
 	assert.Equal(t, int64(len(payload)), last.BytesDone)
