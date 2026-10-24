@@ -44,30 +44,49 @@ func NewResolver(fetcher *MetadataFetcher) *Resolver {
 	return &Resolver{fetcher: fetcher}
 }
 
-// checksumFetchConcurrency bounds parallel ".sha1" sidecar fetches.
-const checksumFetchConcurrency = 8
+// archiveFetchConcurrency bounds parallel per-archive requests.
+const archiveFetchConcurrency = 8
 
 // FetchChecksums populates each archive's Ref.SHA1 from its ".sha1" sidecar file,
 // fetched concurrently. Qt does not embed data-archive digests in Updates.xml, so
 // this is how integrity verification is enabled. Archives whose sidecar is missing
 // or unreadable are left with an empty SHA1 (and will be downloaded unverified).
 func (r *Resolver) FetchChecksums(ctx context.Context, archives []ResolvedArchive) {
-	sem := make(chan struct{}, checksumFetchConcurrency)
+	eachArchive(archives, func(ref *ArchiveRef) {
+		if ref.SHA1 != "" {
+			return
+		}
+		if sha, err := r.fetcher.fetchArchiveSHA1(ctx, ref.URL); err == nil {
+			ref.SHA1 = sha
+		}
+	})
+}
+
+// FetchSizes populates each archive's Ref.Size with a HEAD request, fetched
+// concurrently. Updates.xml only has a package's total size, which covers
+// all its archives. Archives the mirror reports no size for keep Size 0.
+func (r *Resolver) FetchSizes(ctx context.Context, archives []ResolvedArchive) {
+	eachArchive(archives, func(ref *ArchiveRef) {
+		if ref.Size != 0 {
+			return
+		}
+		if size, err := r.fetcher.client.ContentLength(ctx, ref.URL); err == nil {
+			ref.Size = size
+		}
+	})
+}
+
+// eachArchive calls fn for every archive's Ref, at most archiveFetchConcurrency
+// at a time, and waits for all of them.
+func eachArchive(archives []ResolvedArchive, fn func(ref *ArchiveRef)) {
+	sem := make(chan struct{}, archiveFetchConcurrency)
 	var wg sync.WaitGroup
 	for i := range archives {
-		if archives[i].Ref.SHA1 != "" {
-			continue
-		}
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			sha, err := r.fetcher.fetchArchiveSHA1(ctx, archives[i].Ref.URL)
-			if err == nil {
-				archives[i].Ref.SHA1 = sha
-			}
-		}(i)
+			fn(&archives[i].Ref)
+		})
 	}
 	wg.Wait()
 }

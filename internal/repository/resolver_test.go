@@ -70,6 +70,29 @@ func TestFetchChecksums(t *testing.T) {
 	assert.Equal(t, "keepme", archives[2].Ref.SHA1, "preset SHA1 should be left untouched")
 }
 
+func TestFetchSizes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/good.7z" {
+			w.Header().Set("Content-Length", "12345")
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	r := NewResolver(NewMetadataFetcher(NewClient(5), nil, nil))
+	archives := []ResolvedArchive{
+		{Name: "good", Ref: ArchiveRef{URL: srv.URL + "/good.7z", Filename: "good.7z"}},
+		{Name: "missing", Ref: ArchiveRef{URL: srv.URL + "/missing.7z", Filename: "missing.7z"}},
+		{Name: "preset", Ref: ArchiveRef{URL: srv.URL + "/preset.7z", Filename: "preset.7z", Size: 7}},
+	}
+	r.FetchSizes(context.Background(), archives)
+
+	assert.Equal(t, int64(12345), archives[0].Ref.Size, "size should come from HEAD")
+	assert.Zero(t, archives[1].Ref.Size, "a missing archive should keep size 0")
+	assert.Equal(t, int64(7), archives[2].Ref.Size, "a known size should be left untouched")
+}
+
 func TestResolveArchives_ExcludesBundledDebugSymbols(t *testing.T) {
 	// QtWebEngine's add-on package bundles a debug-symbols archive alongside
 	// the module archive. It must not be downloaded unless requested.

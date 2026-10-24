@@ -377,6 +377,7 @@ func (inst *Installer) Install(ctx context.Context, opts Options, progressCh cha
 			return ErrUpToDate
 		}
 		reportDepModules(progressCh, resolveOpts.Modules, modules)
+		inst.resolver.FetchSizes(ctx, archives)
 		runDryRun(archives, progressCh)
 		return nil
 	}

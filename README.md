@@ -90,7 +90,7 @@ qvm prefix 6.8.3                   # or print its directory for your own scripts
 | `--target` | `desktop` (default), `android`, `ios`, or `wasm`; all but `desktop` need `--arch` |
 | `--host` | Another host's build, e.g. `windows_x86` |
 | `--dir` | Install root, instead of `install.dir` |
-| `--dry-run` | List the archives without downloading them |
+| `--dry-run` | List the archives and their sizes without downloading them |
 | `--force` | Reinstall |
 | `--quiet`, `-q` | No progress output |
 
