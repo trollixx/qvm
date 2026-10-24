@@ -10,7 +10,6 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/trollixx/qvm/internal/config"
-	"github.com/trollixx/qvm/internal/platform"
 	"github.com/trollixx/qvm/internal/repository"
 	"github.com/trollixx/qvm/internal/storage"
 	"github.com/trollixx/qvm/pkg/qtmeta"
@@ -161,7 +160,7 @@ func (a *app) runListRemote(ctx context.Context, cmd *cli.Command) error {
 
 	// Full version (e.g. "6.8.3") -> detail view.
 	if vf.IsFullVersion() {
-		return a.runListRemoteVersion(ctx, fetcher, arg, format)
+		return a.runListRemoteVersion(ctx, fetcher, arg, host, format)
 	}
 
 	// Partial version (e.g. "6" or "6.9") -> filtered list view.
@@ -308,7 +307,7 @@ func (a *app) runListRemoteFiltered(
 func (a *app) runListRemoteVersion(
 	ctx context.Context,
 	fetcher *repository.MetadataFetcher,
-	version, format string,
+	version, host, format string,
 ) error {
 	idx, err := fetcher.FetchQtVersion(ctx, version)
 	if err != nil {
@@ -329,7 +328,7 @@ func (a *app) runListRemoteVersion(
 		)
 	}
 
-	vi.SetDefaultArch(platform.Current().DefaultArch(version))
+	vi.SetDefaultArch(defaultArch(version, host))
 
 	if format == formatJSON {
 		return a.printJSON(vi)

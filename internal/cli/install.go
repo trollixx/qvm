@@ -87,13 +87,18 @@ func resolveInstallArch(cmd *cli.Command, version, host, target string) (string,
 			fmt.Sprintf("Run 'qvm list-remote %s' to see available arches for this target.", version),
 		)
 	}
+	return defaultArch(version, host), nil
+}
+
+// defaultArch returns the default desktop arch for version: the one for host
+// when it's set and known, otherwise the one for this machine.
+func defaultArch(version, host string) string {
 	if host != "" {
-		arch = platform.DefaultArchForHost(host, version)
+		if arch := platform.DefaultArchForHost(host, version); arch != "" {
+			return arch
+		}
 	}
-	if arch == "" {
-		arch = platform.Current().DefaultArch(version)
-	}
-	return arch, nil
+	return platform.Current().DefaultArch(version)
 }
 
 // buildInstallOptions converts CLI flags into an install.Options.
