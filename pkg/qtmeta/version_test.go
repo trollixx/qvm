@@ -59,6 +59,24 @@ func TestVersionLess(t *testing.T) {
 	}
 }
 
+func TestVersionStringCompareGTE(t *testing.T) {
+	v := MustParseVersion("6.10.2")
+	assert.Equal(t, "6.10.2", v.String())
+
+	older, same, newer := MustParseVersion("6.9.3"), MustParseVersion("6.10.2"), MustParseVersion("6.10.10")
+	assert.Positive(t, v.Compare(older))
+	assert.Zero(t, v.Compare(same))
+	assert.Negative(t, v.Compare(newer))
+
+	assert.True(t, v.GTE(older))
+	assert.True(t, v.GTE(same))
+	assert.False(t, v.GTE(newer))
+}
+
+func TestMustParseVersion_Panics(t *testing.T) {
+	assert.Panics(t, func() { MustParseVersion("6.10") })
+}
+
 func TestIsLTS(t *testing.T) {
 	lts := []string{"6.8.0", "6.8.3", "6.5.0", "6.5.3", "6.2.0"}
 	notLTS := []string{"6.10.0", "6.7.3", "6.6.0", "6.4.0"}
