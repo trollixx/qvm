@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/urfave/cli/v3"
 
@@ -81,6 +82,15 @@ func (a *app) printInstalledQt(reg *storage.Registry, defaultVersion string) {
 		return
 	}
 
+	// Size the columns to their longest value; fmt pads by runes.
+	var verW, archW, dirW int
+	for _, q := range reg.Qt {
+		verW = max(verW, utf8.RuneCountInString(q.Version))
+		archW = max(archW, utf8.RuneCountInString(q.Arch))
+		dirW = max(dirW, utf8.RuneCountInString(q.InstallDir))
+	}
+	indent := strings.Repeat(" ", len("* ")+verW+1) // under the arch column
+
 	starred := false
 	for _, q := range reg.Qt {
 		size := ""
@@ -93,16 +103,17 @@ func (a *app) printInstalledQt(reg *storage.Registry, defaultVersion string) {
 			marker = "*"
 			starred = true
 		}
-		fmt.Fprintf(a.streams.Out, "%s %-8s %-30s %-40s %s\n",
-			marker, q.Version, q.Arch, q.InstallDir, size)
+		line := fmt.Sprintf("%s %-*s %-*s %-*s %s",
+			marker, verW, q.Version, archW, q.Arch, dirW, q.InstallDir, size)
+		fmt.Fprintln(a.streams.Out, strings.TrimRight(line, " "))
 
 		if len(q.Modules) > 0 {
-			fmt.Fprintf(a.streams.Out, "          modules: %s\n", strings.Join(q.Modules, ", "))
+			fmt.Fprintf(a.streams.Out, "%smodules: %s\n", indent, strings.Join(q.Modules, ", "))
 		}
 
 		extras := buildExtrasLine(q.Extras)
 		if extras != "" {
-			fmt.Fprintf(a.streams.Out, "          extras:  %s\n", extras)
+			fmt.Fprintf(a.streams.Out, "%sextras:  %s\n", indent, extras)
 		}
 	}
 

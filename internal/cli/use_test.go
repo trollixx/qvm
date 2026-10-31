@@ -53,6 +53,33 @@ func TestPrintInstalledQt_MarksDefault(t *testing.T) {
 	assert.Contains(t, out.String(), "* default version")
 }
 
+// Columns fit the longest values, and the modules and extras lines sit under
+// the arch column.
+func TestPrintInstalledQt_AlignsColumns(t *testing.T) {
+	reg := &storage.Registry{Qt: []storage.InstalledQt{
+		{
+			Version: "6.10.3", Arch: "win64_msvc2022_arm64_cross_compiled",
+			InstallDir: `C:\Users\someone\Qt\6.10.3\win64_msvc2022_arm64_cross_compiled`,
+			Modules:    []string{"qtcharts"}, SizeBytes: 1 << 30,
+		},
+		{
+			Version: "6.8.3", Arch: "win64_mingw", InstallDir: `C:\Qt\6.8.3\win64_mingw`,
+			Extras: storage.InstalledExtras{Docs: true},
+		},
+	}}
+	a, out := newTestApp()
+	a.printInstalledQt(reg, "6.8.3")
+
+	assert.Equal(t, `Installed Qt versions
+  6.10.3 win64_msvc2022_arm64_cross_compiled C:\Users\someone\Qt\6.10.3\win64_msvc2022_arm64_cross_compiled 1.0 GB
+         modules: qtcharts
+* 6.8.3  win64_mingw                         C:\Qt\6.8.3\win64_mingw
+         extras:  docs
+
+* default version (set with 'qvm use')
+`, out.String())
+}
+
 func TestPrintInstalledQt_NoDefaultNoLegend(t *testing.T) {
 	a, out := newTestApp()
 	a.printInstalledQt(testRegistry("6.10.2"), "")
