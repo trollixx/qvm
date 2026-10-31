@@ -101,6 +101,13 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
 
   vulncheck:
+    name: vulncheck (${{ matrix.goos }})
+    strategy:
+      fail-fast: false
+      matrix:
+        goos: [linux, darwin, windows]
     runs-on: ubuntu-latest
+    env:
+      GOOS: ${{ matrix.goos }}
     steps:
       - uses: golang/govulncheck-action@v1
