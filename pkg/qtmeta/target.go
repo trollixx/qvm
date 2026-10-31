@@ -23,12 +23,17 @@ var knownTargetMap = func() map[string]TargetMeta { //nolint:gochecknoglobals //
 		// Windows
 		{Name: "win64_msvc2022_64", DisplayName: "MSVC 2022, 64-bit", OS: Windows},
 		{Name: "win64_msvc2022_arm64", DisplayName: "MSVC 2022, ARM64", OS: Windows},
+		{Name: "win64_msvc2022_arm64_cross_compiled", DisplayName: "MSVC 2022, ARM64 (cross-compiled)", OS: Windows},
 		{Name: "win64_msvc2019_64", DisplayName: "MSVC 2019, 64-bit", OS: Windows},
-		{Name: "win64_mingw", DisplayName: "MinGW 13.1, 64-bit", OS: Windows},
+		{Name: "win64_msvc2019_arm64", DisplayName: "MSVC 2019, ARM64 (cross-compiled)", OS: Windows},
+		// MinGW 11.2 before Qt 6.8, 13.1 since.
+		{Name: "win64_mingw", DisplayName: "MinGW, 64-bit", OS: Windows},
+		{Name: "win64_mingw81", DisplayName: "MinGW 8.1, 64-bit", OS: Windows},
 		{Name: "win64_llvm_mingw", DisplayName: "LLVM/Clang MinGW, 64-bit", OS: Windows},
 		// Linux
 		{Name: "gcc_64", DisplayName: "GCC, 64-bit", OS: Linux},
 		{Name: "linux_gcc_64", DisplayName: "GCC, 64-bit", OS: Linux},
+		{Name: "linux_gcc_arm64", DisplayName: "GCC, ARM64", OS: Linux},
 		// macOS
 		{Name: "clang_64", DisplayName: "Clang, 64-bit (universal)", OS: MacOS},
 	}
