@@ -165,8 +165,7 @@ func (a *app) runInstallQt(ctx context.Context, cmd *cli.Command, version string
 	close(progressCh)
 	<-doneCh
 
-	var elsewhere *install.InstalledElsewhereError
-	if errors.As(installErr, &elsewhere) {
+	if elsewhere, ok := errors.AsType[*install.InstalledElsewhereError](installErr); ok {
 		return newHintError(elsewhere.Error(), fmt.Sprintf(
 			"Run 'qvm uninstall %s --arch %s' first to install it in %s.", version, arch, elsewhere.Requested))
 	}

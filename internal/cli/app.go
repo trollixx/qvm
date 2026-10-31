@@ -69,8 +69,7 @@ func newRootCommand(streams *IOStreams) *cli.Command {
 				return
 			}
 			fmt.Fprintln(a.streams.ErrOut, err.Error())
-			var he *hintError
-			if errors.As(err, &he) {
+			if he, ok := errors.AsType[*hintError](err); ok {
 				fmt.Fprintln(a.streams.ErrOut)
 				fmt.Fprintln(a.streams.ErrOut, he.hint)
 			}

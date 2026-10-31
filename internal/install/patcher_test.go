@@ -28,7 +28,7 @@ func TestPatchQtConf(t *testing.T) {
 		},
 		{
 			name:         "updates existing with Prefix line",
-			existingConf: strPtr("[Paths]\nPrefix=/old/path\nTranslations=translations\n"),
+			existingConf: new("[Paths]\nPrefix=/old/path\nTranslations=translations\n"),
 			createBinDir: true,
 			wantContains: []string{
 				"[Paths]",
@@ -40,7 +40,7 @@ func TestPatchQtConf(t *testing.T) {
 		},
 		{
 			name:         "inserts Prefix after [Paths] when missing",
-			existingConf: strPtr("[Paths]\nTranslations=translations\nPlugins=plugins\n"),
+			existingConf: new("[Paths]\nTranslations=translations\nPlugins=plugins\n"),
 			createBinDir: true,
 			wantContains: []string{
 				"[Paths]",
@@ -51,7 +51,7 @@ func TestPatchQtConf(t *testing.T) {
 		},
 		{
 			name:         "prepends [Paths] section when absent",
-			existingConf: strPtr("Translations=translations\nPlugins=plugins\n"),
+			existingConf: new("Translations=translations\nPlugins=plugins\n"),
 			createBinDir: true,
 			wantContains: []string{
 				"[Paths]",
@@ -126,10 +126,6 @@ func TestPatchQtConf_PrefixUsesForwardSlashes(t *testing.T) {
 	assert.Contains(t, content, "Prefix="+expectedPrefix)
 	// On Windows, verify no backslashes in the Prefix value.
 	assert.NotContains(t, content, "Prefix="+installDir+"\\")
-}
-
-func strPtr(s string) *string {
-	return &s
 }
 
 func TestIsPrefixLine(t *testing.T) {

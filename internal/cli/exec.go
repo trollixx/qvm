@@ -202,8 +202,7 @@ func runChild(ctx context.Context, args, env []string) (int, error) {
 	defer ignoreCtrlC(false)
 
 	if waitErr := c.Wait(); waitErr != nil {
-		var ee *exec.ExitError
-		if errors.As(waitErr, &ee) {
+		if ee, ok := errors.AsType[*exec.ExitError](waitErr); ok {
 			return childExitCode(ee), nil
 		}
 		return 0, fmt.Errorf("running %s: %w", args[0], waitErr)
