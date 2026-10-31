@@ -66,8 +66,3 @@ func guessOS(name string) TargetOS {
 		return Linux
 	}
 }
-
-// NormalizeTarget normalises target strings (e.g. trims whitespace, lowercases).
-func NormalizeTarget(s string) string {
-	return strings.TrimSpace(strings.ToLower(s))
-}
