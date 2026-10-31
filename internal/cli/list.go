@@ -337,6 +337,10 @@ func (a *app) runListRemoteVersion(
 	fmt.Fprintf(a.streams.Out, "Qt %s\n", version)
 
 	fmt.Fprintf(a.streams.Out, "\nArchitectures\n")
+	width := 0
+	for _, ar := range vi.Archs {
+		width = max(width, len(ar.Name))
+	}
 	for _, ar := range vi.Archs {
 		def := ""
 		if ar.IsDefault {
@@ -346,7 +350,7 @@ func (a *app) runListRemoteVersion(
 		if display == ar.Name {
 			display = ""
 		}
-		fmt.Fprintf(a.streams.Out, "  %-30s %s%s\n", ar.Name, display, def)
+		fmt.Fprintf(a.streams.Out, "  %-*s %s%s\n", width, ar.Name, display, def)
 	}
 
 	var addons []repository.Module
